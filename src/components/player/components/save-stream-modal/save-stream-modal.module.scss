@@ -1,0 +1,206 @@
+.modalContainer {
+    position: relative;
+    display: inline-block;
+}
+
+.trigger {
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modalOverlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(0, 0, 0, 0.7);
+    z-index: 2000;
+}
+
+.modal {
+    position: absolute;
+    background: #1a1a1a;
+    border-radius: 4px;
+    padding: 20px;
+    outline: none; /* Убираем контур фокуса */
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    width: 350px;
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    top: 25px;
+
+    .mb1 {
+        margin-bottom: 0.5rem;
+        font-weight: normal;
+        font-size: 14px;
+        color: rgba(255, 255, 255, 0.8);
+    }
+
+    .mt2 {
+        margin-top: 1rem;
+    }
+
+    > div {
+        input {
+            padding: 0.5rem 1rem;
+            font-size: 1rem;
+            width: 310px;
+            background-color: #2a2a2a;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            border-radius: 4px;
+
+            &:focus {
+                outline: none;
+                border-color: #4a90e2;
+            }
+        }
+    }
+
+    .close {
+        position: absolute;
+        right: 1rem;
+        top: 1rem;
+        font-size: 1.4rem;
+        cursor: pointer;
+        border: none;
+        background-color: transparent;
+        color: rgba(255, 255, 255, 0.6);
+
+        &:hover {
+            color: white;
+        }
+    }
+
+    // .react-datepicker-wrapper {
+    //     display: block !important;
+    // }
+
+    .saveBtn {
+        margin-top: 2rem;
+        width: 100%;
+        background-color: #4a90e2;
+        border: none;
+        color: white;
+        padding: 0.75rem;
+        border-radius: 4px;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+
+        &:hover {
+            background-color: #3a80d2;
+        }
+
+        &:focus {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.4);
+            background-color: #3a80d2;
+        }
+
+        &:active {
+            background-color: #2a70c2;
+        }
+    }
+}
+
+// .datePickerInput {
+//     padding: 0.5rem 1rem;
+//     font-size: 1rem;
+//     width: 100%;
+//     background-color: #2a2a2a;
+//     border: 1px solid rgba(255, 255, 255, 0.2);
+//     color: white;
+//     border-radius: 4px;
+
+//     &:focus {
+//         outline: none;
+//         border-color: #4a90e2;
+//     }
+// }
+
+// .datePickerPopper {
+//     z-index: 3000 !important;
+// }
+
+// .datePickerCalendar {
+//     font-family: inherit !important;
+//     background-color: #2a2a2a !important;
+//     border-color: rgba(255, 255, 255, 0.2) !important;
+//     color: white !important;
+// }
+
+/* Стили для react-datepicker, чтобы он соответствовал темной теме */
+// :global(.react-datepicker) {
+//     background-color: #2a2a2a !important;
+//     border-color: rgba(255, 255, 255, 0.2) !important;
+//     font-family: inherit !important;
+//     color: white !important;
+
+//     :global(.react-datepicker__header) {
+//         background-color: #1a1a1a !important;
+//         border-bottom-color: rgba(255, 255, 255, 0.1) !important;
+//     }
+
+//     :global(.react-datepicker__current-month),
+//     :global(.react-datepicker__day-name),
+//     :global(.react-datepicker__day),
+//     :global(.react-datepicker__time-name) {
+//         color: white !important;
+//     }
+
+//     :global(.react-datepicker__day:hover),
+//     :global(.react-datepicker__month-text:hover),
+//     :global(.react-datepicker__quarter-text:hover),
+//     :global(.react-datepicker__year-text:hover) {
+//         background-color: rgba(74, 144, 226, 0.3) !important;
+//     }
+
+//     :global(.react-datepicker__day--selected),
+//     :global(.react-datepicker__day--keyboard-selected) {
+//         background-color: #4a90e2 !important;
+//     }
+
+//     :global(.react-datepicker__time-container) {
+//         border-left-color: rgba(255, 255, 255, 0.1) !important;
+//     }
+
+//     :global(.react-datepicker__time-container .react-datepicker__time) {
+//         background-color: #2a2a2a !important;
+//     }
+
+//     :global(
+//         .react-datepicker__time-container
+//             .react-datepicker__time
+//             .react-datepicker__time-box
+//             ul.react-datepicker__time-list
+//             li.react-datepicker__time-list-item
+//     ) {
+//         color: white !important;
+
+//         &:hover {
+//             background-color: rgba(74, 144, 226, 0.3) !important;
+//         }
+//     }
+
+//     :global(
+//         .react-datepicker__time-container
+//             .react-datepicker__time
+//             .react-datepicker__time-box
+//             ul.react-datepicker__time-list
+//             li.react-datepicker__time-list-item--selected
+//     ) {
+//         background-color: #4a90e2 !important;
+//     }
+// }
+
+// :global(.modal:focus),
+// :global(.modal *:focus:not(.saveBtn)) {
+//     outline: none !important;
+// }

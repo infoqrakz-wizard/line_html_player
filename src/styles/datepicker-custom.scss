@@ -1,0 +1,111 @@
+/* Импортируем оригинальные стили DatePicker */
+@import 'react-datepicker/dist/react-datepicker.css';
+
+/* Кастомные стили для DatePicker, соответствующие дизайну проекта */
+.react-datepicker {
+    background-color: #1a1a1a;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    color: white;
+    font-family: inherit;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+.react-datepicker__header {
+    background-color: #2a2a2a;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding-top: 8px;
+}
+
+h2.react-datepicker__current-month {
+    color: white !important;
+    font-weight: 500;
+    margin-bottom: 5px; /* Уменьшаем отступ снизу */
+}
+
+.react-datepicker__day-name,
+.react-datepicker__day {
+    color: white;
+    width: 24px;
+    height: 24px;
+    line-height: 24px;
+    margin: 2px;
+}
+
+.react-datepicker__day:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+}
+
+.react-datepicker__day--selected,
+.react-datepicker__day--keyboard-selected {
+    background-color: #4caf50;
+    border-radius: 4px;
+    font-weight: normal;
+}
+
+.react-datepicker__day--outside-month {
+    color: rgba(255, 255, 255, 0.3);
+}
+
+button.react-datepicker__navigation {
+    top: 2px;
+}
+
+.react-datepicker__navigation-icon::before {
+    border-color: white;
+}
+
+.react-datepicker__time-container {
+    border-left: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.react-datepicker__time-container .react-datepicker__time {
+    background-color: #1a1a1a;
+}
+
+.react-datepicker__time-container
+    .react-datepicker__time-box
+    ul.react-datepicker__time-list
+    li.react-datepicker__time-list-item {
+    padding: 5px 10px;
+    height: auto;
+}
+
+.react-datepicker__time-container
+    .react-datepicker__time-box
+    ul.react-datepicker__time-list
+    li.react-datepicker__time-list-item:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.react-datepicker__time-container
+    .react-datepicker__time-box
+    ul.react-datepicker__time-list
+    li.react-datepicker__time-list-item--selected {
+    background-color: #4caf50;
+}
+
+/* Уменьшаем размер месяца и года */
+.react-datepicker__month-container {
+    padding-bottom: 5px; /* Уменьшаем отступ снизу */
+}
+
+/* Уменьшаем размер дней */
+.react-datepicker__month {
+    margin: 0.4em;
+}
+
+/* Уменьшаем отступы в заголовке */
+.react-datepicker__header {
+    padding-top: 5px;
+}
+
+/* Уменьшаем размер выпадающего списка времени */
+.react-datepicker__time-container .react-datepicker__time {
+    max-height: 150px;
+}
+
+.react-datepicker-popper {
+    z-index: 9999;
+}

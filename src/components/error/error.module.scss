@@ -1,0 +1,28 @@
+.error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    width: 100%;
+    padding: 2rem;
+    text-align: center;
+    background-color: #fff;
+
+    .icon {
+        color: #e74c3c;
+        font-size: 3rem;
+        margin-bottom: 1rem;
+
+        &::before {
+            content: '⚠️';
+        }
+    }
+
+    .message {
+        color: #e74c3c;
+        font-size: 1.1rem;
+        max-width: 600px;
+        margin: 0 auto;
+    }
+}

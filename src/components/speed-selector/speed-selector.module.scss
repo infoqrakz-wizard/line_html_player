@@ -1,0 +1,123 @@
+.container {
+    position: relative;
+    display: inline-block;
+}
+
+.trigger {
+    padding: 5px 10px;
+    background: transparent;
+    border: none;
+    color: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    font-size: 12px;
+
+    &:hover {
+        opacity: 0.8;
+    }
+
+    &.disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+}
+
+
+.dropdown {
+    background: rgba(0, 0, 0, 0.9);
+    padding: 10px 20px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    overflow: hidden;
+    color: #969797;
+    min-width: 200px;
+}
+
+.header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    // border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+
+
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 14px;
+    letter-spacing: -2%;
+
+}
+
+.backButton {
+    background: transparent;
+    border: none;
+    color: #969797;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    // padding: 4px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    width: 5px;
+    height: 9px;
+
+    &:hover {
+        background: rgba(255, 255, 255, 0.1);
+    }
+}
+
+.title {
+    font-size: 14px;
+    font-weight: 500;
+    // flex: 1;
+}
+
+.divider {
+    height: 1px;
+    background: rgba(255, 255, 255, 0.1);
+    margin: 0;
+    margin: 14px 0;
+}
+
+.options {
+    display: flex;
+    flex-direction: column;
+}
+
+.option {
+    width: 100%;
+    padding: 8px 0;
+    background: transparent;
+    border: none;
+    color: #969797;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    flex-direction: row;
+    justify-content: end;
+    gap: 10px;
+    transition: all 0.2s ease;
+
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 14px;
+    letter-spacing: -2%;
+
+    &:first-child {
+        padding-top: 0;
+    }
+
+    &:last-child {
+        padding-bottom: 0;
+    }
+}
+
+.optionLabel {
+    font-size: 14px;
+    // flex: 1;
+} 

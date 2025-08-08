@@ -1,0 +1,303 @@
+<!doctype html>
+<html>
+    <head>
+        <meta charset="UTF-8" />
+        <title>DevLine Player Demo</title>
+        <style>
+            body {
+                margin: 0;
+                padding: 20px;
+                font-family:
+                    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans',
+                    'Helvetica Neue', sans-serif;
+                height: 100vh;
+                /* overflow: hidden; */
+            }
+            .container {
+                max-width: 100%;
+                height: calc(100vh - 40px);
+                display: flex;
+                flex-direction: column;
+            }
+            .header {
+                margin-bottom: 15px;
+            }
+            .content {
+                display: flex;
+                flex: 1;
+                gap: 20px;
+                height: calc(100% - 60px);
+            }
+            .player-section {
+                flex: 1;
+                min-width: 0;
+            }
+            .player-container {
+                width: 100%;
+                height: 100%;
+                background: #000;
+                border-radius: 8px;
+                overflow: hidden;
+            }
+            .controls-section {
+                width: 350px;
+                overflow-y: auto;
+                padding-right: 10px;
+            }
+            .controls {
+                background: #f5f5f5;
+                border-radius: 8px;
+                padding: 15px;
+                height: 100%;
+            }
+            .control-group {
+                margin-bottom: 12px;
+            }
+            .control-group label {
+                display: block;
+                margin-bottom: 4px;
+                font-weight: 500;
+                font-size: 14px;
+            }
+            .control-group input,
+            .control-group select {
+                padding: 6px;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+                width: 100%;
+                font-family: monospace;
+                font-size: 14px;
+                box-sizing: border-box;
+            }
+            .control-group .checkbox-label {
+                display: inline-flex;
+                align-items: center;
+                cursor: pointer;
+                margin-right: 15px;
+                font-size: 14px;
+            }
+            .control-group .checkbox-label input {
+                width: auto;
+                margin-right: 5px;
+            }
+            .actions {
+                display: flex;
+                gap: 8px;
+                margin-top: 15px;
+            }
+            .button {
+                padding: 8px 16px;
+                border: none;
+                border-radius: 4px;
+                background: #007bff;
+                color: white;
+                cursor: pointer;
+                flex: 1;
+                font-size: 14px;
+            }
+            .button:hover {
+                background: #0056b3;
+            }
+        </style>
+        <!-- Загрузчик DevLine Player -->
+        <script src="./devline-player-loader.js"></script>
+    </head>
+
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>DevLine Player Demo</h1>
+            </div>
+            <div class="content">
+                <div class="player-section">
+                    <div
+                        id="player"
+                        class="player-container"
+                    ></div>
+                </div>
+                <div class="controls-section">
+                    <div class="controls">
+                        <div class="control-group">
+                            <label for="streamUrl">Stream URL:</label>
+                            <input
+                                type="text"
+                                id="streamUrl"
+                                value="lc56.loc.devline.tv"
+                            />
+                        </div>
+
+                        <div class="control-group">
+                            <label for="streamPort">Stream Port:</label>
+                            <input
+                                type="number"
+                                id="streamPort"
+                                value="2376"
+                            />
+                        </div>
+
+                        <div class="control-group">
+                            <label for="stream">Stream ID:</label>
+                            <input
+                                type="text"
+                                id="stream"
+                                value="0"
+                            />
+                        </div>
+
+                        <div class="control-group">
+                            <label for="login">Login:</label>
+                            <input
+                                type="text"
+                                id="login"
+                                value="yandex"
+                            />
+                        </div>
+
+                        <div class="control-group">
+                            <label for="password">Password:</label>
+                            <input
+                                type="password"
+                                id="password"
+                                value="NLAWyYrH08nVTVthqsKk"
+                            />
+                        </div>
+
+                        <div class="control-group">
+                            <label for="rpcUrl">RPC URL:</label>
+                            <input
+                                type="text"
+                                id="rpcUrl"
+                                value="lc56.loc.devline.tv"
+                            />
+                        </div>
+
+                        <div class="control-group">
+                            <label for="rpcPort">RPC port:</label>
+                            <input
+                                type="number"
+                                id="rpcPort"
+                                value="2376"
+                            />
+                        </div>
+
+                        <div class="control-group">
+                            <label for="mode">Mode:</label>
+                            <select id="mode">
+                                <option
+                                    value="live"
+                                    selected
+                                >
+                                    Live
+                                </option>
+                                <option value="record">Record</option>
+                                <option value="poster">Poster</option>
+                            </select>
+                        </div>
+
+                        <div class="control-group">
+                            <label class="checkbox-label">
+                                <input
+                                    type="checkbox"
+                                    id="autoplay"
+                                    checked
+                                />
+                                Autoplay
+                            </label>
+                            <label class="checkbox-label">
+                                <input
+                                    type="checkbox"
+                                    id="muted"
+                                />
+                                Muted
+                            </label>
+                        </div>
+
+                        <div class="actions">
+                            <button
+                                class="button"
+                                onclick="initPlayer()"
+                            >
+                                Apply
+                            </button>
+                            <button
+                                class="button"
+                                onclick="destroyPlayer()"
+                                style="background-color: #dc3545"
+                            >
+                                Destroy
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            let player = null;
+
+            function getStreamId() {
+                return document.getElementById('stream').value;
+            }
+
+            function initPlayer() {
+                // Destroy existing player if any
+                destroyPlayer();
+
+                // Wait for the DevLine Player to load
+                window.__DEVLINE_PLAYER_LOADER__.onLoad(function () {
+                    // Get values from form
+                    const streamUrl = document.getElementById('streamUrl').value;
+                    const streamPort = parseInt(document.getElementById('streamPort').value, 10);
+                    const login = document.getElementById('login').value;
+                    const password = document.getElementById('password').value;
+                    const rpcUrl = document.getElementById('rpcUrl').value;
+                    const rpcPort = parseInt(document.getElementById('rpcPort').value, 10);
+                    const mode = document.getElementById('mode').value;
+                    const autoplay = document.getElementById('autoplay').checked;
+                    const muted = document.getElementById('muted').checked;
+                    const camera = parseInt(getStreamId(), 10);
+
+                    // Create new player instance
+                    player = new DevLinePlayer(document.getElementById('player'), {
+                        streamUrl,
+                        streamPort,
+                        login,
+                        password,
+                        rpcUrl,
+                        rpcPort,
+                        mode,
+                        autoplay,
+                        muted,
+                        camera
+                    });
+
+                    console.log('Player initialized with options:', {
+                        streamUrl,
+                        streamPort,
+                        login,
+                        password: password ? '******' : '',
+                        rpcUrl,
+                        rpcPort,
+                        mode,
+                        autoplay,
+                        muted,
+                        camera
+                    });
+                });
+            }
+
+            function destroyPlayer() {
+                if (player) {
+                    player.destroy();
+                    player = null;
+                    console.log('Player destroyed');
+                }
+            }
+
+            // Initialize player on page load
+            document.addEventListener('DOMContentLoaded', function () {
+                initPlayer();
+            });
+        </script>
+    </body>
+</html>
