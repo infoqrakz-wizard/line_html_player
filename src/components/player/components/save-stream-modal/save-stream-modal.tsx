@@ -8,7 +8,6 @@ registerLocale('ru', ru);
 
 import styles from './save-stream-modal.module.scss';
 import {addMinutesToDate} from '@/utils/dates';
-import {Icons} from '../../../icons';
 
 interface SaveStreamProps {
     isOpen: boolean;
@@ -95,7 +94,7 @@ export const SaveStreamModal: React.FC<SaveStreamProps> = ({isOpen, onClose, onF
                         locale={ru}
                         showTimeSelect
                         timeIntervals={10}
-                        dateFormat="dd.MM.yyyy HH:mm"
+                        dateFormat="dd.MM.yyyy HH:mm:ss"
                         showTimeCaption={false}
                         onChange={date => onChangeStart(date)}
                         popperClassName={styles.datePickerPopper}
@@ -116,7 +115,7 @@ export const SaveStreamModal: React.FC<SaveStreamProps> = ({isOpen, onClose, onF
                         locale={ru}
                         showTimeSelect
                         timeIntervals={10}
-                        dateFormat="dd.MM.yyyy HH:mm"
+                        dateFormat="dd.MM.yyyy HH:mm:ss"
                         showTimeCaption={false}
                         onChange={date => onChangeEnd(date)}
                         popperClassName={styles.datePickerPopper}
