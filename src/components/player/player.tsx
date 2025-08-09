@@ -114,6 +114,9 @@ export const Player: React.FC<PlayerProps> = ({
             // setCurrentMode(Mode.Record);
             // setServerTime(clickedTime, true);
         }
+
+        // При клике по таймлайну всегда запускаем воспроизведение
+        setIsPlaying(true);
     };
 
     // Обработчики событий
