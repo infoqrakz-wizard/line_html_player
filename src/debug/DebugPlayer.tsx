@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { Player } from '../components/player';
-import { TimeProvider } from '../context/time-context';
-import { Mode } from '../utils/types';
+import React, {useState} from 'react';
+import {Player} from '../components/player';
+import {TimeProvider} from '../context/time-context';
+import {Mode} from '../utils/types';
 
 import './DebugPlayer.scss';
 
@@ -16,8 +16,6 @@ const DebugPlayer: React.FC = () => {
         streamPort: 2376,
         login: 'yandex',
         password: 'NLAWyYrH08nVTVthqsKk',
-        rpcUrl: 'lc56.loc.devline.tv',
-        rpcPort: 2376,
         mode: Mode.Live,
         muted: true,
         camera: 0
@@ -25,7 +23,7 @@ const DebugPlayer: React.FC = () => {
 
     // Обработчик изменения параметров
     const handleParamChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-        const { name, value, type } = e.target as HTMLInputElement;
+        const {name, value, type} = e.target as HTMLInputElement;
 
         setParams(prev => ({
             ...prev,
@@ -33,8 +31,8 @@ const DebugPlayer: React.FC = () => {
                 type === 'checkbox'
                     ? (e.target as HTMLInputElement).checked
                     : type === 'number'
-                        ? parseInt(value, 10)
-                        : value
+                      ? parseInt(value, 10)
+                      : value
         }));
     };
 
@@ -107,18 +105,6 @@ const DebugPlayer: React.FC = () => {
                                 onChange={handleParamChange}
                             />
                         </div>
-
-                        <div className="form-group">
-                            <label htmlFor="rpcUrl">RPC URL:</label>
-                            <input
-                                type="text"
-                                id="rpcUrl"
-                                name="rpcUrl"
-                                value={params.rpcUrl}
-                                onChange={handleParamChange}
-                            />
-                        </div>
-
                         <div className="form-group">
                             <label htmlFor="mode">Mode:</label>
                             <select

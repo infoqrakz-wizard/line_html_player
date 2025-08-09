@@ -21,8 +21,6 @@ export interface PlayerProps {
     streamPort: number;
     login: string;
     password?: string; // Делаем пароль опциональным
-    rpcUrl: string;
-    rpcPort: number;
     mode?: Mode;
     muted?: boolean; // Делаем звук опциональным
     camera: number;
@@ -33,8 +31,6 @@ export const Player: React.FC<PlayerProps> = ({
     streamPort = 80,
     login = '',
     password = '',
-    rpcUrl = '',
-    rpcPort = 80,
     mode = Mode.Live,
     muted = false,
     camera = 0
@@ -68,7 +64,7 @@ export const Player: React.FC<PlayerProps> = ({
     const authorization = `${login}:${password}`;
     const videoUrl = getStreamUrl(streamType);
 
-    const {updateServerTime} = useTimelineState(undefined, rpcUrl, rpcPort, authorization);
+    const {updateServerTime} = useTimelineState(undefined, streamUrl, streamPort, authorization);
 
     // Формирование URL для потока в зависимости от режима и серверного времени
     const finalStreamUrl =
@@ -308,7 +304,7 @@ export const Player: React.FC<PlayerProps> = ({
 
         const date = start.toISOString().split('.')[0];
 
-        const url = `${protocol}://${rpcUrl}:${rpcPort}/cameras/${camera}/streaming/main.mp4?authorization=Basic%20${btoa(`${login}:${password}`)}&time=${date}&duration=${formatDuration(durationSeconds)}&download=1&filename=${fileName}`;
+        const url = `${protocol}://${streamUrl}:${streamPort}/cameras/${camera}/streaming/main.mp4?authorization=Basic%20${btoa(`${login}:${password}`)}&time=${date}&duration=${formatDuration(durationSeconds)}&download=1&filename=${fileName}`;
         const downloadUrl = formatUrlForDownload({
             url,
             start,
@@ -396,8 +392,8 @@ export const Player: React.FC<PlayerProps> = ({
                         isMuted={isMuted}
                         isFullscreen={isFullscreen}
                         playbackSpeed={playbackSpeed}
-                        url={rpcUrl}
-                        port={rpcPort}
+                        url={streamUrl}
+                        port={streamPort}
                         credentials={authorization}
                         progress={ctxProgress}
                         camera={camera}
