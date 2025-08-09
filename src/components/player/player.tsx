@@ -54,6 +54,7 @@ export const Player: React.FC<PlayerProps> = ({
     const playerRef = useRef<PlayerRef | null>(null);
     const archiveTargetTimeRef = useRef<Date | null>(null);
     const forwardAccumOffsetRef = useRef<number | null>(null);
+    const wasPlayingBeforeHiddenRef = useRef<boolean>(false);
 
     const protocol = getProtocol();
     const getStreamUrl = (type: string) =>
@@ -288,6 +289,38 @@ export const Player: React.FC<PlayerProps> = ({
         document.addEventListener('fullscreenchange', handleFsChange);
         return () => document.removeEventListener('fullscreenchange', handleFsChange);
     }, []);
+
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            const isVisible = document.visibilityState === 'visible';
+            if (!isVisible) {
+                // Сохраняем текущее состояние воспроизведения и ставим на паузу
+                wasPlayingBeforeHiddenRef.current = isPlaying;
+                if (isPlaying) {
+                    setIsPlaying(false);
+                }
+                return;
+            }
+
+            // Вкладка снова видима
+            const resume = async () => {
+                if (currentMode === Mode.Live) {
+                    // Актуализируем серверное время для прямой трансляции
+                    await updateServerTime();
+                    setProgress(0);
+                }
+
+                if (wasPlayingBeforeHiddenRef.current) {
+                    setIsPlaying(true);
+                }
+            };
+
+            void resume();
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }, [isPlaying, currentMode, updateServerTime, setProgress]);
 
     const handleSaveStreamFinish = (start: Date, end: Date) => {
         const fileName = `record_${formatDate(start, 'yyyy-MM-dd_HH-mm')}_${formatDate(end, 'yyyy-MM-dd_HH-mm')}`;
