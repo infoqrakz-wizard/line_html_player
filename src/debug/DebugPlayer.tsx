@@ -51,7 +51,7 @@ const DebugPlayer: React.FC = () => {
 
             <div className="debug-layout">
                 <div className="debug-panel">
-                    <h2>Параметры</h2>
+                    <h2 className="title">Параметры</h2>
                     <form onSubmit={handleSubmit}>
                         <div className="form-group">
                             <label htmlFor="streamUrl">Stream URL:</label>
@@ -155,7 +155,7 @@ const DebugPlayer: React.FC = () => {
                 </div>
 
                 <div className="player-container">
-                    <h2>Плеер</h2>
+                    <h2 className="title">Плеер</h2>
                     <div className="player-wrapper">
                         <TimeProvider>
                             <Player {...params} />
