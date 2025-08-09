@@ -78,13 +78,18 @@ export const HlsPlayer = forwardRef<PlayerRef, HlsPlayerProps>((props, ref) => {
     };
 
     const handlePlayPause = () => {
-        if (videoRef.current) {
-            if (!playingRef.current) {
-                videoRef.current.pause();
-            } else {
-                videoRef.current.play();
-            }
+        const video = videoRef.current;
+        if (!video) return;
+        if (!playingRef.current) {
+            video.pause();
+            return;
         }
+
+        if (isLoading) return;
+
+        video.play().catch(error => {
+            console.error('Ошибка при попытке воспроизведения:', error);
+        });
     };
 
     const handleMuteToggle = () => {
@@ -445,13 +450,15 @@ export const HlsPlayer = forwardRef<PlayerRef, HlsPlayerProps>((props, ref) => {
             <video
                 data-type="hls"
                 ref={videoRef}
+                onClick={() => onPlayPause?.(false)}
                 controls={false}
                 controlsList="nodownload nofullscreen noremoteplayback"
                 onTimeUpdate={handleTimeUpdate}
                 playsInline
                 muted={mutedRef.current}
                 // poster={posterUrl}
-                autoPlay={true}
+                autoPlay={false}
+                aria-label="HLS video player"
             />
         </VideoContainer>
     );
