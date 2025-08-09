@@ -60,6 +60,7 @@ export const Player: React.FC<PlayerProps> = ({
     const playerRef = useRef<PlayerRef | null>(null);
     const archiveTargetTimeRef = useRef<Date | null>(null);
     const forwardAccumOffsetRef = useRef<number | null>(null);
+    const isSwitchingToLiveRef = useRef<boolean>(false);
 
     const resolvedProtocol = protocolProp ?? getProtocol();
     const streamHost = `${resolvedProtocol}://${streamUrl}`;
@@ -290,6 +291,37 @@ export const Player: React.FC<PlayerProps> = ({
     useEffect(() => {
         forwardAccumOffsetRef.current = null;
     }, [ctxProgress]);
+
+    // Автоматическое переключение на LIVE, когда архив "догоняет" текущее время
+    useEffect(() => {
+        if (currentMode !== Mode.Record) return;
+        if (!isPlaying) return;
+        if (!serverTime) return;
+        if ((playbackSpeed || 1) <= 1) return;
+        if (isSwitchingToLiveRef.current) return;
+
+        const absolutePlaybackTime = addSecondsToDate(serverTime, ctxProgress);
+        const approxNow = new Date();
+
+        // Переключаемся на live чуть заранее (за ~2 секунды до "сейчас"),
+        // чтобы избежать остановки на границе архива
+        const msUntilNow = approxNow.getTime() - absolutePlaybackTime.getTime();
+        const thresholdMs = 2000; // 2s margin
+
+        if (msUntilNow <= thresholdMs) {
+            (async () => {
+                try {
+                    isSwitchingToLiveRef.current = true;
+                    const nowServer = (await updateServerTime()) ?? new Date();
+                    setCurrentMode(Mode.Live);
+                    setServerTime(nowServer, false);
+                    setProgress(0);
+                } finally {
+                    isSwitchingToLiveRef.current = false;
+                }
+            })();
+        }
+    }, [currentMode, isPlaying, playbackSpeed, serverTime, ctxProgress, updateServerTime, setServerTime, setProgress]);
 
     useEffect(() => {
         const handleFsChange = () => setIsFullscreen(Boolean(document.fullscreenElement));

@@ -36,6 +36,12 @@ export const HlsPlayer = forwardRef<PlayerRef, HlsPlayerProps>((props, ref) => {
     const playingRef = useRef(playing);
     const mutedRef = useRef(muted);
 
+    useEffect(() => {
+        videoRef.current?.addEventListener('pause', () => {
+            console.log('Video paused');
+        });
+    }, [])
+
     useImperativeHandle(ref, () => ({
         seekBy: (seconds: number) => {
             const video = videoRef.current;
