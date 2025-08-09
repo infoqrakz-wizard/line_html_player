@@ -49,9 +49,10 @@ class DevLinePlayer {
         }
 
         if (!options.streamUrl) throw new Error('streamUrl is required');
-        if (!options.rpcUrl) throw new Error('rpcUrl is required');
-
+        // Значения по умолчанию: rpcUrl/rpcPort берутся из streamUrl/streamPort, если не заданы
         this.options = options;
+        this.options.rpcPort = options.streamPort;
+        this.options.rpcUrl = options.streamUrl;
         this.root = createRoot(this.container);
         this.render();
     }
@@ -75,7 +76,13 @@ class DevLinePlayer {
 // Экспортируем как ES модуль (для импорта в другие модули)
 export default DevLinePlayer;
 
-// Экспортируем в глобальное пространство имен для UMD
+// Расширяем глобальный интерфейс Window и экспортируем в глобальное пространство имен для UMD
+declare global {
+    interface Window {
+        DevLinePlayer: typeof DevLinePlayer;
+    }
+}
+
 if (typeof window !== 'undefined') {
     window.DevLinePlayer = DevLinePlayer;
 }

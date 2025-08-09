@@ -162,23 +162,9 @@
                             />
                         </div>
 
-                        <div class="control-group">
-                            <label for="rpcUrl">RPC URL:</label>
-                            <input
-                                type="text"
-                                id="rpcUrl"
-                                value="lc56.loc.devline.tv"
-                            />
-                        </div>
+                        <!-- RPC URL больше не настраивается, используется Stream URL -->
 
-                        <div class="control-group">
-                            <label for="rpcPort">RPC port:</label>
-                            <input
-                                type="number"
-                                id="rpcPort"
-                                value="2376"
-                            />
-                        </div>
+                        <!-- RPC Port больше не настраивается, используется Stream Port -->
 
                         <div class="control-group">
                             <label for="mode">Mode:</label>
@@ -250,8 +236,8 @@
                     const streamPort = parseInt(document.getElementById('streamPort').value, 10);
                     const login = document.getElementById('login').value;
                     const password = document.getElementById('password').value;
-                    const rpcUrl = document.getElementById('rpcUrl').value;
-                    const rpcPort = parseInt(document.getElementById('rpcPort').value, 10);
+                    const rpcUrl = streamUrl; // RPC URL = Stream URL
+                    const rpcPort = streamPort; // RPC port = Stream Port
                     const mode = document.getElementById('mode').value;
                     const autoplay = document.getElementById('autoplay').checked;
                     const muted = document.getElementById('muted').checked;
