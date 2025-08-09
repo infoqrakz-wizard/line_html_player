@@ -7,7 +7,7 @@ interface ModeIndicatorProps {
 }
 
 export const ModeIndicator: React.FC<ModeIndicatorProps> = ({ mode, isPlaying }) => {
-    const label = mode === 'live' ? 'LIVE' : 'REC';
+    const label = mode === 'live' ? 'LIVE' : 'PLAYBACK';
     const statusClassName = `${styles.statusDot} ${
         isPlaying ? (mode === 'live' ? styles.blinkGreen : styles.blinkRed) : styles.paused
     }`;
