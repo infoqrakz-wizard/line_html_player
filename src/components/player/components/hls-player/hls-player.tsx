@@ -1,18 +1,17 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import Hls from 'hls.js';
 
-import { PlayOverlay } from '../play-overlay';
-import { Loader } from '../loader';
-import { VideoContainer } from '../video-container';
-
-import styles from './hls-player.module.scss';
+import {PlayOverlay} from '../play-overlay';
+import {Loader} from '../loader';
+import {VideoContainer} from '../video-container';
 
 export interface HlsPlayerProps {
     url: string;
     playing?: boolean;
-    posterUrl?: string;
+    playbackSpeed?: number;
+    // posterUrl?: string;
     muted?: boolean;
-    onProgress?: (progress: { currentTime: number; duration: number }) => void;
+    onProgress?: (progress: {currentTime: number; duration: number}) => void;
     onPlayPause?: (playing: boolean) => void;
 }
 
@@ -21,16 +20,16 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
     playing = false,
     onProgress,
     onPlayPause,
-    posterUrl,
+    playbackSpeed,
+    // posterUrl,
     muted = true
 }) => {
     const videoRef = useRef<HTMLVideoElement>(null);
     const hlsRef = useRef<Hls | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
-    const [playbackSpeed, setPlaybackSpeed] = useState(1);
+    // const [playbackSpeed, setPlaybackSpeed] = useState(1);
     const [isBuffering, setIsBuffering] = useState(false);
-    const [isFragLoading, setIsFragLoading] = useState(false);
     const bufferingTimeout = useRef<NodeJS.Timeout | null>(null);
     const fragLoadingTimeout = useRef<NodeJS.Timeout | null>(null);
     const lastPlayheadPosition = useRef<number>(0);
@@ -53,6 +52,12 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
         mutedRef.current = muted;
         handleMuteToggle();
     }, [muted, mutedRef]);
+
+    useEffect(() => {
+        if (videoRef.current) {
+            videoRef.current.playbackRate = playbackSpeed || 1;
+        }
+    }, [playbackSpeed]);
 
     const handleTimeUpdate = () => {
         if (videoRef.current && onProgress) {
@@ -79,13 +84,6 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
         }
     };
 
-    const handleSpeedChange = (speed: number) => {
-        if (videoRef.current) {
-            videoRef.current.playbackRate = speed;
-            setPlaybackSpeed(speed);
-        }
-    };
-
     useEffect(() => {
         const video = videoRef.current;
         if (!video) return;
@@ -104,24 +102,24 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
                     default: {
                         maxLoadTimeMs: 20000,
                         maxTimeToFirstByteMs: 8000,
-                        timeoutRetry: { maxNumRetry: 5, retryDelayMs: 500, maxRetryDelayMs: 2000 },
-                        errorRetry: { maxNumRetry: 5, retryDelayMs: 500, maxRetryDelayMs: 2000 }
+                        timeoutRetry: {maxNumRetry: 5, retryDelayMs: 500, maxRetryDelayMs: 2000},
+                        errorRetry: {maxNumRetry: 5, retryDelayMs: 500, maxRetryDelayMs: 2000}
                     }
                 },
                 playlistLoadPolicy: {
                     default: {
                         maxLoadTimeMs: 20000,
                         maxTimeToFirstByteMs: 8000,
-                        timeoutRetry: { maxNumRetry: 5, retryDelayMs: 500, maxRetryDelayMs: 2000 },
-                        errorRetry: { maxNumRetry: 5, retryDelayMs: 500, maxRetryDelayMs: 2000 }
+                        timeoutRetry: {maxNumRetry: 5, retryDelayMs: 500, maxRetryDelayMs: 2000},
+                        errorRetry: {maxNumRetry: 5, retryDelayMs: 500, maxRetryDelayMs: 2000}
                     }
                 },
                 fragLoadPolicy: {
                     default: {
                         maxLoadTimeMs: 120000,
                         maxTimeToFirstByteMs: 8000,
-                        timeoutRetry: { maxNumRetry: 5, retryDelayMs: 500, maxRetryDelayMs: 2000 },
-                        errorRetry: { maxNumRetry: 5, retryDelayMs: 500, maxRetryDelayMs: 2000 }
+                        timeoutRetry: {maxNumRetry: 5, retryDelayMs: 500, maxRetryDelayMs: 2000},
+                        errorRetry: {maxNumRetry: 5, retryDelayMs: 500, maxRetryDelayMs: 2000}
                     }
                 },
                 maxBufferSize: 30 * 1000 * 1000,
@@ -160,10 +158,6 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
                 if (fragLoadingTimeout.current) {
                     clearTimeout(fragLoadingTimeout.current);
                 }
-
-                if (activeFragLoads.current === 1) {
-                    setIsFragLoading(true);
-                }
             });
 
             hls.on(Hls.Events.FRAG_LOADED, (event, data) => {
@@ -177,12 +171,6 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
                 if (fragLoadingTimeout.current) {
                     clearTimeout(fragLoadingTimeout.current);
                 }
-
-                if (activeFragLoads.current === 0) {
-                    fragLoadingTimeout.current = setTimeout(() => {
-                        setIsFragLoading(false);
-                    }, 300);
-                }
             });
 
             hls.on(Hls.Events.ERROR, (event, data) => {
@@ -193,7 +181,7 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
                         fatal: data.fatal,
                         buffer:
                             video.buffered.length > 0
-                                ? { start: video.buffered.start(0), end: video.buffered.end(0) }
+                                ? {start: video.buffered.start(0), end: video.buffered.end(0)}
                                 : null,
                         currentTime: video.currentTime,
                         readyState: video.readyState,
@@ -340,7 +328,7 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
                         hlsRef.current = newHls;
                         newHls.loadSource(url);
                         newHls.attachMedia(video);
-                        video.playbackRate = playbackSpeed;
+                        video.playbackRate = playbackSpeed || 1;
                         setIsLoading(false);
                     }, 2000);
                     return;
@@ -361,12 +349,12 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
                     switch (recoveryAttempts.current) {
                         case 1:
                             hls.recoverMediaError();
-                            video.playbackRate = playbackSpeed;
+                            video.playbackRate = playbackSpeed || 1;
                             break;
                         case 2:
                             video.currentTime = video.currentTime;
                             hls.recoverMediaError();
-                            video.playbackRate = playbackSpeed;
+                            video.playbackRate = playbackSpeed || 1;
                             break;
                         case 3:
                             const currentTime = video.currentTime;
@@ -381,7 +369,7 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
                             newHls.loadSource(url);
                             newHls.attachMedia(video);
                             setTimeout(() => {
-                                video.playbackRate = playbackSpeed;
+                                video.playbackRate = playbackSpeed || 1;
                             }, 100);
                             break;
                     }
@@ -392,7 +380,7 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
                 if (recoveryAttempts.current > 0) {
                     console.log('Воспроизведение успешно восстановлено');
                     if (video.playbackRate !== playbackSpeed) {
-                        video.playbackRate = playbackSpeed;
+                        video.playbackRate = playbackSpeed || 1;
                     }
                     setTimeout(() => {
                         if (!video.error) {
@@ -443,12 +431,7 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
 
     return (
         <VideoContainer>
-            {(isLoading || isBuffering) && (
-                <Loader
-                    message={isLoading ? 'Загрузка видео...' : 'Буферизация...'}
-                    className="video-loader"
-                />
-            )}
+            {(isLoading || isBuffering) && <Loader message={isLoading ? 'Загрузка видео...' : 'Буферизация...'} />}
             {!playingRef.current && !isLoading && !isBuffering && <PlayOverlay onClick={() => onPlayPause?.(true)} />}
             <video
                 data-type="hls"
