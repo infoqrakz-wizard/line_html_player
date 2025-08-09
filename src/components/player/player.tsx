@@ -1,17 +1,19 @@
-import React, {useEffect, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
+import {createPortal} from 'react-dom';
 
-import {formatDate, addSecondsToDate} from '@/utils/dates';
-import {getProtocol, formatUrlForDownload, clickA} from '@/utils/url-params';
-import {Mode} from '@/utils/types';
+import {formatDate, addSecondsToDate} from '../../utils/dates';
+import {getProtocol, formatUrlForDownload, clickA} from '../../utils/url-params';
+import {Mode} from '../../utils/types';
 
 import {ControlPanel} from '../control-panel';
 import {useTime} from '../../context/time-context';
 
 import {HlsPlayer, VideoTag, SaveStreamModal, ModeIndicator} from './components';
 import {PlayerComponentProps} from './components/player-interface';
+import type {PlayerRef} from './components/player-interface';
+import {useTimelineState} from '../timeline/hooks/use-timeline-state';
 
 import styles from './player.module.scss';
-import {useTimelineState} from '../timeline/hooks/use-timeline-state';
 
 export interface PlayerProps {
     // Основные пропсы из DevLinePlayerProps
@@ -53,6 +55,9 @@ export const Player: React.FC<PlayerProps> = ({
 
     const containerRef = useRef<HTMLDivElement>(null);
     const controlAreaRef = useRef<HTMLDivElement>(null);
+    const playerRef = useRef<PlayerRef | null>(null);
+    const archiveTargetTimeRef = useRef<Date | null>(null);
+    const forwardAccumOffsetRef = useRef<number | null>(null);
 
     const protocol = getProtocol();
     const getStreamUrl = (type: string) =>
@@ -142,28 +147,148 @@ export const Player: React.FC<PlayerProps> = ({
         }, 10000);
     };
 
-    const toggleFullscreen = () => {
+    // Показываем панель (включая Timeline) и перезапускаем таймер авто-скрытия
+    const showControlsAndRestartAutoHide = useCallback(() => {
+        if (hideTimeoutRef.current) {
+            clearTimeout(hideTimeoutRef.current);
+        }
+        setShowControls(true);
+        hideTimeoutRef.current = setTimeout(() => {
+            setShowControls(false);
+        }, 10000);
+    }, []);
+
+    const toggleFullscreen = useCallback(() => {
         if (!document.fullscreenElement) {
-            // Если элемент не в полноэкранном режиме, переключаем в полноэкранный режим
             if (containerRef.current?.requestFullscreen) {
                 containerRef.current.requestFullscreen().catch(err => {
                     console.error(`Ошибка при попытке перехода в полноэкранный режим: ${err.message}`);
                 });
             }
-        } else {
-            // Если элемент уже в полноэкранном режиме, выходим из него
-            if (document.exitFullscreen) {
-                document.exitFullscreen().catch(err => {
-                    console.error(`Ошибка при попытке выхода из полноэкранного режима: ${err.message}`);
-                });
-            }
+            return;
         }
-    };
 
-    const handleToggleFullscreen = () => {
-        setIsFullscreen(!isFullscreen);
+        if (document.exitFullscreen) {
+            document.exitFullscreen().catch(err => {
+                console.error(`Ошибка при попытке выхода из полноэкранного режима: ${err.message}`);
+            });
+        }
+    }, []);
+
+    const handleToggleFullscreen = useCallback(() => {
+        setIsFullscreen(prev => !prev);
         toggleFullscreen();
-    };
+    }, [toggleFullscreen]);
+
+    useEffect(() => {
+        const handleKeyDown = async (e: KeyboardEvent) => {
+            const key = e.key.toLowerCase();
+            const code = (e as KeyboardEvent).code;
+
+            const target = e.target as HTMLElement | null;
+            const tag = target?.tagName?.toLowerCase();
+            if (tag === 'input' || tag === 'textarea' || tag === 'select' || target?.isContentEditable) return;
+
+            // Fullscreen (F)
+            if (key === 'f') {
+                e.preventDefault();
+                handleToggleFullscreen();
+                return;
+            }
+
+            // Play/Pause (Space)
+            const isSpace = key === ' ' || code === 'Space' || e.key === 'Spacebar';
+            if (isSpace) {
+                e.preventDefault();
+                setIsPlaying(prev => !prev);
+                return;
+            }
+
+            const isLeft = key === 'arrowleft' || code === 'ArrowLeft';
+            const isRight = key === 'arrowright' || code === 'ArrowRight';
+            if (isLeft || isRight) {
+                console.log('arrow click');
+                e.preventDefault();
+                // Всегда показываем Timeline и перезапускаем таймер скрытия
+                showControlsAndRestartAutoHide();
+                const delta = isLeft ? -5 : 5;
+
+                if (currentMode === Mode.Live && isLeft) {
+                    const base = archiveTargetTimeRef.current ?? (await updateServerTime()) ?? new Date();
+                    const targetTime = addSecondsToDate(base, delta);
+                    archiveTargetTimeRef.current = targetTime;
+                    setCurrentMode(Mode.Record);
+                    setServerTime(targetTime, true);
+                    return;
+                }
+
+                if (currentMode === Mode.Record && serverTime) {
+                    let candidateAbsolute = addSecondsToDate(serverTime, ctxProgress + delta);
+
+                    if (isRight) {
+                        console.log('right arrow click');
+                        const baseOffset = forwardAccumOffsetRef.current ?? ctxProgress;
+                        const nextOffset = baseOffset + 5;
+                        forwardAccumOffsetRef.current = nextOffset;
+                        candidateAbsolute = addSecondsToDate(serverTime, nextOffset);
+
+                        const approxNow = new Date();
+                        console.log('approxNow', approxNow);
+                        console.log('candidateAbsolute', candidateAbsolute);
+                        if (candidateAbsolute.getTime() > approxNow.getTime()) {
+                            forwardAccumOffsetRef.current = null;
+                            const nowServer = (await updateServerTime()) ?? new Date();
+                            console.log('switch to live', nowServer);
+                            setCurrentMode(Mode.Live);
+                            setServerTime(nowServer, false);
+                            setProgress(0);
+                            return;
+                        } else {
+                            setServerTime(candidateAbsolute, true);
+                        }
+                    }
+
+                    if (isLeft && ctxProgress + delta < 0) {
+                        setServerTime(candidateAbsolute, true);
+                        return;
+                    }
+                }
+
+                playerRef.current?.seekBy(delta);
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [
+        handleToggleFullscreen,
+        currentMode,
+        serverTime,
+        ctxProgress,
+        updateServerTime,
+        setProgress,
+        setServerTime,
+        showControlsAndRestartAutoHide
+    ]);
+
+    useEffect(() => {
+        if (currentMode !== Mode.Live) {
+            archiveTargetTimeRef.current = null;
+        }
+        if (currentMode !== Mode.Record) {
+            forwardAccumOffsetRef.current = null;
+        }
+    }, [currentMode]);
+
+    useEffect(() => {
+        forwardAccumOffsetRef.current = null;
+    }, [ctxProgress]);
+
+    useEffect(() => {
+        const handleFsChange = () => setIsFullscreen(Boolean(document.fullscreenElement));
+        document.addEventListener('fullscreenchange', handleFsChange);
+        return () => document.removeEventListener('fullscreenchange', handleFsChange);
+    }, []);
 
     const handleSaveStreamFinish = (start: Date, end: Date) => {
         const fileName = `record_${formatDate(start, 'yyyy-MM-dd_HH-mm')}_${formatDate(end, 'yyyy-MM-dd_HH-mm')}`;
@@ -196,7 +321,6 @@ export const Player: React.FC<PlayerProps> = ({
         setShowSaveModal(true);
     };
 
-    const VideoComponent = currentMode === 'record' ? HlsPlayer : VideoTag;
     const props: PlayerComponentProps = {
         url: finalStreamUrl,
         playing: isPlaying,
@@ -213,6 +337,8 @@ export const Player: React.FC<PlayerProps> = ({
         <div
             className={styles.player}
             ref={containerRef}
+            role="region"
+            aria-label="Плеер видео"
         >
             <div className={styles.modeIndicatorContainer}>
                 <ModeIndicator
@@ -220,8 +346,31 @@ export const Player: React.FC<PlayerProps> = ({
                     isPlaying={isPlaying}
                 />
             </div>
-            <div className={styles.videoContainer}>
-                <VideoComponent {...props} />
+            <div
+                className={styles.videoContainer}
+                onDoubleClick={handleToggleFullscreen}
+                role="button"
+                aria-label="Переключить полноэкранный режим"
+                tabIndex={0}
+                onKeyDown={e => {
+                    const key = e.key.toLowerCase();
+                    if (key === 'enter') {
+                        e.preventDefault();
+                        handleToggleFullscreen();
+                    }
+                }}
+            >
+                {currentMode === 'record' ? (
+                    <HlsPlayer
+                        ref={playerRef}
+                        {...props}
+                    />
+                ) : (
+                    <VideoTag
+                        ref={playerRef}
+                        {...props}
+                    />
+                )}
                 {showSaveModal && (
                     <SaveStreamModal
                         currentTime={addSecondsToDate(serverTime ?? new Date(), ctxProgress)}
@@ -262,6 +411,24 @@ export const Player: React.FC<PlayerProps> = ({
                     />
                 </div>
             </div>
+
+            {/** FIXME: убрать после завершения разработки */}
+            {createPortal(
+                <div className={styles.debugInfo}>
+                    <h2 className="title">Debug info</h2>
+                    <div className="debug-info-content">
+                        <p>serverTime: {serverTime?.toLocaleTimeString()}</p>
+                        <p>ctxProgress: {ctxProgress}</p>
+                        <p>isPlaying: {isPlaying ? 'true' : 'false'}</p>
+                        <p>isMuted: {isMuted ? 'true' : 'false'}</p>
+                        <p>playbackSpeed: {playbackSpeed}</p>
+                        <p>currentMode: {currentMode}</p>
+                        <p>isFullscreen: {isFullscreen ? 'true' : 'false'}</p>
+                        <p>showControls: {showControls ? 'true' : 'false'}</p>
+                    </div>
+                </div>,
+                document.body
+            )}
         </div>
     );
 };

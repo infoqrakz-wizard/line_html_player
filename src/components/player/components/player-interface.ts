@@ -7,3 +7,7 @@ export interface PlayerComponentProps {
     onPlayPause?: () => void;
     onProgress?: (progress: {currentTime: number; duration: number}) => void;
 }
+
+export interface PlayerRef {
+    seekBy: (seconds: number) => void;
+}

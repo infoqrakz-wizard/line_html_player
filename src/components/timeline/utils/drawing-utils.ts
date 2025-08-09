@@ -70,7 +70,7 @@ export const drawFragments = (
             const xStart = ((fragmentStartTime - visibleTimeRange.start.getTime()) / screenDuration) * width;
             const xEnd = ((fragmentEndTime - visibleTimeRange.start.getTime()) / screenDuration) * width;
 
-            if (xEnd >= 0 && xStart <= width && fragmentEndTime < Date.now()) {
+            if (xEnd >= 0 && xStart <= width) {
                 const visibleXStart = Math.max(0, xStart);
                 const visibleXEnd = Math.min(width, xEnd);
                 const visibleWidth = visibleXEnd - visibleXStart;

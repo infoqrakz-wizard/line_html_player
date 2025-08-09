@@ -5,6 +5,8 @@
 /**
  * Свойства компонента Timeline
  */
+import { Mode } from '../../utils/types';
+
 export interface TimelineProps {
     /** URL сервера */
     url: string;
@@ -20,6 +22,8 @@ export interface TimelineProps {
     stream?: string;
     /** Номер камеры */
     camera: number;
+    /** Режим плеера (live/record) */
+    mode?: Mode;
 }
 
 /**
