@@ -109,3 +109,10 @@ button.react-datepicker__navigation {
 .react-datepicker-popper {
     z-index: 9999;
 }
+
+
+.highlighted-date {
+    position: relative;
+    border-radius: 9999px;
+    background-color: #4caf50;
+}
