@@ -236,8 +236,6 @@
                     const streamPort = parseInt(document.getElementById('streamPort').value, 10);
                     const login = document.getElementById('login').value;
                     const password = document.getElementById('password').value;
-                    const rpcUrl = streamUrl; // RPC URL = Stream URL
-                    const rpcPort = streamPort; // RPC port = Stream Port
                     const mode = document.getElementById('mode').value;
                     const autoplay = document.getElementById('autoplay').checked;
                     const muted = document.getElementById('muted').checked;
@@ -249,8 +247,6 @@
                         streamPort,
                         login,
                         password,
-                        rpcUrl,
-                        rpcPort,
                         mode,
                         autoplay,
                         muted,
@@ -262,8 +258,6 @@
                         streamPort,
                         login,
                         password: password ? '******' : '',
-                        rpcUrl,
-                        rpcPort,
                         mode,
                         autoplay,
                         muted,

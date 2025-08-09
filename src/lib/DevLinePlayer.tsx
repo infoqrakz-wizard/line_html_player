@@ -15,8 +15,6 @@ interface DevLinePlayerOptions {
     camera: number;
     login: string;
     password?: string;
-    rpcUrl: string;
-    rpcPort: number;
 }
 
 class DevLinePlayer {
@@ -32,10 +30,8 @@ class DevLinePlayer {
             camera: 0,
             login: '',
             password: '',
-            rpcUrl: '',
             mode: Mode.Live,
-            muted: true,
-            rpcPort: 80
+            muted: true
         }
     ) {
         if (typeof container === 'string') {
@@ -49,10 +45,7 @@ class DevLinePlayer {
         }
 
         if (!options.streamUrl) throw new Error('streamUrl is required');
-        // Значения по умолчанию: rpcUrl/rpcPort берутся из streamUrl/streamPort, если не заданы
         this.options = options;
-        this.options.rpcPort = options.streamPort;
-        this.options.rpcUrl = options.streamUrl;
         this.root = createRoot(this.container);
         this.render();
     }
