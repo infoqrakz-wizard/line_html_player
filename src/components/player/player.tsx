@@ -106,10 +106,8 @@ export const Player: React.FC<PlayerProps> = ({
             // Обновляем позицию на timeline без изменения serverTime
             setProgress(0); // Сбрасываем progress для корректного отображения
         } else {
-            handleChangeMode(Mode.Record, clickedTime);
             // Если время в прошлом - переключаемся на запись
-            // setCurrentMode(Mode.Record);
-            // setServerTime(clickedTime, true);
+            handleChangeMode(Mode.Record, clickedTime);
         }
 
         // При клике по таймлайну всегда запускаем воспроизведение

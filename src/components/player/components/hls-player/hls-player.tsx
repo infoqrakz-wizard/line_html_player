@@ -236,6 +236,10 @@ export const HlsPlayer = forwardRef<PlayerRef, HlsPlayerProps>((props, ref) => {
 
             hls.on(Hls.Events.MANIFEST_PARSED, () => {
                 setIsLoading(false);
+                // Re-apply playback speed after new manifest is parsed to avoid reset to 1x
+                if (video.playbackRate !== (playbackSpeed || 1)) {
+                    video.playbackRate = playbackSpeed || 1;
+                }
                 if (playingRef.current) {
                     video.play().catch(console.error);
                 }
