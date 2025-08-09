@@ -3,7 +3,7 @@ import {createPortal} from 'react-dom';
 
 import {formatDate, addSecondsToDate} from '../../utils/dates';
 import {getProtocol, formatUrlForDownload, clickA} from '../../utils/url-params';
-import {Mode} from '../../utils/types';
+import {Mode, Protocol} from '../../utils/types';
 
 import {ControlPanel} from '../control-panel';
 import {useTime} from '../../context/time-context';
@@ -26,6 +26,7 @@ export interface PlayerProps {
     mode?: Mode;
     muted?: boolean; // Делаем звук опциональным
     camera: number;
+    protocol?: Protocol;
 }
 
 export const Player: React.FC<PlayerProps> = ({
@@ -37,7 +38,8 @@ export const Player: React.FC<PlayerProps> = ({
     rpcPort = 80,
     mode = Mode.Live,
     muted = false,
-    camera = 0
+    camera = 0,
+    protocol: protocolProp
 }) => {
     const [currentMode, setCurrentMode] = useState<Mode>(mode);
     const [isFirstLoad, setIsFirstLoad] = useState(true);
@@ -59,16 +61,18 @@ export const Player: React.FC<PlayerProps> = ({
     const archiveTargetTimeRef = useRef<Date | null>(null);
     const forwardAccumOffsetRef = useRef<number | null>(null);
 
-    const protocol = getProtocol();
+    const resolvedProtocol = protocolProp ?? getProtocol();
+    const streamHost = `${resolvedProtocol}://${streamUrl}`;
+    const rpcHost = `${resolvedProtocol}://${rpcUrl}`;
     const getStreamUrl = (type: string) =>
-        `${protocol}://${streamUrl}:${streamPort}/cameras/${camera}/streaming/main.${type}?authorization=Basic%20${btoa(`${login}:${password}`)}`;
+        `${streamHost}:${streamPort}/cameras/${camera}/streaming/main.${type}?authorization=Basic%20${btoa(`${login}:${password}`)}`;
 
     // const posterUrl = `${protocol}://${streamUrl}:${streamPort}/cameras/${camera}/image?stream=main&authorization=Basic%20${btoa(`${login}:${password}`)}`;
     const streamType = currentMode === 'record' ? 'm3u8' : 'mp4';
     const authorization = `${login}:${password}`;
     const videoUrl = getStreamUrl(streamType);
 
-    const {updateServerTime} = useTimelineState(undefined, rpcUrl, rpcPort, authorization);
+    const {updateServerTime} = useTimelineState(undefined, rpcHost, rpcPort, authorization);
 
     // Формирование URL для потока в зависимости от режима и серверного времени
     const finalStreamUrl =
@@ -295,7 +299,6 @@ export const Player: React.FC<PlayerProps> = ({
 
     const handleSaveStreamFinish = (start: Date, end: Date) => {
         const fileName = `record_${formatDate(start, 'yyyy-MM-dd_HH-mm')}_${formatDate(end, 'yyyy-MM-dd_HH-mm')}`;
-        const protocol = getProtocol();
         const durationSeconds = (end.getTime() - start.getTime()) / 1000;
 
         const formatDuration = (seconds: number): string => {
@@ -308,7 +311,7 @@ export const Player: React.FC<PlayerProps> = ({
 
         const date = start.toISOString().split('.')[0];
 
-        const url = `${protocol}://${rpcUrl}:${rpcPort}/cameras/${camera}/streaming/main.mp4?authorization=Basic%20${btoa(`${login}:${password}`)}&time=${date}&duration=${formatDuration(durationSeconds)}&download=1&filename=${fileName}`;
+        const url = `${rpcHost}:${rpcPort}/cameras/${camera}/streaming/main.mp4?authorization=Basic%20${btoa(`${login}:${password}`)}&time=${date}&duration=${formatDuration(durationSeconds)}&download=1&filename=${fileName}`;
         const downloadUrl = formatUrlForDownload({
             url,
             start,
@@ -396,7 +399,7 @@ export const Player: React.FC<PlayerProps> = ({
                         isMuted={isMuted}
                         isFullscreen={isFullscreen}
                         playbackSpeed={playbackSpeed}
-                        url={rpcUrl}
+                        url={rpcHost}
                         port={rpcPort}
                         credentials={authorization}
                         progress={ctxProgress}

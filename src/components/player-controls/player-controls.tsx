@@ -5,11 +5,10 @@ import {ru} from 'date-fns/locale/ru';
 import {Mode} from '@/utils/types';
 
 import {Icons} from '../icons';
-// import { SpeedSelector } from '../speed-selector';
 
 import '@/styles/datepicker-custom.scss';
-import styles from './player-controls.module.scss';
 import {SpeedSelector} from '../speed-selector';
+import styles from './player-controls.module.scss';
 
 registerLocale('ru', ru);
 

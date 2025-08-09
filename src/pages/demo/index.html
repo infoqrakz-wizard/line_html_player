@@ -118,6 +118,14 @@
                 <div class="controls-section">
                     <div class="controls">
                         <div class="control-group">
+                            <label for="protocol">Protocol:</label>
+                            <select id="protocol">
+                                <option value="http">http</option>
+                                <option value="https">https</option>
+                            </select>
+                        </div>
+
+                        <div class="control-group">
                             <label for="streamUrl">Stream URL:</label>
                             <input
                                 type="text"
@@ -247,6 +255,7 @@
                 window.__DEVLINE_PLAYER_LOADER__.onLoad(function () {
                     // Get values from form
                     const streamUrl = document.getElementById('streamUrl').value;
+                    const protocol = document.getElementById('protocol').value;
                     const streamPort = parseInt(document.getElementById('streamPort').value, 10);
                     const login = document.getElementById('login').value;
                     const password = document.getElementById('password').value;
@@ -259,6 +268,7 @@
 
                     // Create new player instance
                     player = new DevLinePlayer(document.getElementById('player'), {
+                        protocol,
                         streamUrl,
                         streamPort,
                         login,

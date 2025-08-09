@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { Player } from '../components/player';
-import { TimeProvider } from '../context/time-context';
-import { Mode } from '../utils/types';
+import React, {useState} from 'react';
+import {Player} from '../components/player';
+import {TimeProvider} from '../context/time-context';
+import {Mode, Protocol} from '../utils/types';
 
 import './DebugPlayer.scss';
 
@@ -20,21 +20,24 @@ const DebugPlayer: React.FC = () => {
         rpcPort: 2376,
         mode: Mode.Live,
         muted: true,
-        camera: 0
+        camera: 0,
+        protocol: Protocol.Http
     });
 
     // Обработчик изменения параметров
     const handleParamChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-        const { name, value, type } = e.target as HTMLInputElement;
+        const {name, value, type} = e.target as HTMLInputElement;
+
+        let parsedValue: string | number | boolean = value;
+        if (type === 'checkbox') {
+            parsedValue = (e.target as HTMLInputElement).checked;
+        } else if (type === 'number') {
+            parsedValue = parseInt(value, 10);
+        }
 
         setParams(prev => ({
             ...prev,
-            [name]:
-                type === 'checkbox'
-                    ? (e.target as HTMLInputElement).checked
-                    : type === 'number'
-                        ? parseInt(value, 10)
-                        : value
+            [name]: parsedValue
         }));
     };
 
@@ -53,6 +56,19 @@ const DebugPlayer: React.FC = () => {
                 <div className="debug-panel">
                     <h2 className="title">Параметры</h2>
                     <form onSubmit={handleSubmit}>
+                        <div className="form-group">
+                            <label htmlFor="protocol">Protocol:</label>
+                            <select
+                                id="protocol"
+                                name="protocol"
+                                value={params.protocol}
+                                onChange={handleParamChange}
+                            >
+                                <option value={Protocol.Http}>http</option>
+                                <option value={Protocol.Https}>https</option>
+                            </select>
+                        </div>
+
                         <div className="form-group">
                             <label htmlFor="streamUrl">Stream URL:</label>
                             <input

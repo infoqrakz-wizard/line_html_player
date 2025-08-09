@@ -1,6 +1,6 @@
 import React from 'react';
 import {createRoot} from 'react-dom/client';
-import {Mode} from '../utils/types';
+import {Mode, Protocol} from '../utils/types';
 import {Player} from '../components/player';
 import {TimeProvider} from '../context/time-context';
 
@@ -17,6 +17,7 @@ interface DevLinePlayerOptions {
     password?: string;
     rpcUrl: string;
     rpcPort: number;
+    protocol?: Protocol;
 }
 
 class DevLinePlayer {
@@ -76,6 +77,12 @@ class DevLinePlayer {
 export default DevLinePlayer;
 
 // Экспортируем в глобальное пространство имен для UMD
+declare global {
+    interface Window {
+        DevLinePlayer: typeof DevLinePlayer;
+    }
+}
+
 if (typeof window !== 'undefined') {
     window.DevLinePlayer = DevLinePlayer;
 }
