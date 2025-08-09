@@ -1,6 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { createPortal } from 'react-dom';
-import { Icons } from '../icons';
+import React, {useState, useRef, useEffect} from 'react';
+import {createPortal} from 'react-dom';
+import {Icons} from '../icons';
 import styles from './speed-selector.module.scss';
 
 interface SpeedSelectorProps {
@@ -11,14 +11,12 @@ interface SpeedSelectorProps {
 }
 
 const speedOptions = [
-    { value: 0.25, label: '0.25x' },
-    { value: 0.5, label: '0.5x' },
-    { value: 0.75, label: '0.75x' },
-    { value: 1, label: 'Обычная', controlLabel: '1x' },
-    { value: 1.25, label: '1.25x' },
-    { value: 1.5, label: '1.5x' },
-    { value: 1.75, label: '1.75x' },
-    { value: 2, label: '2x' }
+    {value: 1, label: 'Обычная', controlLabel: '1x'},
+    {value: 1.25, label: '1.25x'},
+    {value: 1.5, label: '1.5x'},
+    {value: 1.75, label: '1.75x'},
+    {value: 2, label: '2x'},
+    {value: 4, label: '4x'}
 ];
 
 export const SpeedSelector: React.FC<SpeedSelectorProps> = ({
@@ -30,7 +28,7 @@ export const SpeedSelector: React.FC<SpeedSelectorProps> = ({
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
-    const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
+    const [dropdownPosition, setDropdownPosition] = useState({top: 0, left: 0, width: 0});
 
     const handleToggle = () => {
         if (!disabled) {
@@ -39,7 +37,7 @@ export const SpeedSelector: React.FC<SpeedSelectorProps> = ({
 
                 // В обычном режиме используем фиксированное позиционирование
                 setDropdownPosition({
-                    top: rect.top - 290 - 20,
+                    top: rect.top - 253,
                     left: rect.right - 165,
                     width: rect.width
                 });
@@ -96,7 +94,7 @@ export const SpeedSelector: React.FC<SpeedSelectorProps> = ({
     };
 
     return (
-        <div style={{ position: 'relative' }}>
+        <div style={{position: 'relative'}}>
             <div
                 className={styles.container}
                 ref={containerRef}

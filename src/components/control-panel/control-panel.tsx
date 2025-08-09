@@ -1,10 +1,10 @@
 import React, {useRef} from 'react';
 
-import {Mode} from '@/utils/types';
 import {Timeline} from '../timeline';
 import {PlayerControls} from '../player-controls';
 import {TimelineRef} from '../timeline/types';
 import styles from './control-panel.module.scss';
+import {Mode} from '@/utils/types';
 
 interface ControlPanelProps {
     mode: Mode;

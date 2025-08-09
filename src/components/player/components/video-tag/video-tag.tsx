@@ -1,16 +1,13 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Loader } from '../loader';
-import { PlayOverlay } from '../play-overlay';
-import { VideoContainer } from '../video-container';
-
-import styles from './video-tag.module.scss';
-
+import React, {useEffect, useRef, useState} from 'react';
+import {Loader} from '../loader';
+import {PlayOverlay} from '../play-overlay';
+import {VideoContainer} from '../video-container';
 export interface VideoTagProps {
     url: string;
     playing: boolean;
     muted?: boolean;
     posterUrl?: string;
-    onProgress?: (progress: { currentTime: number; duration: number }) => void;
+    onProgress?: (progress: {currentTime: number; duration: number}) => void;
     onPlayPause?: (playing: boolean) => void;
 }
 
@@ -181,12 +178,7 @@ export const VideoTag: React.FC<VideoTagProps> = ({
 
     return (
         <VideoContainer>
-            {(isLoading || isBuffering) && (
-                <Loader
-                    message={isLoading ? 'Загрузка видео...' : 'Буферизация...'}
-                    className="video-loader"
-                />
-            )}
+            {(isLoading || isBuffering) && <Loader message={isLoading ? 'Загрузка видео...' : 'Буферизация...'} />}
             {!playingRef.current && !isLoading && !isBuffering && <PlayOverlay onClick={() => onPlayPause?.(true)} />}
             <video
                 data-type="video"

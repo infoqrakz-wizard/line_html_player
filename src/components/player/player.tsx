@@ -1,18 +1,17 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 
-import { formatDate, addSecondsToDate } from '@/utils/dates';
-import { getProtocol, formatUrlForDownload, clickA } from '@/utils/url-params';
-import { Mode } from '@/utils/types';
+import {formatDate, addSecondsToDate} from '@/utils/dates';
+import {getProtocol, formatUrlForDownload, clickA} from '@/utils/url-params';
+import {Mode} from '@/utils/types';
 
-import { ControlPanel } from '../control-panel';
-import { Icons } from '../icons';
-import { useTime } from '../../context/time-context';
+import {ControlPanel} from '../control-panel';
+import {useTime} from '../../context/time-context';
 
-import { HlsPlayer, VideoTag, SaveStreamModal, ModeIndicator } from './components';
-import { PlayerComponentProps } from './components/player-interface';
+import {HlsPlayer, VideoTag, SaveStreamModal, ModeIndicator} from './components';
+import {PlayerComponentProps} from './components/player-interface';
 
 import styles from './player.module.scss';
-import { useTimelineState } from '../timeline/hooks/use-timeline-state';
+import {useTimelineState} from '../timeline/hooks/use-timeline-state';
 
 export interface PlayerProps {
     // Основные пропсы из DevLinePlayerProps
@@ -41,7 +40,7 @@ export const Player: React.FC<PlayerProps> = ({
     const [currentMode, setCurrentMode] = useState<Mode>(mode);
     const [isFirstLoad, setIsFirstLoad] = useState(true);
     const [isFullscreen, setIsFullscreen] = useState(false);
-    const { serverTime, setServerTime, progress: ctxProgress, setProgress } = useTime();
+    const {serverTime, setServerTime, progress: ctxProgress, setProgress} = useTime();
     const [showSaveModal, setShowSaveModal] = useState<boolean>(false);
 
     const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -59,13 +58,12 @@ export const Player: React.FC<PlayerProps> = ({
     const getStreamUrl = (type: string) =>
         `${protocol}://${streamUrl}:${streamPort}/cameras/${camera}/streaming/main.${type}?authorization=Basic%20${btoa(`${login}:${password}`)}`;
 
-    const posterUrl = `${protocol}://${streamUrl}:${streamPort}/cameras/${camera}/image?stream=main&authorization=Basic%20${btoa(`${login}:${password}`)}`;
     // const posterUrl = `${protocol}://${streamUrl}:${streamPort}/cameras/${camera}/image?stream=main&authorization=Basic%20${btoa(`${login}:${password}`)}`;
     const streamType = currentMode === 'record' ? 'm3u8' : 'mp4';
     const authorization = `${login}:${password}`;
     const videoUrl = getStreamUrl(streamType);
 
-    const { updateServerTime } = useTimelineState(undefined, rpcUrl, rpcPort, authorization);
+    const {updateServerTime} = useTimelineState(undefined, rpcUrl, rpcPort, authorization);
 
     // Формирование URL для потока в зависимости от режима и серверного времени
     const finalStreamUrl =
@@ -98,7 +96,7 @@ export const Player: React.FC<PlayerProps> = ({
 
         // Проверяем, является ли выбранное время в будущем
         // Добавляем небольшой буфер (5 секунд) для более точного определения
-        const isFutureTime = clickedTime.getTime() > currentServerTime.getTime();
+        const isFutureTime = clickedTime.getTime() > (currentServerTime?.getTime() ?? 0);
 
         if (isFutureTime) {
             // Если время в будущем - переключаемся на прямую трансляцию
@@ -203,12 +201,14 @@ export const Player: React.FC<PlayerProps> = ({
         url: finalStreamUrl,
         playing: isPlaying,
         muted: isMuted,
-        posterUrl,
+        // posterUrl,
+        playbackSpeed,
         onPlayPause: (value?: boolean) => handlePlayPause(value),
         onProgress: p => {
             setProgress(p.currentTime);
         }
     };
+
     return (
         <div
             className={styles.player}

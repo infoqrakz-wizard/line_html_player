@@ -1,15 +1,15 @@
-import React, { useState, useRef } from 'react';
-import DatePicker, { registerLocale } from 'react-datepicker';
-import { ru } from 'date-fns/locale/ru';
+import React, {useState, useRef} from 'react';
+import DatePicker, {registerLocale} from 'react-datepicker';
+import {ru} from 'date-fns/locale/ru';
 
-import { Mode } from '@/utils/types';
+import {Mode} from '@/utils/types';
 
-import { Icons } from '../icons';
+import {Icons} from '../icons';
 // import { SpeedSelector } from '../speed-selector';
 
 import '@/styles/datepicker-custom.scss';
 import styles from './player-controls.module.scss';
-import { SpeedSelector } from '../speed-selector';
+import {SpeedSelector} from '../speed-selector';
 
 registerLocale('ru', ru);
 
@@ -40,13 +40,11 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
     onPlayPause,
     onMuteToggle,
     onSpeedChange,
-    onCenterTimeline,
     onChangeStartDate,
     onSaveStream,
     onToggleFullscreen,
     onChangeMode,
-    disableSpeedChange = false,
-    disableCenterTimeline = false
+    disableSpeedChange = false
 }) => {
     const [startDate, setStartDate] = useState(new Date());
     const datePickerRef = useRef<any>(null);
@@ -105,12 +103,14 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
                 >
                     <Icons.Export />
                 </button>
-                <SpeedSelector
-                    playbackSpeed={playbackSpeed}
-                    onSpeedChange={onSpeedChange}
-                    disabled={disableSpeedChange}
-                    isFullscreen={isFullscreen}
-                />
+                {mode !== Mode.Live && (
+                    <SpeedSelector
+                        playbackSpeed={playbackSpeed}
+                        onSpeedChange={onSpeedChange}
+                        disabled={disableSpeedChange}
+                        isFullscreen={isFullscreen}
+                    />
+                )}
                 <button
                     className={styles.controlButton}
                     onClick={onToggleFullscreen}
