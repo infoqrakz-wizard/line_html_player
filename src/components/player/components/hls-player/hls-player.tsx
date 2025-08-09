@@ -1,4 +1,4 @@
-import React, {useEffect, useRef, useState} from 'react';
+import React, {forwardRef, useEffect, useImperativeHandle, useRef, useState} from 'react';
 import Hls from 'hls.js';
 
 import {PlayOverlay} from '../play-overlay';
@@ -15,15 +15,10 @@ export interface HlsPlayerProps {
     onPlayPause?: (playing: boolean) => void;
 }
 
-export const HlsPlayer: React.FC<HlsPlayerProps> = ({
-    url,
-    playing = false,
-    onProgress,
-    onPlayPause,
-    playbackSpeed,
-    // posterUrl,
-    muted = true
-}) => {
+import type {PlayerRef} from '../player-interface';
+
+export const HlsPlayer = forwardRef<PlayerRef, HlsPlayerProps>((props, ref) => {
+    const {url, playing = false, onProgress, onPlayPause, playbackSpeed, muted = true} = props;
     const videoRef = useRef<HTMLVideoElement>(null);
     const hlsRef = useRef<Hls | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -40,6 +35,20 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
 
     const playingRef = useRef(playing);
     const mutedRef = useRef(muted);
+
+    useImperativeHandle(ref, () => ({
+        seekBy: (seconds: number) => {
+            const video = videoRef.current;
+            if (!video) return;
+            try {
+                const duration = Number.isFinite(video.duration) ? video.duration : undefined;
+                const next = Math.max(0, (video.currentTime || 0) + seconds);
+                video.currentTime = duration ? Math.min(next, duration) : next;
+            } catch (e) {
+                // no-op
+            }
+        }
+    }));
 
     useEffect(() => {
         if (playing !== playingRef.current) {
@@ -446,4 +455,6 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
             />
         </VideoContainer>
     );
-};
+});
+
+HlsPlayer.displayName = 'HlsPlayer';

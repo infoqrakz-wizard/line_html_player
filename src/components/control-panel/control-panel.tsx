@@ -4,7 +4,7 @@ import {Timeline} from '../timeline';
 import {PlayerControls} from '../player-controls';
 import {TimelineRef} from '../timeline/types';
 import styles from './control-panel.module.scss';
-import {Mode} from '@/utils/types';
+import {Mode} from '../../utils/types';
 
 interface ControlPanelProps {
     mode: Mode;
@@ -80,6 +80,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                 onTimeClick={onTimeClick}
                 progress={progress}
                 camera={camera}
+                mode={mode}
             />
         </div>
     );

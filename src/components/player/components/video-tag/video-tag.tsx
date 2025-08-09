@@ -1,7 +1,8 @@
-import React, {useEffect, useRef, useState} from 'react';
+import React, {forwardRef, useEffect, useImperativeHandle, useRef, useState} from 'react';
 import {Loader} from '../loader';
 import {PlayOverlay} from '../play-overlay';
 import {VideoContainer} from '../video-container';
+import type {PlayerRef} from '../player-interface';
 export interface VideoTagProps {
     url: string;
     playing: boolean;
@@ -11,14 +12,8 @@ export interface VideoTagProps {
     onPlayPause?: (playing: boolean) => void;
 }
 
-export const VideoTag: React.FC<VideoTagProps> = ({
-    url,
-    playing = true,
-    muted = true,
-    posterUrl,
-    onProgress,
-    onPlayPause
-}) => {
+export const VideoTag = forwardRef<PlayerRef, VideoTagProps>((props, ref) => {
+    const {url, playing = true, muted = true, posterUrl, onProgress, onPlayPause} = props;
     const videoRef = useRef<HTMLVideoElement>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isBuffering, setIsBuffering] = useState(false);
@@ -29,7 +24,19 @@ export const VideoTag: React.FC<VideoTagProps> = ({
 
     const playingRef = useRef(playing);
     const mutedRef = useRef(muted);
-
+    useImperativeHandle(ref, () => ({
+        seekBy: (seconds: number) => {
+            const video = videoRef.current;
+            if (!video) return;
+            try {
+                const duration = Number.isFinite(video.duration) ? video.duration : undefined;
+                const next = Math.max(0, (video.currentTime || 0) + seconds);
+                video.currentTime = duration ? Math.min(next, duration) : next;
+            } catch (e) {
+                // no-op
+            }
+        }
+    }));
     const handleTimeUpdate = () => {
         if (videoRef.current && onProgress) {
             onProgress({
@@ -193,4 +200,6 @@ export const VideoTag: React.FC<VideoTagProps> = ({
             />
         </VideoContainer>
     );
-};
+});
+
+VideoTag.displayName = 'VideoTag';
