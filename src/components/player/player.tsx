@@ -42,6 +42,7 @@ export const Player: React.FC<PlayerProps> = ({
     const {serverTime, setServerTime, progress: ctxProgress, setProgress} = useTime();
     const [showSaveModal, setShowSaveModal] = useState<boolean>(false);
     const [isH265Codec, setIsH265Codec] = useState<boolean>(false);
+    const [isNoSound, setIsNoSound] = useState<boolean>(false);
 
     const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -87,6 +88,7 @@ export const Player: React.FC<PlayerProps> = ({
             const result = await getCameraState(streamUrl, streamPort, authorization, camera);
 
             setIsH265Codec(result.state.video_streams.video.codec === 'h265');
+            setIsNoSound(result.state.audio_streams.audio.signal === 'no');
         };
 
         if (streamUrl && streamPort && authorization && Number.isInteger(camera)) {
@@ -437,6 +439,7 @@ export const Player: React.FC<PlayerProps> = ({
                             isPlaying={isPlaying}
                             isMuted={isMuted}
                             isFullscreen={isFullscreen}
+                            isNoSound={isNoSound}
                             playbackSpeed={playbackSpeed}
                             url={streamUrl}
                             port={streamPort}

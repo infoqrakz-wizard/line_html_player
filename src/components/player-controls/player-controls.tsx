@@ -22,6 +22,7 @@ interface PlayerControlsProps {
     isPlaying: boolean;
     isMuted: boolean;
     isFullscreen: boolean;
+    isNoSound: boolean;
     playbackSpeed: number;
     // for fetching month availability
     url?: string;
@@ -45,6 +46,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
     isPlaying,
     isMuted,
     isFullscreen,
+    isNoSound,
     playbackSpeed,
     url,
     port,
@@ -59,7 +61,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
     onChangeMode,
     disableSpeedChange = false
 }) => {
-    const { hasTimelineAccess, setTimelineAccess } = useTimelineAuth();
+    const {hasTimelineAccess, setTimelineAccess} = useTimelineAuth();
     const [startDate, setStartDate] = useState(new Date());
     const datePickerRef = useRef<ReactDatePicker | null>(null);
 
@@ -138,12 +140,14 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
                 >
                     {isPlaying ? <Icons.Pause /> : <Icons.Play />}
                 </button>
-                <button
-                    className={styles.controlButton}
-                    onClick={onMuteToggle}
-                >
-                    {isMuted ? <Icons.Mute /> : <Icons.Unmute />}
-                </button>
+                {!isNoSound && (
+                    <button
+                        className={styles.controlButton}
+                        onClick={onMuteToggle}
+                    >
+                        {isMuted ? <Icons.Mute /> : <Icons.Unmute />}
+                    </button>
+                )}
                 {mode === Mode.Record && (
                     <button
                         className={styles.recordButton}

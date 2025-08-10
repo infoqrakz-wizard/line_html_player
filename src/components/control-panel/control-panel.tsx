@@ -12,6 +12,7 @@ interface ControlPanelProps {
     isPlaying: boolean;
     isMuted: boolean;
     isFullscreen: boolean;
+    isNoSound: boolean;
     playbackSpeed: number;
     url: string;
     port: number;
@@ -35,6 +36,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
     isPlaying,
     isMuted,
     isFullscreen,
+    isNoSound,
     playbackSpeed,
     url,
     port,
@@ -62,6 +64,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                 isPlaying={isPlaying}
                 isMuted={isMuted}
                 isFullscreen={isFullscreen}
+                isNoSound={isNoSound}
                 playbackSpeed={playbackSpeed}
                 url={url}
                 port={port}
