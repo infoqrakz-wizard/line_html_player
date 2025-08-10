@@ -20,7 +20,7 @@
 h2.react-datepicker__current-month {
     color: white !important;
     font-weight: 500;
-    margin-bottom: 5px; /* Уменьшаем отступ снизу */
+    margin-bottom: 5px;
 }
 
 .react-datepicker__day-name,
@@ -86,33 +86,38 @@ button.react-datepicker__navigation {
     background-color: #4caf50;
 }
 
-/* Уменьшаем размер месяца и года */
 .react-datepicker__month-container {
-    padding-bottom: 5px; /* Уменьшаем отступ снизу */
+    padding-bottom: 5px;
 }
 
-/* Уменьшаем размер дней */
 .react-datepicker__month {
     margin: 0.4em;
 }
 
-/* Уменьшаем отступы в заголовке */
 .react-datepicker__header {
     padding-top: 5px;
 }
 
-/* Уменьшаем размер выпадающего списка времени */
 .react-datepicker__time-container .react-datepicker__time {
     max-height: 150px;
 }
 
-.react-datepicker-popper {
-    z-index: 9999;
-}
-
-
-.highlighted-date {
+.highlighted-date,
+.highlighted-date:hover,
+.react-datepicker__day:not([aria-disabled=true]):hover {
     position: relative;
     border-radius: 9999px;
     background-color: #4caf50;
+}
+
+.react-datepicker__day:not([aria-disabled=true]):hover {
+    color: #000;
+}
+
+.custom-datepicker .react-datepicker__time-list {
+    scrollbar-width: none;
+}
+
+.custom-datepicker .react-datepicker__time-list::-webkit-scrollbar {
+    display: none;
 }
