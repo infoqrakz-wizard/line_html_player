@@ -6,6 +6,7 @@ import {addMonths, format, startOfDay, startOfMonth} from 'date-fns';
 
 import {Mode} from '../../utils/types';
 import {getFramesTimeline} from '../../utils/api';
+import {useTimelineAuth} from '../../context/timeline-auth-context';
 
 import {Icons} from '../icons';
 
@@ -30,7 +31,7 @@ interface PlayerControlsProps {
     onPlayPause: () => void;
     onMuteToggle: () => void;
     onSpeedChange: (speed: number) => void;
-    onCenterTimeline: () => void;
+    onCenterTimeline?: () => void;
     onSaveStream?: () => void;
     onChangeStartDate?: (date: Date) => void;
     onToggleFullscreen?: () => void;
@@ -58,6 +59,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
     onChangeMode,
     disableSpeedChange = false
 }) => {
+    const { hasTimelineAccess, setTimelineAccess } = useTimelineAuth();
     const [startDate, setStartDate] = useState(new Date());
     const datePickerRef = useRef<ReactDatePicker | null>(null);
 
@@ -76,7 +78,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
     };
 
     const fetchMonthAvailability = async (viewDate: Date) => {
-        if (!url || !port || !credentials) return;
+        if (!url || !port || !credentials || !hasTimelineAccess) return;
         const key = monthKey(viewDate);
         if (loadedMonths.current.has(key)) return;
 
@@ -112,7 +114,10 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
             });
             loadedMonths.current.add(key);
         } catch (e) {
-            // ignore errors to not break UI
+            if (e instanceof Error && e.message === 'FORBIDDEN') {
+                setTimelineAccess(false);
+                return;
+            }
         }
     };
 
@@ -150,28 +155,30 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
             </div>
 
             <div className={styles.rightControls}>
-                <DatePicker
-                    ref={datePickerRef}
-                    selected={startDate}
-                    customInput={
-                        <button className={styles.controlButton}>
-                            <Icons.Datepicker />
-                        </button>
-                    }
-                    locale={ru}
-                    showTimeSelect
-                    timeIntervals={10}
-                    timeFormat="HH:mm"
-                    showTimeCaption={false}
-                    shouldCloseOnSelect={true}
-                    popperPlacement="top"
-                    calendarClassName="custom-datepicker"
-                    highlightDates={highlightedDates.length ? [{'highlighted-date': highlightedDates}] : undefined}
-                    filterDate={date => allowedDayKeys.size === 0 || allowedDayKeys.has(dayKey(date))}
-                    onChange={date => onChangeDatepickerDate(date)}
-                    onCalendarOpen={handleCalendarOpen}
-                    onMonthChange={handleMonthChange}
-                />
+                {hasTimelineAccess && (
+                    <DatePicker
+                        ref={datePickerRef}
+                        selected={startDate}
+                        customInput={
+                            <button className={styles.controlButton}>
+                                <Icons.Datepicker />
+                            </button>
+                        }
+                        locale={ru}
+                        showTimeSelect
+                        timeIntervals={10}
+                        timeFormat="HH:mm"
+                        showTimeCaption={false}
+                        shouldCloseOnSelect={true}
+                        popperPlacement="top"
+                        calendarClassName="custom-datepicker"
+                        highlightDates={highlightedDates.length ? [{'highlighted-date': highlightedDates}] : undefined}
+                        filterDate={date => allowedDayKeys.size === 0 || allowedDayKeys.has(dayKey(date))}
+                        onChange={date => onChangeDatepickerDate(date)}
+                        onCalendarOpen={handleCalendarOpen}
+                        onMonthChange={handleMonthChange}
+                    />
+                )}
                 <button
                     className={styles.controlButton}
                     onClick={onSaveStream}

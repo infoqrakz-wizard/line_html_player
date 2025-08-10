@@ -3,6 +3,7 @@ import {createRoot} from 'react-dom/client';
 import {Mode} from '../utils/types';
 import {Player} from '../components/player';
 import {TimeProvider} from '../context/time-context';
+import {TimelineAuthProvider} from '../context/timeline-auth-context';
 
 import '../styles/global.scss';
 
@@ -54,7 +55,9 @@ class DevLinePlayer {
         this.root.render(
             <React.StrictMode>
                 <TimeProvider>
-                    <Player {...this.options} />
+                    <TimelineAuthProvider>
+                        <Player {...this.options} />
+                    </TimelineAuthProvider>
                 </TimeProvider>
             </React.StrictMode>
         );

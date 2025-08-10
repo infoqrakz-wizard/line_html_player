@@ -1,6 +1,7 @@
 import React, {useState} from 'react';
 import {Player} from '../components/player';
 import {TimeProvider} from '../context/time-context';
+import {TimelineAuthProvider} from '../context/timeline-auth-context';
 import {Mode} from '../utils/types';
 
 import './DebugPlayer.scss';
@@ -144,7 +145,9 @@ const DebugPlayer: React.FC = () => {
                     <h2 className="title">Плеер</h2>
                     <div className="player-wrapper">
                         <TimeProvider>
-                            <Player {...params} />
+                            <TimelineAuthProvider>
+                                <Player {...params} />
+                            </TimelineAuthProvider>
                         </TimeProvider>
                     </div>
                 </div>

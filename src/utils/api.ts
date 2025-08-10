@@ -48,18 +48,22 @@ export const getFramesTimeline = (params: GetFramesTimelineParams): Promise<Time
 
         const xhr = new XMLHttpRequest();
         xhr.open('POST', rpcUrl, true);
-        // xhr.setRequestHeader('Content-Type', 'application/json');
-
-        // Устанавливаем responseType как arraybuffer для получения бинарных данных
-        // xhr.responseType = 'arraybuffer';
 
         xhr.onload = function () {
             if (xhr.status >= 200 && xhr.status < 300) {
-                // Декодируем msgpack в JavaScript объект
-                // const data = decode(new Uint8Array(xhr.response)) as TimelineResponse;
+                try {
+                    const data = JSON.parse(xhr.responseText);
 
-                const data = JSON.parse(xhr.responseText);
-                resolve(data.result);
+                    // Проверяем наличие ошибки авторизации
+                    if (data.error && data.error.type === 'auth' && data.error.message === 'forbidden') {
+                        reject(new Error('FORBIDDEN'));
+                        return;
+                    }
+
+                    resolve(data.result);
+                } catch (parseError) {
+                    reject(new Error('Failed to parse timeline data'));
+                }
             } else {
                 reject(new Error('Failed to fetch timeline data'));
             }
