@@ -4,14 +4,15 @@ import {createPortal} from 'react-dom';
 import {formatDate, addSecondsToDate} from '../../utils/dates';
 import {getProtocol, formatUrlForDownload, clickA} from '../../utils/url-params';
 import {Mode} from '../../utils/types';
-
+import {getCameraState} from '../../utils/api';
 import {ControlPanel} from '../control-panel';
+
 import {useTime} from '../../context/time-context';
+import {useTimelineState} from '../timeline/hooks/use-timeline-state';
 
 import {HlsPlayer, VideoTag, SaveStreamModal, ModeIndicator} from './components';
 import {PlayerComponentProps} from './components/player-interface';
 import type {PlayerRef} from './components/player-interface';
-import {useTimelineState} from '../timeline/hooks/use-timeline-state';
 
 import styles from './player.module.scss';
 
@@ -40,6 +41,7 @@ export const Player: React.FC<PlayerProps> = ({
     const [isFullscreen, setIsFullscreen] = useState(false);
     const {serverTime, setServerTime, progress: ctxProgress, setProgress} = useTime();
     const [showSaveModal, setShowSaveModal] = useState<boolean>(false);
+    const [isH265Codec, setIsH265Codec] = useState<boolean>(false);
 
     const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -79,6 +81,18 @@ export const Player: React.FC<PlayerProps> = ({
             setIsFirstLoad(false);
         }
     }, [currentMode, mode, isFirstLoad]);
+
+    useEffect(() => {
+        const fetchCameraState = async () => {
+            const result = await getCameraState(streamUrl, streamPort, authorization, camera);
+
+            setIsH265Codec(result.state.video_streams.video.codec === 'h265');
+        };
+
+        if (streamUrl && streamPort && authorization && Number.isInteger(camera)) {
+            void fetchCameraState();
+        }
+    }, [streamUrl, streamPort, authorization, camera]);
 
     const handleChangeMode = (newMode: Mode, time?: Date) => {
         setCurrentMode(newMode);
@@ -364,101 +378,108 @@ export const Player: React.FC<PlayerProps> = ({
     };
 
     return (
-        <div
-            className={styles.player}
-            ref={containerRef}
-            role="region"
-            aria-label="Плеер видео"
-        >
-            <div className={styles.modeIndicatorContainer}>
-                <ModeIndicator
-                    mode={currentMode}
-                    isPlaying={isPlaying}
-                />
-            </div>
+        <>
             <div
-                className={styles.videoContainer}
-                onDoubleClick={handleToggleFullscreen}
-                role="button"
-                aria-label="Переключить полноэкранный режим"
-                tabIndex={0}
-                onKeyDown={e => {
-                    const key = e.key.toLowerCase();
-                    if (key === 'enter') {
-                        e.preventDefault();
-                        handleToggleFullscreen();
-                    }
-                }}
+                className={styles.player}
+                ref={containerRef}
+                role="region"
+                aria-label="Плеер видео"
             >
-                {currentMode === 'record' ? (
-                    <HlsPlayer
-                        ref={playerRef}
-                        {...props}
-                    />
-                ) : (
-                    <VideoTag
-                        ref={playerRef}
-                        {...props}
-                    />
-                )}
-                {showSaveModal && (
-                    <SaveStreamModal
-                        currentTime={addSecondsToDate(serverTime ?? new Date(), ctxProgress)}
-                        isOpen={showSaveModal}
-                        onClose={() => setShowSaveModal(false)}
-                        onFinish={handleSaveStreamFinish}
-                    />
-                )}
-            </div>
-            <div
-                className={styles.controlArea}
-                ref={controlAreaRef}
-                onMouseEnter={handleMouseEnter}
-                onMouseLeave={handleMouseLeave}
-            >
-                <div className={`${styles.controlPanelContainer} ${showControls ? styles.show : ''}`}>
-                    <ControlPanel
+                <div className={styles.modeIndicatorContainer}>
+                    <ModeIndicator
                         mode={currentMode}
                         isPlaying={isPlaying}
-                        isMuted={isMuted}
-                        isFullscreen={isFullscreen}
-                        playbackSpeed={playbackSpeed}
-                        url={streamUrl}
-                        port={streamPort}
-                        credentials={authorization}
-                        progress={ctxProgress}
-                        camera={camera}
-                        onPlayPause={() => handlePlayPause()}
-                        onMuteToggle={() => handleMuteToggle()}
-                        onToggleFullscreen={() => handleToggleFullscreen()}
-                        onSpeedChange={handleSpeedChange}
-                        onSaveStream={handleSaveStream}
-                        onTimeClick={handleTimelineClick}
-                        onChangeStartDate={handleTimeChange}
-                        onChangeMode={handleChangeMode}
-                        disableSpeedChange={currentMode === Mode.Live}
-                        disableCenterTimeline={currentMode === Mode.Live}
                     />
                 </div>
-            </div>
-
-            {/** FIXME: убрать после завершения разработки */}
-            {createPortal(
-                <div className={styles.debugInfo}>
-                    <h2 className="title">Debug info</h2>
-                    <div className="debug-info-content">
-                        <p>serverTime: {serverTime?.toLocaleTimeString()}</p>
-                        <p>ctxProgress: {ctxProgress}</p>
-                        <p>isPlaying: {isPlaying ? 'true' : 'false'}</p>
-                        <p>isMuted: {isMuted ? 'true' : 'false'}</p>
-                        <p>playbackSpeed: {playbackSpeed}</p>
-                        <p>currentMode: {currentMode}</p>
-                        <p>isFullscreen: {isFullscreen ? 'true' : 'false'}</p>
-                        <p>showControls: {showControls ? 'true' : 'false'}</p>
+                <div
+                    className={styles.videoContainer}
+                    onDoubleClick={handleToggleFullscreen}
+                    role="button"
+                    aria-label="Переключить полноэкранный режим"
+                    tabIndex={0}
+                    onKeyDown={e => {
+                        const key = e.key.toLowerCase();
+                        if (key === 'enter') {
+                            e.preventDefault();
+                            handleToggleFullscreen();
+                        }
+                    }}
+                >
+                    {currentMode === 'record' ? (
+                        <HlsPlayer
+                            ref={playerRef}
+                            {...props}
+                        />
+                    ) : (
+                        <VideoTag
+                            ref={playerRef}
+                            {...props}
+                        />
+                    )}
+                    {showSaveModal && (
+                        <SaveStreamModal
+                            currentTime={addSecondsToDate(serverTime ?? new Date(), ctxProgress)}
+                            isOpen={showSaveModal}
+                            onClose={() => setShowSaveModal(false)}
+                            onFinish={handleSaveStreamFinish}
+                        />
+                    )}
+                </div>
+                <div
+                    className={styles.controlArea}
+                    ref={controlAreaRef}
+                    onMouseEnter={handleMouseEnter}
+                    onMouseLeave={handleMouseLeave}
+                >
+                    <div className={`${styles.controlPanelContainer} ${showControls ? styles.show : ''}`}>
+                        <ControlPanel
+                            mode={currentMode}
+                            isPlaying={isPlaying}
+                            isMuted={isMuted}
+                            isFullscreen={isFullscreen}
+                            playbackSpeed={playbackSpeed}
+                            url={streamUrl}
+                            port={streamPort}
+                            credentials={authorization}
+                            progress={ctxProgress}
+                            camera={camera}
+                            onPlayPause={() => handlePlayPause()}
+                            onMuteToggle={() => handleMuteToggle()}
+                            onToggleFullscreen={() => handleToggleFullscreen()}
+                            onSpeedChange={handleSpeedChange}
+                            onSaveStream={handleSaveStream}
+                            onTimeClick={handleTimelineClick}
+                            onChangeStartDate={handleTimeChange}
+                            onChangeMode={handleChangeMode}
+                            disableSpeedChange={currentMode === Mode.Live}
+                            disableCenterTimeline={currentMode === Mode.Live}
+                        />
                     </div>
-                </div>,
-                document.body
+                </div>
+
+                {/** FIXME: убрать после завершения разработки */}
+                {createPortal(
+                    <div className={styles.debugInfo}>
+                        <h2 className="title">Debug info</h2>
+                        <div className="debug-info-content">
+                            <p>serverTime: {serverTime?.toLocaleTimeString()}</p>
+                            <p>ctxProgress: {ctxProgress}</p>
+                            <p>isPlaying: {isPlaying ? 'true' : 'false'}</p>
+                            <p>isMuted: {isMuted ? 'true' : 'false'}</p>
+                            <p>playbackSpeed: {playbackSpeed}</p>
+                            <p>currentMode: {currentMode}</p>
+                            <p>isFullscreen: {isFullscreen ? 'true' : 'false'}</p>
+                            <p>showControls: {showControls ? 'true' : 'false'}</p>
+                        </div>
+                    </div>,
+                    document.body
+                )}
+            </div>
+            {isH265Codec && (
+                <div className={styles.h265CodecWarning}>
+                    <p>265</p>
+                </div>
             )}
-        </div>
+        </>
     );
 };

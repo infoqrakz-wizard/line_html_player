@@ -92,49 +92,71 @@ export const formatUrlForDownload = (params: UrlForDownloadParams) => {
     return downloadUrl;
 };
 
-
-interface ServerTimeResponse {
-  info: {
-    local_time: number[];
-    [key: string]: any;
-  };
-}
-
 export const getServerTime = (url: string, port: number, credentials: string): Promise<Date> => {
-  return new Promise((resolve, reject) => {
-    const fullUrl = url.startsWith('http') ? url : `${getProtocol()}://${url}`;
-    const rpcUrl = `${fullUrl}:${port}/rpc?authorization=Basic ${btoa(credentials)}&content-type=application/json`;
+    return new Promise((resolve, reject) => {
+        const fullUrl = url.startsWith('http') ? url : `${getProtocol()}://${url}`;
+        const rpcUrl = `${fullUrl}:${port}/rpc?authorization=Basic ${btoa(credentials)}&content-type=application/json`;
 
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', rpcUrl, true);
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', rpcUrl, true);
 
-    xhr.onload = function () {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        try {
-          const data = JSON.parse(xhr.responseText);
-          const localTime = data.result.info.local_time;
-          
-          if (Array.isArray(localTime) && localTime.length >= 7) {
-            // local_time format: [year, month, day, hour, minute, second, millisecond]
-            // Note: JavaScript months are 0-indexed, but the API returns 1-indexed months
-            const [year, month, day, hour, minute, second, millisecond] = localTime;
-            const serverDate = new Date(year, month - 1, day, hour, minute, second, millisecond);
-            resolve(serverDate);
-          } else {
-            reject(new Error('Invalid server time format'));
-          }
-        } catch (error) {
-          reject(new Error('Failed to parse server time response'));
-        }
-      } else {
-        reject(new Error('Failed to fetch server time'));
-      }
-    };
+        xhr.onload = function () {
+            if (xhr.status >= 200 && xhr.status < 300) {
+                try {
+                    const data = JSON.parse(xhr.responseText);
+                    const localTime = data.result.info.local_time;
 
-    xhr.onerror = function () {
-      reject(new Error('Failed to fetch server time'));
-    };
+                    if (Array.isArray(localTime) && localTime.length >= 7) {
+                        // local_time format: [year, month, day, hour, minute, second, millisecond]
+                        // Note: JavaScript months are 0-indexed, but the API returns 1-indexed months
+                        const [year, month, day, hour, minute, second, millisecond] = localTime;
+                        const serverDate = new Date(year, month - 1, day, hour, minute, second, millisecond);
+                        resolve(serverDate);
+                    } else {
+                        reject(new Error('Invalid server time format'));
+                    }
+                } catch (error) {
+                    reject(new Error('Failed to parse server time response'));
+                }
+            } else {
+                reject(new Error('Failed to fetch server time'));
+            }
+        };
 
-    xhr.send(JSON.stringify({ method: 'get_server_info', version: 12 }));
-  });
+        xhr.onerror = function () {
+            reject(new Error('Failed to fetch server time'));
+        };
+
+        xhr.send(JSON.stringify({method: 'get_server_info', version: 12}));
+    });
+};
+
+export const getCameraState = (url: string, port: number, credentials: string, camera: number): Promise<any> => {
+    return new Promise((resolve, reject) => {
+        const fullUrl = url.startsWith('http') ? url : `${getProtocol()}://${url}`;
+        const rpcUrl = `${fullUrl}:${port}/rpc?authorization=Basic ${btoa(credentials)}&content-type=application/json`;
+
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', rpcUrl, true);
+
+        xhr.onload = function () {
+            if (xhr.status >= 200 && xhr.status < 300) {
+                try {
+                    const data = JSON.parse(xhr.responseText);
+
+                    resolve(data.result);
+                } catch (error) {
+                    reject(new Error('Failed to parse server time response'));
+                }
+            } else {
+                reject(new Error('Failed to fetch server time'));
+            }
+        };
+
+        xhr.onerror = function () {
+            reject(new Error('Failed to fetch server time'));
+        };
+
+        xhr.send(JSON.stringify({method: 'get_camera_state', params: {camera: String(camera)}, version: 13}));
+    });
 };
