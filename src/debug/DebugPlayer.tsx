@@ -18,8 +18,8 @@ const DebugPlayer: React.FC = () => {
         login: 'yandex',
         password: 'NLAWyYrH08nVTVthqsKk',
         mode: Mode.Live,
-        muted: true,
-        camera: 0
+        muted: true
+        // camera: 0
     });
 
     // Обработчик изменения параметров
