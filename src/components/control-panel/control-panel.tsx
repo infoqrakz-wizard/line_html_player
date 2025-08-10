@@ -5,6 +5,7 @@ import {PlayerControls} from '../player-controls';
 import {TimelineRef} from '../timeline/types';
 import styles from './control-panel.module.scss';
 import {Mode} from '../../utils/types';
+import {useTimelineAuth} from '../../context/timeline-auth-context';
 
 interface ControlPanelProps {
     mode: Mode;
@@ -51,6 +52,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
     disableCenterTimeline = false,
     onChangeMode
 }) => {
+    const {hasTimelineAccess} = useTimelineAuth();
     const timelineRef = useRef<TimelineRef>(null);
 
     return (
@@ -68,7 +70,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                 onPlayPause={onPlayPause}
                 onMuteToggle={onMuteToggle}
                 onSpeedChange={onSpeedChange}
-                onCenterTimeline={() => timelineRef.current?.centerOnCurrentTime()}
+                onCenterTimeline={hasTimelineAccess ? () => timelineRef.current?.centerOnCurrentTime() : undefined}
                 onChangeStartDate={onChangeStartDate}
                 onSaveStream={onSaveStream}
                 onToggleFullscreen={onToggleFullscreen}
@@ -76,16 +78,18 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                 disableCenterTimeline={disableCenterTimeline}
                 onChangeMode={onChangeMode}
             />
-            <Timeline
-                ref={timelineRef}
-                url={url}
-                port={port}
-                credentials={credentials}
-                onTimeClick={onTimeClick}
-                progress={progress}
-                camera={camera}
-                mode={mode}
-            />
+            {hasTimelineAccess && (
+                <Timeline
+                    ref={timelineRef}
+                    url={url}
+                    port={port}
+                    credentials={credentials}
+                    onTimeClick={onTimeClick}
+                    progress={progress}
+                    camera={camera}
+                    mode={mode}
+                />
+            )}
         </div>
     );
 };

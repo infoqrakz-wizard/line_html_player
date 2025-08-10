@@ -1,17 +1,20 @@
 /**
  * Хук для управления фрагментами временной шкалы
  */
-import { useState, useRef, useCallback } from 'react';
-import { getFramesTimeline } from '../../../utils/api';
-import { TimeRange, LoadQueueItem, TimelineFragmentsParams } from '../types';
-import { BUFFER_SCREENS, UNIT_LENGTHS } from '../utils/constants';
+import {useState, useRef, useCallback} from 'react';
+import {getFramesTimeline} from '../../../utils/api';
+import {TimeRange, LoadQueueItem, TimelineFragmentsParams} from '../types';
+import {BUFFER_SCREENS, UNIT_LENGTHS} from '../utils/constants';
+import {useTimelineAuth} from '../../../context/timeline-auth-context';
 
 /**
  * Хук для управления фрагментами временной шкалы
  * @param params Параметры для загрузки фрагментов
  * @returns Состояние фрагментов и методы для управления ими
  */
-export const useTimelineFragments = ({ url, port, credentials, camera }: TimelineFragmentsParams) => {
+export const useTimelineFragments = ({url, port, credentials, camera}: TimelineFragmentsParams) => {
+    const {setTimelineAccess} = useTimelineAuth();
+
     // Массив с наличием фрагментов
     const [fragments, setFragments] = useState<number[]>([]);
 
@@ -33,7 +36,7 @@ export const useTimelineFragments = ({ url, port, credentials, camera }: Timelin
     const processLoadQueue = useCallback(async () => {
         if (isLoadingFragments || !loadQueue.current) return;
 
-        const { start, end, zoomIndex } = loadQueue.current;
+        const {start, end, zoomIndex} = loadQueue.current;
         loadQueue.current = null;
         setIsLoadingFragments(true);
 
@@ -56,10 +59,15 @@ export const useTimelineFragments = ({ url, port, credentials, camera }: Timelin
             // Проверяем, не появился ли новый запрос в очереди
             if (!loadQueue.current) {
                 setFragments(response.timeline);
-                setFragmentsBufferRange({ start: bufferStart, end: bufferEnd });
+                setFragmentsBufferRange({start: bufferStart, end: bufferEnd});
             }
         } catch (error) {
             console.error('Failed to load fragments:', error);
+
+            if (error instanceof Error && error.message === 'FORBIDDEN') {
+                setTimelineAccess(false);
+                return;
+            }
         } finally {
             setIsLoadingFragments(false);
             // Если в очереди появился новый запрос, обрабатываем его
@@ -105,7 +113,7 @@ export const useTimelineFragments = ({ url, port, credentials, camera }: Timelin
             }
 
             console.log('loadFragments: добавляем новый запрос в очередь');
-            loadQueue.current = { start, end, zoomIndex };
+            loadQueue.current = {start, end, zoomIndex};
             processLoadQueue();
         },
         [processLoadQueue, fragmentsBufferRange, isLoadingFragments]
