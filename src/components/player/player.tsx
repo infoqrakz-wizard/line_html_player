@@ -36,6 +36,9 @@ export const Player: React.FC<PlayerProps> = ({
     muted = false,
     camera = 0
 }) => {
+    // Local auth state to allow updating credentials when 401 occurs
+    const [authLogin, setAuthLogin] = useState<string>(login);
+    const [authPassword, setAuthPassword] = useState<string>(password ?? '');
     const [currentMode, setCurrentMode] = useState<Mode>(mode);
     const [isFirstLoad, setIsFirstLoad] = useState(true);
     const [isFullscreen, setIsFullscreen] = useState(false);
@@ -43,6 +46,12 @@ export const Player: React.FC<PlayerProps> = ({
     const [showSaveModal, setShowSaveModal] = useState<boolean>(false);
     const [isH265Codec, setIsH265Codec] = useState<boolean>(false);
     const [isNoSound, setIsNoSound] = useState<boolean>(false);
+
+    // Availability/auth check state
+    const [isCheckingAvailability, setIsCheckingAvailability] = useState<boolean>(false);
+    const [authRequired, setAuthRequired] = useState<boolean>(false);
+    const [serverUnavailable, setServerUnavailable] = useState<boolean>(false);
+    const [authVerified, setAuthVerified] = useState<boolean>(false);
 
     const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -61,20 +70,26 @@ export const Player: React.FC<PlayerProps> = ({
 
     const protocol = getProtocol();
     const getStreamUrl = (type: string) =>
-        `${protocol}://${streamUrl}:${streamPort}/cameras/${camera}/streaming/main.${type}?authorization=Basic%20${btoa(`${login}:${password}`)}`;
+        `${protocol}://${streamUrl}:${streamPort}/cameras/${camera}/streaming/main.${type}?authorization=Basic%20${btoa(`${authLogin}:${authPassword}`)}`;
 
     // const posterUrl = `${protocol}://${streamUrl}:${streamPort}/cameras/${camera}/image?stream=main&authorization=Basic%20${btoa(`${login}:${password}`)}`;
     const streamType = currentMode === 'record' ? 'm3u8' : 'mp4';
-    const authorization = `${login}:${password}`;
+    const authorization = `${authLogin}:${authPassword}`;
     const videoUrl = getStreamUrl(streamType);
 
-    const {updateServerTime} = useTimelineState(undefined, streamUrl, streamPort, authorization);
+    const {updateServerTime} = useTimelineState(
+        undefined,
+        streamUrl,
+        streamPort,
+        authVerified ? authorization : undefined
+    );
 
     // Формирование URL для потока в зависимости от режима и серверного времени
-    const finalStreamUrl =
-        currentMode === 'record' && serverTime
+    const finalStreamUrl = authVerified
+        ? currentMode === 'record' && serverTime
             ? `${videoUrl}&time=${formatDate(serverTime)}&autoplay=1&audio=1`
-            : videoUrl || '';
+            : videoUrl || ''
+        : '';
 
     // Отслеживаем переключение режимов для определения, что это уже не первая загрузка
     useEffect(() => {
@@ -91,10 +106,62 @@ export const Player: React.FC<PlayerProps> = ({
             setIsNoSound(result.state.audio_streams.audio.signal === 'no');
         };
 
-        if (streamUrl && streamPort && authorization && Number.isInteger(camera)) {
+        if (authVerified && streamUrl && streamPort && authorization && Number.isInteger(camera)) {
             void fetchCameraState();
         }
-    }, [streamUrl, streamPort, authorization, camera]);
+    }, [authVerified, streamUrl, streamPort, authorization, camera]);
+
+    const checkAvailability = useCallback(
+        async (credentials: string) => {
+            if (!streamUrl || !streamPort) return;
+            const controller = new AbortController();
+            const timeoutMs = 5000;
+            let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+            setIsCheckingAvailability(true);
+            setAuthVerified(false);
+            setServerUnavailable(false);
+            setAuthRequired(false);
+
+            const url = `${protocol}://${streamUrl}:${streamPort}/cameras?authorization=Basic%20${btoa(credentials)}`;
+
+            try {
+                timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+                const res = await fetch(url, {method: 'GET', signal: controller.signal});
+                if (res.status === 401) {
+                    setAuthRequired(true);
+                    setServerUnavailable(false);
+                    setAuthVerified(false);
+                    return;
+                }
+                if (!res.ok) {
+                    console.warn('Cameras check failed with status', res.status);
+                    setAuthVerified(false);
+                    return;
+                }
+                setAuthRequired(false);
+                setServerUnavailable(false);
+                setAuthVerified(true);
+            } catch (e) {
+                setServerUnavailable(true);
+                setAuthVerified(false);
+            } finally {
+                if (timeoutId) clearTimeout(timeoutId);
+                setIsCheckingAvailability(false);
+            }
+        },
+        [protocol, streamPort, streamUrl]
+    );
+
+    useEffect(() => {
+        void checkAvailability(`${authLogin}:${authPassword}`);
+    }, [checkAvailability, streamUrl, streamPort, camera]);
+
+    useEffect(() => {
+        setAuthLogin(login);
+        setAuthPassword(password ?? '');
+        void checkAvailability(`${login}:${password ?? ''}`);
+    }, [login, password, checkAvailability]);
 
     const handleChangeMode = (newMode: Mode, time?: Date) => {
         setCurrentMode(newMode);
@@ -351,7 +418,7 @@ export const Player: React.FC<PlayerProps> = ({
 
         const date = start.toISOString().split('.')[0];
 
-        const url = `${protocol}://${streamUrl}:${streamPort}/cameras/${camera}/streaming/main.mp4?authorization=Basic%20${btoa(`${login}:${password}`)}&time=${date}&duration=${formatDuration(durationSeconds)}&download=1&filename=${fileName}`;
+        const url = `${protocol}://${streamUrl}:${streamPort}/cameras/${camera}/streaming/main.mp4?authorization=Basic%20${btoa(`${authLogin}:${authPassword}`)}&time=${date}&duration=${formatDuration(durationSeconds)}&download=1&filename=${fileName}`;
         const downloadUrl = formatUrlForDownload({
             url,
             start,
@@ -426,6 +493,67 @@ export const Player: React.FC<PlayerProps> = ({
                             onFinish={handleSaveStreamFinish}
                         />
                     )}
+                    {(serverUnavailable || authRequired) && (
+                        <div
+                            className={styles.overlay}
+                            aria-live="polite"
+                        >
+                            {serverUnavailable && (
+                                <div
+                                    className={styles.overlayCard}
+                                    role="alert"
+                                >
+                                    <div className={styles.overlayTitle}>Сервер недоступен</div>
+                                    <div className={styles.overlayText}>Проверьте подключение и попробуйте позже.</div>
+                                </div>
+                            )}
+                            {authRequired && (
+                                <div
+                                    className={styles.overlayCard}
+                                    role="dialog"
+                                    aria-modal="true"
+                                >
+                                    <div className={styles.overlayTitle}>Требуется авторизация</div>
+                                    <form
+                                        className={styles.loginForm}
+                                        onSubmit={e => {
+                                            e.preventDefault();
+                                            // Re-check availability with new credentials
+                                            void checkAvailability(`${authLogin}:${authPassword}`);
+                                        }}
+                                    >
+                                        <label className={styles.label}>
+                                            Логин
+                                            <input
+                                                className={styles.input}
+                                                type="text"
+                                                value={authLogin}
+                                                onChange={e => setAuthLogin(e.target.value)}
+                                            />
+                                        </label>
+                                        <label className={styles.label}>
+                                            Пароль
+                                            <input
+                                                className={styles.input}
+                                                type="password"
+                                                value={authPassword}
+                                                onChange={e => setAuthPassword(e.target.value)}
+                                            />
+                                        </label>
+                                        <div className={styles.actions}>
+                                            <button
+                                                type="submit"
+                                                className={styles.primaryButton}
+                                                disabled={isCheckingAvailability}
+                                            >
+                                                Войти
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
                 <div
                     className={styles.controlArea}
@@ -443,7 +571,7 @@ export const Player: React.FC<PlayerProps> = ({
                             playbackSpeed={playbackSpeed}
                             url={streamUrl}
                             port={streamPort}
-                            credentials={authorization}
+                            credentials={authVerified ? authorization : ''}
                             progress={ctxProgress}
                             camera={camera}
                             onPlayPause={() => handlePlayPause()}
