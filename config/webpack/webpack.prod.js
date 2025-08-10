@@ -8,6 +8,7 @@ const HtmlWebpackPlugin = require('html-webpack-plugin');
 const BundleAnalyzerPlugin = require('webpack-bundle-analyzer').BundleAnalyzerPlugin;
 const {WebpackManifestPlugin} = require('webpack-manifest-plugin');
 const LoaderGeneratorPlugin = require('./plugins/LoaderGeneratorPlugin');
+const PlayerStandalonePlugin = require('./plugins/PlayerStandalonePlugin');
 const path = require('path');
 
 module.exports = () => {
@@ -107,6 +108,12 @@ module.exports = () => {
                 filename: 'demo.html',
                 chunks: [] // Не включаем никакие чанки, так как используем загрузчик
             }),
+            // Add HTML plugin for the player page
+            new HtmlWebpackPlugin({
+                template: paths.templates.player,
+                filename: 'player.html',
+                chunks: [] // Не включаем никакие чанки, так как используем загрузчик
+            }),
             // Generate manifest file
             new WebpackManifestPlugin({
                 fileName: 'asset-manifest.json',
@@ -144,6 +151,10 @@ module.exports = () => {
                 openAnalyzer: false,
                 generateStatsFile: true,
                 statsFilename: 'webpack-stats.json'
+            }),
+            new PlayerStandalonePlugin({
+                outputDir: 'player',
+                htmlFileName: 'player.html'
             })
         ]
     });
