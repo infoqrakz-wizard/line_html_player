@@ -6,6 +6,7 @@ const BUILD_DIR = path.resolve(ROOT_DIR, 'build');
 const ASSETS_DIR = path.resolve(ROOT_DIR, 'assets');
 const DEMO_DIR = path.resolve(SRC_DIR, 'pages/demo');
 const DEBUG_DIR = path.resolve(SRC_DIR, 'debug');
+const PLAYER_DIR = path.resolve(SRC_DIR, 'player-page');
 
 module.exports = {
     paths: {
@@ -15,13 +16,15 @@ module.exports = {
         assets: ASSETS_DIR,
         demo: DEMO_DIR,
         debug: DEBUG_DIR,
+        player: PLAYER_DIR,
         entries: {
             library: path.resolve(SRC_DIR, 'lib/DevLinePlayer.tsx'),
             debug: path.resolve(DEBUG_DIR, 'index.tsx')
         },
         templates: {
             demo: path.resolve(DEMO_DIR, 'index.html'),
-            debug: path.resolve(DEBUG_DIR, 'index.html')
+            debug: path.resolve(DEBUG_DIR, 'index.html'),
+            player: path.resolve(PLAYER_DIR, 'index.html')
         },
         nodeModules: path.resolve(ROOT_DIR, 'node_modules'),
         packageJson: path.resolve(ROOT_DIR, 'package.json')

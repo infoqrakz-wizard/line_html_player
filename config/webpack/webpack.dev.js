@@ -12,9 +12,9 @@ module.exports = () => {
         devServer: {
             historyApiFallback: {
                 rewrites: [
-                    { from: /^\/debug/, to: '/debug.html' },
-                    { from: /^\/demo/, to: '/demo.html' },
-                    { from: /./, to: '/debug.html' }
+                    {from: /^\/debug/, to: '/debug.html'},
+                    {from: /^\/demo/, to: '/demo.html'},
+                    {from: /./, to: '/debug.html'}
                 ]
             },
             open: ['/debug.html'],
@@ -119,15 +119,21 @@ module.exports = () => {
                 template: paths.templates.demo,
                 filename: 'demo.html',
                 chunks: ['devline-player']
+            }),
+            // HTML-плагин для плеера на полный экран
+            new HtmlWebpackPlugin({
+                template: paths.templates.player,
+                filename: 'player.html',
+                chunks: []
             })
         ]
     });
-    
+
     // Настройка точек входа
     config.entry = {
         'devline-player': paths.entries.library,
-        'debug': paths.entries.debug
+        debug: paths.entries.debug
     };
-    
+
     return config;
-}
+};
