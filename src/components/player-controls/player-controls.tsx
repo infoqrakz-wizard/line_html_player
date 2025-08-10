@@ -2,7 +2,7 @@ import React, {useMemo, useRef, useState} from 'react';
 import DatePicker, {registerLocale} from 'react-datepicker';
 import type ReactDatePicker from 'react-datepicker';
 import {ru} from 'date-fns/locale/ru';
-import {endOfMonth, format, startOfDay, startOfMonth} from 'date-fns';
+import {addMonths, format, startOfDay, startOfMonth} from 'date-fns';
 
 import {Mode} from '../../utils/types';
 import {getFramesTimeline} from '../../utils/api';
@@ -81,7 +81,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
         if (loadedMonths.current.has(key)) return;
 
         const start = startOfMonth(viewDate);
-        const end = endOfMonth(viewDate);
+        const end = startOfMonth(addMonths(viewDate, 1));
 
         try {
             const result = await getFramesTimeline({
@@ -89,7 +89,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
                 port,
                 credentials,
                 startTime: startOfDay(start),
-                endTime: end,
+                endTime: startOfDay(end),
                 unitLength: 86400,
                 channel: camera
             });
@@ -164,11 +164,13 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
                     timeFormat="HH:mm"
                     showTimeCaption={false}
                     shouldCloseOnSelect={true}
+                    popperPlacement="top"
+                    calendarClassName="custom-datepicker"
+                    highlightDates={highlightedDates.length ? [{'highlighted-date': highlightedDates}] : undefined}
+                    filterDate={date => allowedDayKeys.size === 0 || allowedDayKeys.has(dayKey(date))}
                     onChange={date => onChangeDatepickerDate(date)}
                     onCalendarOpen={handleCalendarOpen}
                     onMonthChange={handleMonthChange}
-                    highlightDates={highlightedDates.length ? [{'highlighted-date': highlightedDates}] : undefined}
-                    filterDate={date => allowedDayKeys.size === 0 || allowedDayKeys.has(dayKey(date))}
                 />
                 <button
                     className={styles.controlButton}
@@ -176,7 +178,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
                 >
                     <Icons.Export />
                 </button>
-                {mode !== Mode.Live && (
+                {mode === Mode.Record && (
                     <SpeedSelector
                         playbackSpeed={playbackSpeed}
                         onSpeedChange={onSpeedChange}
