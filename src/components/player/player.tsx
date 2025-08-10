@@ -4,7 +4,7 @@ import {createPortal} from 'react-dom';
 import {formatDate, addSecondsToDate} from '../../utils/dates';
 import {getProtocol, formatUrlForDownload, clickA} from '../../utils/url-params';
 import {Mode} from '../../utils/types';
-import {getCameraState} from '../../utils/api';
+import {getCameraState, getCamerasList, type CameraInfo} from '../../utils/api';
 import {ControlPanel} from '../control-panel';
 
 import {useTime} from '../../context/time-context';
@@ -24,7 +24,7 @@ export interface PlayerProps {
     password?: string; // Делаем пароль опциональным
     mode?: Mode;
     muted?: boolean; // Делаем звук опциональным
-    camera: number;
+    camera?: number;
 }
 
 export const Player: React.FC<PlayerProps> = ({
@@ -34,7 +34,7 @@ export const Player: React.FC<PlayerProps> = ({
     password = '',
     mode = Mode.Live,
     muted = false,
-    camera = 0
+    camera: initialCamera
 }) => {
     // Local auth state to allow updating credentials when 401 occurs
     const [authLogin, setAuthLogin] = useState<string>(login);
@@ -69,8 +69,11 @@ export const Player: React.FC<PlayerProps> = ({
     const wasPlayingBeforeHiddenRef = useRef<boolean>(false);
 
     const protocol = getProtocol();
+    const [availableCameras, setAvailableCameras] = useState<CameraInfo[]>([]);
+    const [camera, setCamera] = useState<number | undefined>(initialCamera);
+    const shouldShowCameraSelect = initialCamera === undefined && availableCameras.length > 0;
     const getStreamUrl = (type: string) =>
-        `${protocol}://${streamUrl}:${streamPort}/cameras/${camera}/streaming/main.${type}?authorization=Basic%20${btoa(`${authLogin}:${authPassword}`)}`;
+        `${protocol}://${streamUrl}:${streamPort}/cameras/${camera ?? 0}/streaming/main.${type}?authorization=Basic%20${btoa(`${authLogin}:${authPassword}`)}`;
 
     // const posterUrl = `${protocol}://${streamUrl}:${streamPort}/cameras/${camera}/image?stream=main&authorization=Basic%20${btoa(`${login}:${password}`)}`;
     const streamType = currentMode === 'record' ? 'm3u8' : 'mp4';
@@ -85,11 +88,14 @@ export const Player: React.FC<PlayerProps> = ({
     );
 
     // Формирование URL для потока в зависимости от режима и серверного времени
-    const finalStreamUrl = authVerified
-        ? currentMode === 'record' && serverTime
-            ? `${videoUrl}&time=${formatDate(serverTime)}&autoplay=1&audio=1`
-            : videoUrl || ''
-        : '';
+    let finalStreamUrl = '';
+    if (authVerified && camera !== undefined) {
+        if (currentMode === 'record' && serverTime) {
+            finalStreamUrl = `${videoUrl}&time=${formatDate(serverTime)}&autoplay=1&audio=1`;
+        } else {
+            finalStreamUrl = videoUrl || '';
+        }
+    }
 
     // Отслеживаем переключение режимов для определения, что это уже не первая загрузка
     useEffect(() => {
@@ -100,13 +106,13 @@ export const Player: React.FC<PlayerProps> = ({
 
     useEffect(() => {
         const fetchCameraState = async () => {
-            const result = await getCameraState(streamUrl, streamPort, authorization, camera);
+            const result = await getCameraState(streamUrl, streamPort, authorization, camera ?? 0);
 
             setIsH265Codec(result.state.video_streams.video.codec === 'h265');
             setIsNoSound(result.state.audio_streams.audio.signal === 'no');
         };
 
-        if (authVerified && streamUrl && streamPort && authorization && Number.isInteger(camera)) {
+        if (authVerified && streamUrl && streamPort && authorization && Number.isInteger(camera as number)) {
             void fetchCameraState();
         }
     }, [authVerified, streamUrl, streamPort, authorization, camera]);
@@ -114,54 +120,54 @@ export const Player: React.FC<PlayerProps> = ({
     const checkAvailability = useCallback(
         async (credentials: string) => {
             if (!streamUrl || !streamPort) return;
-            const controller = new AbortController();
-            const timeoutMs = 5000;
-            let timeoutId: ReturnType<typeof setTimeout> | null = null;
-
             setIsCheckingAvailability(true);
             setAuthVerified(false);
             setServerUnavailable(false);
             setAuthRequired(false);
 
-            const url = `${protocol}://${streamUrl}:${streamPort}/cameras?authorization=Basic%20${btoa(credentials)}`;
-
             try {
-                timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-                const res = await fetch(url, {method: 'GET', signal: controller.signal});
-                if (res.status === 401) {
-                    setAuthRequired(true);
-                    setServerUnavailable(false);
-                    setAuthVerified(false);
-                    return;
-                }
-                if (!res.ok) {
-                    console.warn('Cameras check failed with status', res.status);
-                    setAuthVerified(false);
-                    return;
-                }
+                await getCamerasList(streamUrl, streamPort, credentials);
                 setAuthRequired(false);
                 setServerUnavailable(false);
                 setAuthVerified(true);
             } catch (e) {
-                setServerUnavailable(true);
-                setAuthVerified(false);
+                if ((e as Error)?.message === 'FORBIDDEN') {
+                    setAuthRequired(true);
+                    setServerUnavailable(false);
+                    setAuthVerified(false);
+                } else {
+                    setServerUnavailable(true);
+                    setAuthVerified(false);
+                }
             } finally {
-                if (timeoutId) clearTimeout(timeoutId);
                 setIsCheckingAvailability(false);
             }
         },
-        [protocol, streamPort, streamUrl]
+        [streamUrl, streamPort]
     );
 
     useEffect(() => {
         void checkAvailability(`${authLogin}:${authPassword}`);
-    }, [checkAvailability, streamUrl, streamPort, camera]);
+    }, [checkAvailability, streamUrl, streamPort, camera, authLogin, authPassword]);
+
+    useEffect(() => {
+        const loadCameras = async () => {
+            if (!authVerified || !streamUrl || !streamPort) return;
+            try {
+                const list = await getCamerasList(streamUrl, streamPort, `${authLogin}:${authPassword}`);
+                setAvailableCameras(list);
+            } catch (err) {
+                // keep silent; availability flow will show errors
+            }
+        };
+        void loadCameras();
+    }, [authVerified, streamUrl, streamPort, authLogin, authPassword, camera]);
 
     useEffect(() => {
         setAuthLogin(login);
         setAuthPassword(password ?? '');
         void checkAvailability(`${login}:${password ?? ''}`);
-    }, [login, password, checkAvailability]);
+    }, [login, password, checkAvailability, camera]);
 
     const handleChangeMode = (newMode: Mode, time?: Date) => {
         setCurrentMode(newMode);
@@ -175,8 +181,6 @@ export const Player: React.FC<PlayerProps> = ({
 
     const handleTimelineClick = async (clickedTime: Date) => {
         // Получаем текущее время сервера или используем текущее время системы
-        // const currentServerTime = serverTime || new Date();
-
         const currentServerTime = await updateServerTime();
 
         // Проверяем, является ли выбранное время в будущем
@@ -418,7 +422,7 @@ export const Player: React.FC<PlayerProps> = ({
 
         const date = start.toISOString().split('.')[0];
 
-        const url = `${protocol}://${streamUrl}:${streamPort}/cameras/${camera}/streaming/main.mp4?authorization=Basic%20${btoa(`${authLogin}:${authPassword}`)}&time=${date}&duration=${formatDuration(durationSeconds)}&download=1&filename=${fileName}`;
+        const url = `${protocol}://${streamUrl}:${streamPort}/cameras/${camera ?? 0}/streaming/main.mp4?authorization=Basic%20${btoa(`${authLogin}:${authPassword}`)}&time=${date}&duration=${formatDuration(durationSeconds)}&download=1&filename=${fileName}`;
         const downloadUrl = formatUrlForDownload({
             url,
             start,
@@ -454,11 +458,33 @@ export const Player: React.FC<PlayerProps> = ({
                 role="region"
                 aria-label="Плеер видео"
             >
-                <div className={styles.modeIndicatorContainer}>
+                <div className={styles.topControls}>
                     <ModeIndicator
                         mode={currentMode}
                         isPlaying={isPlaying}
                     />
+                    {shouldShowCameraSelect && (
+                        <select
+                            value={camera ?? ''}
+                            onChange={e => setCamera(Number(e.target.value))}
+                            aria-label="Выбор камеры"
+                        >
+                            <option
+                                value=""
+                                disabled
+                            >
+                                Выберите камеру
+                            </option>
+                            {availableCameras.map(c => (
+                                <option
+                                    key={c.id}
+                                    value={c.id}
+                                >
+                                    {c.name ?? `Camera ${c.id}`}
+                                </option>
+                            ))}
+                        </select>
+                    )}
                 </div>
                 <div
                     className={styles.videoContainer}
@@ -573,7 +599,7 @@ export const Player: React.FC<PlayerProps> = ({
                             port={streamPort}
                             credentials={authVerified ? authorization : ''}
                             progress={ctxProgress}
-                            camera={camera}
+                            camera={camera ?? 0}
                             onPlayPause={() => handlePlayPause()}
                             onMuteToggle={() => handleMuteToggle()}
                             onToggleFullscreen={() => handleToggleFullscreen()}

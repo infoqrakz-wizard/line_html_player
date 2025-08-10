@@ -1,6 +1,16 @@
 import {getProtocol} from './url-params';
 import {differenceInSeconds, format} from 'date-fns';
 
+export interface CameraInfo {
+    id: number;
+    uri: string;
+    name?: string;
+    width?: number;
+    height?: number;
+    imageUri?: string;
+    streamingUri?: string;
+}
+
 interface GetFramesTimelineParams {
     url: string;
     port: number;
@@ -162,5 +172,76 @@ export const getCameraState = (url: string, port: number, credentials: string, c
         };
 
         xhr.send(JSON.stringify({method: 'get_camera_state', params: {camera: String(camera)}, version: 13}));
+    });
+};
+
+/**
+ * Запрашивает список камер и парсит XML-ответ
+ */
+export const getCamerasList = (
+    url: string,
+    port: number,
+    credentials: string,
+    timeoutMs: number = 5000
+): Promise<CameraInfo[]> => {
+    return new Promise(async (resolve, reject) => {
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+            const fullUrl = url.startsWith('http') ? url : `${getProtocol()}://${url}`;
+            const requestUrl = `${fullUrl}:${port}/cameras?authorization=Basic%20${btoa(credentials)}`;
+
+            const res = await fetch(requestUrl, {method: 'GET', signal: controller.signal});
+            clearTimeout(timeoutId);
+
+            if (res.status === 401) {
+                reject(new Error('FORBIDDEN'));
+                return;
+            }
+
+            if (!res.ok) {
+                reject(new Error(`Failed to fetch cameras: ${res.status}`));
+                return;
+            }
+
+            const text = await res.text();
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(text, 'application/xml');
+
+            const parserError = doc.getElementsByTagName('parsererror')[0];
+            if (parserError) {
+                reject(new Error('Failed to parse cameras XML'));
+                return;
+            }
+
+            const cameraNodes = Array.from(doc.getElementsByTagName('camera'));
+            const cameras: CameraInfo[] = cameraNodes.map(node => {
+                const getText = (tag: string) => node.getElementsByTagName(tag)[0]?.textContent ?? undefined;
+                const uri = getText('uri') ?? '';
+                const idStr = uri.split('/').filter(Boolean).pop() ?? '0';
+                const id = Number.parseInt(idStr, 10);
+                const width = Number.parseInt(getText('width') ?? '', 10);
+                const height = Number.parseInt(getText('height') ?? '', 10);
+
+                return {
+                    id: Number.isNaN(id) ? 0 : id,
+                    uri,
+                    name: getText('name') ?? undefined,
+                    width: Number.isNaN(width) ? undefined : width,
+                    height: Number.isNaN(height) ? undefined : height,
+                    imageUri: getText('image-uri') ?? undefined,
+                    streamingUri: getText('streaming-uri') ?? undefined
+                } as CameraInfo;
+            });
+
+            resolve(cameras);
+        } catch (err) {
+            if ((err as Error).name === 'AbortError') {
+                reject(new Error('Failed to fetch cameras: timeout'));
+                return;
+            }
+            reject(new Error('Failed to fetch cameras'));
+        }
     });
 };
