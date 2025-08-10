@@ -4,7 +4,7 @@ import type ReactDatePicker from 'react-datepicker';
 import {ru} from 'date-fns/locale/ru';
 import {addMonths, format, startOfDay, startOfMonth} from 'date-fns';
 
-import {Mode} from '../../utils/types';
+import {Mode, Protocol} from '../../utils/types';
 import {getFramesTimeline} from '../../utils/api';
 import {useTimelineAuth} from '../../context/timeline-auth-context';
 
@@ -29,6 +29,7 @@ interface PlayerControlsProps {
     port?: number;
     credentials?: string;
     camera?: number;
+    protocol?: Protocol;
     onPlayPause: () => void;
     onMuteToggle: () => void;
     onSpeedChange: (speed: number) => void;
@@ -52,6 +53,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
     port,
     credentials,
     camera,
+    protocol,
     onPlayPause,
     onMuteToggle,
     onSpeedChange,
@@ -95,7 +97,8 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
                 startTime: startOfDay(start),
                 endTime: startOfDay(end),
                 unitLength: 86400,
-                channel: camera
+                channel: camera,
+                protocol
             });
 
             const days: Date[] = [];

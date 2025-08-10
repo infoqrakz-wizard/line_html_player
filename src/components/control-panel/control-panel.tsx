@@ -4,7 +4,7 @@ import {Timeline} from '../timeline';
 import {PlayerControls} from '../player-controls';
 import {TimelineRef} from '../timeline/types';
 import styles from './control-panel.module.scss';
-import {Mode} from '../../utils/types';
+import {Mode, Protocol} from '../../utils/types';
 import {useTimelineAuth} from '../../context/timeline-auth-context';
 
 interface ControlPanelProps {
@@ -19,6 +19,7 @@ interface ControlPanelProps {
     credentials: string;
     progress?: number;
     camera: number;
+    protocol?: Protocol;
     onPlayPause: () => void;
     onMuteToggle: () => void;
     onSpeedChange: (speed: number) => void;
@@ -43,6 +44,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
     credentials,
     progress,
     camera,
+    protocol,
     onPlayPause,
     onMuteToggle,
     onSpeedChange,
@@ -70,6 +72,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                 port={port}
                 credentials={credentials}
                 camera={camera}
+                protocol={protocol}
                 onPlayPause={onPlayPause}
                 onMuteToggle={onMuteToggle}
                 onSpeedChange={onSpeedChange}

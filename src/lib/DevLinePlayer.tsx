@@ -1,6 +1,6 @@
 import React from 'react';
 import {createRoot} from 'react-dom/client';
-import {Mode} from '../utils/types';
+import {Mode, Protocol} from '../utils/types';
 import {Player} from '../components/player';
 import {TimeProvider} from '../context/time-context';
 import {TimelineAuthProvider} from '../context/timeline-auth-context';
@@ -16,6 +16,7 @@ interface DevLinePlayerOptions {
     camera: number;
     login: string;
     password?: string;
+    protocol?: Protocol;
 }
 
 class DevLinePlayer {

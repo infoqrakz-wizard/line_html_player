@@ -5,7 +5,7 @@
 /**
  * Свойства компонента Timeline
  */
-import { Mode } from '../../utils/types';
+import { Mode, Protocol } from '../../utils/types';
 
 export interface TimelineProps {
     /** URL сервера */
@@ -24,6 +24,8 @@ export interface TimelineProps {
     camera: number;
     /** Режим плеера (live/record) */
     mode?: Mode;
+    /** Протокол */
+    protocol?: Protocol;
 }
 
 /**
@@ -208,6 +210,8 @@ export interface TimelineFragmentsParams {
     credentials: string;
     /** Номер камеры */
     camera: number;
+    /** Протокол */
+    protocol?: Protocol;
 }
 
 /**

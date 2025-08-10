@@ -2,7 +2,7 @@ import React, {useState} from 'react';
 import {Player} from '../components/player';
 import {TimeProvider} from '../context/time-context';
 import {TimelineAuthProvider} from '../context/timeline-auth-context';
-import {Mode} from '../utils/types';
+import {Mode, Protocol} from '../utils/types';
 
 import './DebugPlayer.scss';
 
@@ -18,8 +18,9 @@ const DebugPlayer: React.FC = () => {
         login: 'yandex',
         password: 'NLAWyYrH08nVTVthqsKk',
         mode: Mode.Live,
-        muted: true
-        // camera: 0
+        muted: true,
+        camera: 0,
+        protocol: Protocol.Http
     });
 
     // Обработчик изменения параметров
@@ -83,6 +84,19 @@ const DebugPlayer: React.FC = () => {
                                 value={params.camera}
                                 onChange={handleParamChange}
                             />
+                        </div>
+
+                        <div className="form-group">
+                            <label htmlFor="protocol">Protocol:</label>
+                            <select
+                                id="protocol"
+                                name="protocol"
+                                value={params.protocol}
+                                onChange={handleParamChange}
+                            >
+                                <option value={Protocol.Http}>http</option>
+                                <option value={Protocol.Https}>https</option>
+                            </select>
                         </div>
 
                         <div className="form-group">

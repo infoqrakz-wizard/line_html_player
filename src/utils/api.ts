@@ -1,5 +1,6 @@
 import {getProtocol} from './url-params';
 import {differenceInSeconds, format} from 'date-fns';
+import {Protocol} from './types';
 
 export interface CameraInfo {
     id: number;
@@ -20,6 +21,7 @@ interface GetFramesTimelineParams {
     unitLength: number;
     channel?: number;
     stream?: string;
+    protocol?: Protocol;
 }
 
 interface TimelineResponse {
@@ -28,6 +30,7 @@ interface TimelineResponse {
 
 export const getFramesTimeline = (params: GetFramesTimelineParams): Promise<TimelineResponse> => {
     const {url, port, credentials, startTime, endTime, unitLength, channel, stream} = params;
+    const preferredProtocol = params.protocol ?? getProtocol();
 
     const requestParams = {
         start_time: [
@@ -53,7 +56,7 @@ export const getFramesTimeline = (params: GetFramesTimelineParams): Promise<Time
 
     //const credentials = btoa('admin:'); // Кодируем логин:пароль в base64
     return new Promise((resolve, reject) => {
-        const fullUrl = url.startsWith('http') ? url : `${getProtocol()}://${url}`;
+        const fullUrl = url.startsWith('http') ? url : `${preferredProtocol}://${url}`;
         const rpcUrl = `${fullUrl}:${port}/rpc?authorization=Basic ${btoa(credentials)}&content-type=application/json`;
 
         const xhr = new XMLHttpRequest();
@@ -106,9 +109,9 @@ export const formatUrlForDownload = (params: UrlForDownloadParams) => {
     return downloadUrl;
 };
 
-export const getServerTime = (url: string, port: number, credentials: string): Promise<Date> => {
+export const getServerTime = (url: string, port: number, credentials: string, protocol?: Protocol): Promise<Date> => {
     return new Promise((resolve, reject) => {
-        const fullUrl = url.startsWith('http') ? url : `${getProtocol()}://${url}`;
+        const fullUrl = url.startsWith('http') ? url : `${protocol ?? getProtocol()}://${url}`;
         const rpcUrl = `${fullUrl}:${port}/rpc?authorization=Basic ${btoa(credentials)}&content-type=application/json`;
 
         const xhr = new XMLHttpRequest();
@@ -145,9 +148,24 @@ export const getServerTime = (url: string, port: number, credentials: string): P
     });
 };
 
-export const getCameraState = (url: string, port: number, credentials: string, camera: number): Promise<any> => {
+interface CameraStateResponse {
+    result: {
+        state: {
+            video_streams: {video: {codec: string}};
+            audio_streams: {audio: {signal: string}};
+        };
+    };
+}
+
+export const getCameraState = (
+    url: string,
+    port: number,
+    credentials: string,
+    camera: number,
+    protocol?: Protocol
+): Promise<CameraStateResponse> => {
     return new Promise((resolve, reject) => {
-        const fullUrl = url.startsWith('http') ? url : `${getProtocol()}://${url}`;
+        const fullUrl = url.startsWith('http') ? url : `${protocol ?? getProtocol()}://${url}`;
         const rpcUrl = `${fullUrl}:${port}/rpc?authorization=Basic ${btoa(credentials)}&content-type=application/json`;
 
         const xhr = new XMLHttpRequest();
@@ -156,9 +174,9 @@ export const getCameraState = (url: string, port: number, credentials: string, c
         xhr.onload = function () {
             if (xhr.status >= 200 && xhr.status < 300) {
                 try {
-                    const data = JSON.parse(xhr.responseText);
+                    const data = JSON.parse(xhr.responseText) as CameraStateResponse;
 
-                    resolve(data.result);
+                    resolve(data);
                 } catch (error) {
                     reject(new Error('Failed to parse server time response'));
                 }
@@ -182,14 +200,15 @@ export const getCamerasList = (
     url: string,
     port: number,
     credentials: string,
-    timeoutMs: number = 5000
+    timeoutMs: number = 5000,
+    protocol?: Protocol
 ): Promise<CameraInfo[]> => {
     return new Promise(async (resolve, reject) => {
         try {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-            const fullUrl = url.startsWith('http') ? url : `${getProtocol()}://${url}`;
+            const fullUrl = url.startsWith('http') ? url : `${protocol ?? getProtocol()}://${url}`;
             const requestUrl = `${fullUrl}:${port}/cameras?authorization=Basic%20${btoa(credentials)}`;
 
             const res = await fetch(requestUrl, {method: 'GET', signal: controller.signal});
