@@ -6,13 +6,15 @@ import {getFramesTimeline} from '../../../utils/api';
 import {TimeRange, LoadQueueItem, TimelineFragmentsParams} from '../types';
 import {BUFFER_SCREENS, UNIT_LENGTHS} from '../utils/constants';
 import {useTimelineAuth} from '../../../context/timeline-auth-context';
+import {Protocol} from '../../../utils/types';
 
 /**
  * Хук для управления фрагментами временной шкалы
  * @param params Параметры для загрузки фрагментов
  * @returns Состояние фрагментов и методы для управления ими
  */
-export const useTimelineFragments = ({url, port, credentials, camera}: TimelineFragmentsParams) => {
+export const useTimelineFragments = (params: TimelineFragmentsParams & {protocol?: Protocol}) => {
+    const {url, port, credentials, camera, protocol} = params;
     const {setTimelineAccess} = useTimelineAuth();
 
     // Массив с наличием фрагментов
@@ -33,7 +35,7 @@ export const useTimelineFragments = ({url, port, credentials, camera}: TimelineF
     /**
      * Функция для запуска загрузки из очереди
      */
-    const processLoadQueue = useCallback(async () => {
+    const processLoadQueue = useCallback(async (): Promise<void> => {
         if (isLoadingFragments || !loadQueue.current) return;
 
         const {start, end, zoomIndex} = loadQueue.current;
@@ -53,7 +55,8 @@ export const useTimelineFragments = ({url, port, credentials, camera}: TimelineF
                 endTime: bufferEnd,
                 unitLength: UNIT_LENGTHS[zoomIndex],
                 stream: 'video',
-                channel: camera
+                channel: camera,
+                protocol
             });
 
             // Проверяем, не появился ли новый запрос в очереди

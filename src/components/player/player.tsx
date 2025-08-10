@@ -3,7 +3,7 @@ import {createPortal} from 'react-dom';
 
 import {formatDate, addSecondsToDate} from '../../utils/dates';
 import {getProtocol, formatUrlForDownload, clickA} from '../../utils/url-params';
-import {Mode} from '../../utils/types';
+import {Mode, Protocol} from '../../utils/types';
 import {getCameraState, getCamerasList, type CameraInfo} from '../../utils/api';
 import {ControlPanel} from '../control-panel';
 
@@ -25,6 +25,7 @@ export interface PlayerProps {
     mode?: Mode;
     muted?: boolean; // Делаем звук опциональным
     camera?: number;
+    protocol?: Protocol;
 }
 
 export const Player: React.FC<PlayerProps> = ({
@@ -34,7 +35,8 @@ export const Player: React.FC<PlayerProps> = ({
     password = '',
     mode = Mode.Live,
     muted = false,
-    camera: initialCamera
+    camera: initialCamera,
+    protocol: preferredProtocol
 }) => {
     // Local auth state to allow updating credentials when 401 occurs
     const [authLogin, setAuthLogin] = useState<string>(login);
@@ -68,7 +70,7 @@ export const Player: React.FC<PlayerProps> = ({
     const forwardAccumOffsetRef = useRef<number | null>(null);
     const wasPlayingBeforeHiddenRef = useRef<boolean>(false);
 
-    const protocol = getProtocol();
+    const protocol = preferredProtocol ?? getProtocol();
     const [availableCameras, setAvailableCameras] = useState<CameraInfo[]>([]);
     const [camera, setCamera] = useState<number | undefined>(initialCamera);
     const shouldShowCameraSelect = initialCamera === undefined && availableCameras.length > 0;
@@ -84,7 +86,8 @@ export const Player: React.FC<PlayerProps> = ({
         undefined,
         streamUrl,
         streamPort,
-        authVerified ? authorization : undefined
+        authVerified ? authorization : undefined,
+        protocol
     );
 
     // Формирование URL для потока в зависимости от режима и серверного времени
@@ -106,16 +109,16 @@ export const Player: React.FC<PlayerProps> = ({
 
     useEffect(() => {
         const fetchCameraState = async () => {
-            const result = await getCameraState(streamUrl, streamPort, authorization, camera ?? 0);
+            const result = await getCameraState(streamUrl, streamPort, authorization, camera ?? 0, protocol);
 
-            setIsH265Codec(result.state.video_streams.video.codec === 'h265');
-            setIsNoSound(result.state.audio_streams.audio.signal === 'no');
+            setIsH265Codec(result.result.state.video_streams.video.codec === 'h265');
+            setIsNoSound(result.result.state.audio_streams.audio.signal === 'no');
         };
 
         if (authVerified && streamUrl && streamPort && authorization && Number.isInteger(camera as number)) {
             void fetchCameraState();
         }
-    }, [authVerified, streamUrl, streamPort, authorization, camera]);
+    }, [authVerified, streamUrl, streamPort, authorization, camera, protocol]);
 
     const checkAvailability = useCallback(
         async (credentials: string) => {
@@ -126,7 +129,7 @@ export const Player: React.FC<PlayerProps> = ({
             setAuthRequired(false);
 
             try {
-                await getCamerasList(streamUrl, streamPort, credentials);
+                await getCamerasList(streamUrl, streamPort, credentials, undefined, protocol);
                 setAuthRequired(false);
                 setServerUnavailable(false);
                 setAuthVerified(true);
@@ -143,7 +146,7 @@ export const Player: React.FC<PlayerProps> = ({
                 setIsCheckingAvailability(false);
             }
         },
-        [streamUrl, streamPort]
+        [streamUrl, streamPort, protocol]
     );
 
     useEffect(() => {
@@ -154,14 +157,20 @@ export const Player: React.FC<PlayerProps> = ({
         const loadCameras = async () => {
             if (!authVerified || !streamUrl || !streamPort) return;
             try {
-                const list = await getCamerasList(streamUrl, streamPort, `${authLogin}:${authPassword}`);
+                const list = await getCamerasList(
+                    streamUrl,
+                    streamPort,
+                    `${authLogin}:${authPassword}`,
+                    undefined,
+                    protocol
+                );
                 setAvailableCameras(list);
             } catch (err) {
                 // keep silent; availability flow will show errors
             }
         };
         void loadCameras();
-    }, [authVerified, streamUrl, streamPort, authLogin, authPassword, camera]);
+    }, [authVerified, streamUrl, streamPort, authLogin, authPassword, camera, protocol]);
 
     useEffect(() => {
         setAuthLogin(login);
@@ -409,7 +418,6 @@ export const Player: React.FC<PlayerProps> = ({
 
     const handleSaveStreamFinish = (start: Date, end: Date) => {
         const fileName = `record_${formatDate(start, 'yyyy-MM-dd_HH-mm')}_${formatDate(end, 'yyyy-MM-dd_HH-mm')}`;
-        const protocol = getProtocol();
         const durationSeconds = (end.getTime() - start.getTime()) / 1000;
 
         const formatDuration = (seconds: number): string => {

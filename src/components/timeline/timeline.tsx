@@ -17,7 +17,7 @@ import styles from './timeline.module.scss';
  * Компонент временной шкалы
  */
 export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
-    ({url, port, credentials, onTimeClick, progress = 0, camera, mode}, ref) => {
+    ({url, port, credentials, onTimeClick, progress = 0, camera, mode, protocol}, ref) => {
         // Создаем ссылки на DOM-элементы
         const containerRef = useRef<HTMLDivElement>(null);
         const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -34,14 +34,15 @@ export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
             cursorPosition,
             updateCursorPosition,
             resetCursorPosition
-        } = useTimelineState(progress, url, port, credentials);
+        } = useTimelineState(progress, url, port, credentials, protocol);
 
         // Используем хук для управления фрагментами
         const {fragments, fragmentsBufferRange, loadFragments, resetFragments} = useTimelineFragments({
             url,
             port,
             credentials,
-            camera
+            camera,
+            protocol
         });
 
         // Используем хук для обработки взаимодействий пользователя

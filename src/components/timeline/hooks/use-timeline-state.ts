@@ -1,11 +1,12 @@
 /**
  * Хук для управления состоянием временной шкалы
  */
-import { useState, useCallback, useEffect, useRef } from 'react';
-import { useTime } from '../../../context/time-context';
-import { TimeRange, CursorPosition } from '../types';
-import { INTERVALS } from '../utils/constants';
-import { getServerTime } from '../../../utils/api';
+import {useState, useCallback, useEffect, useRef} from 'react';
+import {useTime} from '../../../context/time-context';
+import {TimeRange, CursorPosition} from '../types';
+import {INTERVALS} from '../utils/constants';
+import {getServerTime} from '../../../utils/api';
+import {Protocol} from '../../../utils/types';
 
 /**
  * Сравнивает два диапазона времени на равенство
@@ -24,11 +25,16 @@ const areTimeRangesEqual = (range1: TimeRange | null, range2: TimeRange | null):
  * @param credentials Учетные данные для API запросов
  * @returns Состояние временной шкалы и методы для управления им
  */
-export const useTimelineState = (progress: number = 0, url?: string, port?: number, credentials?: string) => {
+export const useTimelineState = (
+    progress: number = 0,
+    url?: string,
+    port?: number,
+    credentials?: string,
+    protocol?: Protocol
+) => {
     // Получаем время из глобального контекста
-    const { serverTime, setServerTime, progress: ctxProgress, skipCenterTimeline } = useTime();
+    const {serverTime, setServerTime, progress: ctxProgress, skipCenterTimeline} = useTime();
     const [isLoading, setIsLoading] = useState<boolean>(true);
-    const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
     // Индекс текущего интервала масштабирования
     const [intervalIndex, setIntervalIndex] = useState(0);
@@ -59,7 +65,7 @@ export const useTimelineState = (progress: number = 0, url?: string, port?: numb
             const currentDateTime = new Date(serverTime.getTime() + ctxProgress * 1000);
             const start = new Date(currentDateTime.getTime() - halfInterval);
             const end = new Date(currentDateTime.getTime() + halfInterval);
-            setVisibleTimeRangeState({ start, end });
+            setVisibleTimeRangeState({start, end});
             setIsLoading(false);
         }
     }, [serverTime, visibleTimeRange, intervalIndex, ctxProgress]);
@@ -70,7 +76,7 @@ export const useTimelineState = (progress: number = 0, url?: string, port?: numb
 
         const fetchServerTime = () => {
             setIsLoading(true);
-            getServerTime(url, port, credentials)
+            getServerTime(url, port, credentials, protocol)
                 .then(time => {
                     setServerTime(time);
 
@@ -83,7 +89,7 @@ export const useTimelineState = (progress: number = 0, url?: string, port?: numb
                     const start = new Date(currentDateTime.getTime() - halfInterval);
                     const end = new Date(currentDateTime.getTime() + halfInterval);
 
-                    setVisibleTimeRangeState({ start, end });
+                    setVisibleTimeRangeState({start, end});
                     setIsLoading(false);
                 })
                 .catch(error => {
@@ -97,7 +103,7 @@ export const useTimelineState = (progress: number = 0, url?: string, port?: numb
 
     const updateServerTime = async () => {
         if (!url || !port || !credentials) return;
-        const time = await getServerTime(url, port, credentials);
+        const time = await getServerTime(url, port, credentials, protocol);
         setServerTime(time);
         return time;
     };
@@ -122,7 +128,7 @@ export const useTimelineState = (progress: number = 0, url?: string, port?: numb
         const start = new Date(currentDateTime.getTime() - halfInterval);
         const end = new Date(currentDateTime.getTime() + halfInterval);
 
-        setVisibleTimeRangeState({ start, end });
+        setVisibleTimeRangeState({start, end});
     }, [serverTime, ctxProgress, intervalIndex]);
 
     // Центрирование таймлайна при изменении serverTime
