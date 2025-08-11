@@ -76,13 +76,13 @@ export const Player: React.FC<PlayerProps> = ({
     const [availableCameras, setAvailableCameras] = useState<CameraInfo[]>([]);
     const [camera, setCamera] = useState<number | undefined>(initialCamera);
 
-    const getStreamUrl = (type: string) =>
-        `${protocol}://${streamUrl}:${streamPort}/cameras/${camera ?? 0}/streaming/main.${type}?authorization=Basic%20${getAuthToken(`${authLogin}:${authPassword}`)}`;
+    const getStreamUrl = (type: string, isNoSound: boolean, isMuted: boolean) =>
+        `${protocol}://${streamUrl}:${streamPort}/cameras/${camera ?? 0}/streaming/main.${type}?authorization=Basic%20${getAuthToken(`${authLogin}:${authPassword}`)}${!isMuted && !isNoSound ? '&audio=1' : ''}`;
 
     // const posterUrl = `${protocol}://${streamUrl}:${streamPort}/cameras/${camera}/image?stream=main&authorization=Basic%20${btoa(`${login}:${password}`)}`;
     const streamType = currentMode === 'record' ? 'm3u8' : 'mp4';
     const authorization = `${authLogin}:${authPassword}`;
-    const videoUrl = getStreamUrl(streamType);
+    const videoUrl = getStreamUrl(streamType, isNoSound, isMuted);
 
     const {updateServerTime} = useTimelineState(
         undefined,
