@@ -87,6 +87,19 @@ const DebugPlayer: React.FC = () => {
                             />
                         </div>
 
+                        <div className="form-group checkbox">
+                            <label htmlFor="showCameraSelector">
+                                <input
+                                    type="checkbox"
+                                    id="showCameraSelector"
+                                    name="showCameraSelector"
+                                    checked={params.showCameraSelector}
+                                    onChange={handleParamChange}
+                                />
+                                Show camera selector
+                            </label>
+                        </div>
+
                         <div className="form-group">
                             <label htmlFor="protocol">Protocol:</label>
                             <select
