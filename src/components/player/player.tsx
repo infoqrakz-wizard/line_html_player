@@ -97,7 +97,7 @@ export const Player: React.FC<PlayerProps> = ({
     let finalStreamUrl = '';
     if (authVerified && camera !== undefined) {
         if (currentMode === 'record' && serverTime) {
-            finalStreamUrl = `${videoUrl}&time=${formatDate(serverTime)}&autoplay=1&audio=1`;
+            finalStreamUrl = `${videoUrl}&time=${formatDate(serverTime)}&autoplay=1${!isMuted && !isNoSound ? '&audio=1' : ''}`;
         } else {
             finalStreamUrl = videoUrl || '';
         }
