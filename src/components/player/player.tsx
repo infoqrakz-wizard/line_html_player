@@ -621,6 +621,7 @@ export const Player: React.FC<PlayerProps> = ({
                             playbackSpeed={playbackSpeed}
                             url={streamUrl}
                             port={streamPort}
+                            protocol={protocol}
                             credentials={authVerified ? authorization : ''}
                             progress={ctxProgress}
                             camera={camera ?? 0}

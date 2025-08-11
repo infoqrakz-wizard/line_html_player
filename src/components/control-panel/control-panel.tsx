@@ -93,6 +93,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                     credentials={credentials}
                     onTimeClick={onTimeClick}
                     progress={progress}
+                    protocol={protocol}
                     camera={camera}
                     mode={mode}
                 />

@@ -33,7 +33,8 @@ class DevLinePlayer {
             login: '',
             password: '',
             mode: Mode.Live,
-            muted: true
+            muted: true,
+            protocol: Protocol.Http
         }
     ) {
         if (typeof container === 'string') {
