@@ -1,3 +1,4 @@
+/* eslint-disable jsx-a11y/media-has-caption */
 import React, {forwardRef, useEffect, useImperativeHandle, useRef, useState} from 'react';
 import Hls from 'hls.js';
 
@@ -13,12 +14,13 @@ export interface HlsPlayerProps {
     muted?: boolean;
     onProgress?: (progress: {currentTime: number; duration: number}) => void;
     onPlayPause?: (playing: boolean) => void;
+    overlayText?: string;
 }
 
 import type {PlayerRef} from '../player-interface';
 
 export const HlsPlayer = forwardRef<PlayerRef, HlsPlayerProps>((props, ref) => {
-    const {url, playing = false, onProgress, onPlayPause, playbackSpeed, muted = true} = props;
+    const {url, playing = false, onProgress, onPlayPause, playbackSpeed, muted = true, overlayText} = props;
     const videoRef = useRef<HTMLVideoElement>(null);
     const hlsRef = useRef<Hls | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -450,7 +452,12 @@ export const HlsPlayer = forwardRef<PlayerRef, HlsPlayerProps>((props, ref) => {
     return (
         <VideoContainer>
             {(isLoading || isBuffering) && <Loader message={isLoading ? 'Загрузка видео...' : 'Буферизация...'} />}
-            {!playingRef.current && !isLoading && !isBuffering && <PlayOverlay onClick={() => onPlayPause?.(true)} />}
+            {!playingRef.current && !isLoading && !isBuffering && (
+                <PlayOverlay
+                    text={overlayText}
+                    onClick={() => onPlayPause?.(true)}
+                />
+            )}
             <video
                 data-type="hls"
                 ref={videoRef}

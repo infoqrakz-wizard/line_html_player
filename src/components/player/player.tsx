@@ -512,11 +512,13 @@ export const Player: React.FC<PlayerProps> = ({
                         <HlsPlayer
                             ref={playerRef}
                             {...props}
+                            overlayText={isH265Codec ? '265' : undefined}
                         />
                     ) : (
                         <VideoTag
                             ref={playerRef}
                             {...props}
+                            overlayText={isH265Codec ? '265' : undefined}
                         />
                     )}
                     {showSaveModal && (
@@ -640,11 +642,6 @@ export const Player: React.FC<PlayerProps> = ({
                     document.body
                 )}
             </div>
-            {isH265Codec && (
-                <div className={styles.h265CodecWarning}>
-                    <p>265</p>
-                </div>
-            )}
         </>
     );
 };

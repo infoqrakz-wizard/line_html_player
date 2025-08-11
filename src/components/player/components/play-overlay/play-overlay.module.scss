@@ -12,6 +12,13 @@
     cursor: pointer;
 }
 
+.content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
 .playButton {
     background: none;
     border: none;
@@ -28,4 +35,11 @@
     &:hover {
         background-color: rgba(0, 0, 0, 0.7);
     }
+}
+
+.label {
+    color: #ffffff;
+    font-size: 14px;
+    line-height: 1;
+    opacity: 0.9;
 }

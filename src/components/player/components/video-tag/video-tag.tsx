@@ -1,3 +1,4 @@
+/* eslint-disable jsx-a11y/media-has-caption */
 import React, {forwardRef, useEffect, useImperativeHandle, useRef, useState} from 'react';
 import {Loader} from '../loader';
 import {PlayOverlay} from '../play-overlay';
@@ -10,10 +11,11 @@ export interface VideoTagProps {
     posterUrl?: string;
     onProgress?: (progress: {currentTime: number; duration: number}) => void;
     onPlayPause?: (playing: boolean) => void;
+    overlayText?: string;
 }
 
 export const VideoTag = forwardRef<PlayerRef, VideoTagProps>((props, ref) => {
-    const {url, playing = true, muted = true, posterUrl, onProgress, onPlayPause} = props;
+    const {url, playing = true, muted = true, posterUrl, onProgress, onPlayPause, overlayText} = props;
     const videoRef = useRef<HTMLVideoElement>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isBuffering, setIsBuffering] = useState(false);
@@ -37,6 +39,7 @@ export const VideoTag = forwardRef<PlayerRef, VideoTagProps>((props, ref) => {
             }
         }
     }));
+
     const handleTimeUpdate = () => {
         if (videoRef.current && onProgress) {
             onProgress({
@@ -186,7 +189,12 @@ export const VideoTag = forwardRef<PlayerRef, VideoTagProps>((props, ref) => {
     return (
         <VideoContainer>
             {(isLoading || isBuffering) && <Loader message={isLoading ? 'Загрузка видео...' : 'Буферизация...'} />}
-            {!playingRef.current && !isLoading && !isBuffering && <PlayOverlay onClick={() => onPlayPause?.(true)} />}
+            {!playingRef.current && !isLoading && !isBuffering && (
+                <PlayOverlay
+                    onClick={() => onPlayPause?.(true)}
+                    text={overlayText}
+                />
+            )}
             <video
                 data-type="video"
                 onClick={() => onPlayPause?.(false)}
