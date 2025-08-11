@@ -7,11 +7,7 @@ import {TimelineProps, TimelineRef} from './types';
 import {useTimelineState} from './hooks/use-timeline-state';
 import {useTimelineFragments} from './hooks/use-timeline-fragments';
 import {useTimelineInteractions} from './hooks/use-timeline-interactions';
-import {UNIT_LENGTHS} from './utils/constants';
-import {createPortal} from 'react-dom';
 import {Mode} from '../../utils/types';
-
-import styles from './timeline.module.scss';
 
 /**
  * Компонент временной шкалы
@@ -144,55 +140,6 @@ export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
             }
         }, [mode, visibleTimeRange, intervalIndex, loadFragments, resetFragments]);
 
-        // Рассчитать интервалы, где есть данные, по возвращенному массиву fragments
-        const availableDataIntervals = useMemo(() => {
-            if (!fragments || fragments.length === 0) {
-                return [] as Array<{
-                    start: Date;
-                    end: Date;
-                    startIndex: number;
-                    endIndex: number;
-                }>;
-            }
-            const unitSeconds = UNIT_LENGTHS[intervalIndex] ?? UNIT_LENGTHS[0];
-            const baseStartMs = fragmentsBufferRange.start.getTime();
-
-            const intervals: Array<{start: Date; end: Date; startIndex: number; endIndex: number}> = [];
-            let index = 0;
-            while (index < fragments.length) {
-                // Пропускаем нули
-                while (index < fragments.length && !fragments[index]) index += 1;
-                if (index >= fragments.length) break;
-                const runStart = index;
-                // Идем до конца последовательности единиц
-                while (index < fragments.length && !!fragments[index]) index += 1;
-                const runEnd = index - 1;
-
-                const startMs = baseStartMs + runStart * unitSeconds * 1000;
-                const endMs = baseStartMs + (runEnd + 1) * unitSeconds * 1000; // конец не включительно
-                intervals.push({
-                    start: new Date(startMs),
-                    end: new Date(endMs),
-                    startIndex: runStart,
-                    endIndex: runEnd
-                });
-            }
-
-            return intervals;
-        }, [fragments, intervalIndex, fragmentsBufferRange.start]);
-
-        const formatDateTime = useCallback((date: Date) => {
-            return date.toLocaleString([], {
-                year: '2-digit',
-                month: '2-digit',
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-                hour12: false
-            });
-        }, []);
-
         // Если время сервера еще не загружено, показываем загрузку
         if (!serverTime || !visibleTimeRange) {
             return (
@@ -222,48 +169,6 @@ export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
                     canvasRef={canvasRef}
                     cursorPosition={cursorPosition}
                 />
-                {/* Debug: интервалы, где есть данные */}
-                {/** FIXME: убрать после завершения разработки */}
-                {createPortal(
-                    <div
-                        className={styles.timelineDebug}
-                        style={{marginTop: 8}}
-                    >
-                        <div style={{fontSize: 12, opacity: 0.8}}>
-                            <div>
-                                <span>Буфер фрагментов:</span>
-                                <span style={{marginLeft: 4}}>{formatDateTime(fragmentsBufferRange.start)}</span>
-                                <span style={{margin: '0 4px'}}>—</span>
-                                <span>{formatDateTime(fragmentsBufferRange.end)}</span>
-                            </div>
-                            <div>
-                                Единица: <span>{UNIT_LENGTHS[intervalIndex] ?? UNIT_LENGTHS[0]}s</span>
-                            </div>
-                            <div>
-                                Кол-во элементов: <span>{fragments.length}</span>
-                            </div>
-                        </div>
-                        {availableDataIntervals.length > 0 ? (
-                            <ul style={{fontSize: 12, marginTop: 4, paddingLeft: 18}}>
-                                {availableDataIntervals.map((rng, i) => (
-                                    <li key={`${rng.start.getTime()}-${i}`}>
-                                        <span>
-                                            [{rng.startIndex}..{rng.endIndex}]
-                                        </span>
-                                        <span style={{marginLeft: 4}}>{formatDateTime(rng.start)}</span>
-                                        <span style={{margin: '0 4px'}}>—</span>
-                                        <span>{formatDateTime(rng.end)}</span>
-                                    </li>
-                                ))}
-                            </ul>
-                        ) : (
-                            <div style={{fontSize: 12, opacity: 0.7, marginTop: 4}}>
-                                Нет доступных данных в текущем буфере
-                            </div>
-                        )}
-                    </div>,
-                    document.body
-                )}
             </>
         );
     }

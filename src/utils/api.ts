@@ -1,6 +1,7 @@
 import {getProtocol} from './url-params';
 import {differenceInSeconds, format} from 'date-fns';
 import {Protocol} from './types';
+import { getAuthToken } from './getAuthToken';
 
 export interface CameraInfo {
     id: number;
@@ -54,10 +55,9 @@ export const getFramesTimeline = (params: GetFramesTimelineParams): Promise<Time
         ...(stream !== undefined && {stream})
     };
 
-    //const credentials = btoa('admin:'); // Кодируем логин:пароль в base64
     return new Promise((resolve, reject) => {
         const fullUrl = url.startsWith('http') ? url : `${preferredProtocol}://${url}`;
-        const rpcUrl = `${fullUrl}:${port}/rpc?authorization=Basic ${btoa(credentials)}&content-type=application/json`;
+        const rpcUrl = `${fullUrl}:${port}/rpc?authorization=Basic ${getAuthToken(credentials)}&content-type=application/json`;
 
         const xhr = new XMLHttpRequest();
         xhr.open('POST', rpcUrl, true);
@@ -112,7 +112,7 @@ export const formatUrlForDownload = (params: UrlForDownloadParams) => {
 export const getServerTime = (url: string, port: number, credentials: string, protocol?: Protocol): Promise<Date> => {
     return new Promise((resolve, reject) => {
         const fullUrl = url.startsWith('http') ? url : `${protocol ?? getProtocol()}://${url}`;
-        const rpcUrl = `${fullUrl}:${port}/rpc?authorization=Basic ${btoa(credentials)}&content-type=application/json`;
+        const rpcUrl = `${fullUrl}:${port}/rpc?authorization=Basic ${getAuthToken(credentials)}&content-type=application/json`;
 
         const xhr = new XMLHttpRequest();
         xhr.open('POST', rpcUrl, true);
@@ -166,7 +166,7 @@ export const getCameraState = (
 ): Promise<CameraStateResponse> => {
     return new Promise((resolve, reject) => {
         const fullUrl = url.startsWith('http') ? url : `${protocol ?? getProtocol()}://${url}`;
-        const rpcUrl = `${fullUrl}:${port}/rpc?authorization=Basic ${btoa(credentials)}&content-type=application/json`;
+        const rpcUrl = `${fullUrl}:${port}/rpc?authorization=Basic ${getAuthToken(credentials)}&content-type=application/json`;
 
         const xhr = new XMLHttpRequest();
         xhr.open('POST', rpcUrl, true);
@@ -209,7 +209,7 @@ export const getCamerasList = (
             const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
             const fullUrl = url.startsWith('http') ? url : `${protocol ?? getProtocol()}://${url}`;
-            const requestUrl = `${fullUrl}:${port}/cameras?authorization=Basic%20${btoa(credentials)}`;
+            const requestUrl = `${fullUrl}:${port}/cameras?authorization=Basic%20${getAuthToken(credentials)}`;
 
             const res = await fetch(requestUrl, {method: 'GET', signal: controller.signal});
             clearTimeout(timeoutId);

@@ -23,6 +23,7 @@ interface PlayerControlsProps {
     isMuted: boolean;
     isFullscreen: boolean;
     isNoSound: boolean;
+    isDownloadAccess: boolean;
     playbackSpeed: number;
     // for fetching month availability
     url?: string;
@@ -48,6 +49,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
     isMuted,
     isFullscreen,
     isNoSound,
+    isDownloadAccess,
     playbackSpeed,
     url,
     port,
@@ -186,12 +188,14 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
                         onMonthChange={handleMonthChange}
                     />
                 )}
-                <button
-                    className={styles.controlButton}
-                    onClick={onSaveStream}
-                >
-                    <Icons.Export />
-                </button>
+                {isDownloadAccess && (
+                    <button
+                        className={styles.controlButton}
+                        onClick={onSaveStream}
+                    >
+                        <Icons.Export />
+                    </button>
+                )}
                 {mode === Mode.Record && (
                     <SpeedSelector
                         playbackSpeed={playbackSpeed}

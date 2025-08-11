@@ -1,5 +1,4 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
-import {createPortal} from 'react-dom';
 
 import {formatDate, addSecondsToDate} from '../../utils/dates';
 import {getProtocol, formatUrlForDownload, clickA} from '../../utils/url-params';
@@ -12,8 +11,9 @@ import {useTimelineState} from '../timeline/hooks/use-timeline-state';
 
 import {HlsPlayer, VideoTag, SaveStreamModal, ModeIndicator} from './components';
 import {PlayerComponentProps} from './components/player-interface';
-import type {PlayerRef} from './components/player-interface';
+import {getAuthToken} from '../../utils/getAuthToken';
 
+import type {PlayerRef} from './components/player-interface';
 import styles from './player.module.scss';
 
 export interface PlayerProps {
@@ -75,7 +75,7 @@ export const Player: React.FC<PlayerProps> = ({
     const [camera, setCamera] = useState<number | undefined>(initialCamera);
     const shouldShowCameraSelect = initialCamera === undefined && availableCameras.length > 0;
     const getStreamUrl = (type: string) =>
-        `${protocol}://${streamUrl}:${streamPort}/cameras/${camera ?? 0}/streaming/main.${type}?authorization=Basic%20${btoa(`${authLogin}:${authPassword}`)}`;
+        `${protocol}://${streamUrl}:${streamPort}/cameras/${camera ?? 0}/streaming/main.${type}?authorization=Basic%20${getAuthToken(authLogin, authPassword)}`;
 
     // const posterUrl = `${protocol}://${streamUrl}:${streamPort}/cameras/${camera}/image?stream=main&authorization=Basic%20${btoa(`${login}:${password}`)}`;
     const streamType = currentMode === 'record' ? 'm3u8' : 'mp4';
@@ -134,6 +134,7 @@ export const Player: React.FC<PlayerProps> = ({
                 setServerUnavailable(false);
                 setAuthVerified(true);
             } catch (e) {
+                // Проверяем, является ли ошибка связанной с авторизацией (401)
                 if ((e as Error)?.message === 'FORBIDDEN') {
                     setAuthRequired(true);
                     setServerUnavailable(false);
@@ -149,9 +150,19 @@ export const Player: React.FC<PlayerProps> = ({
         [streamUrl, streamPort, protocol]
     );
 
+    // Функция для проверки авторизации при клике на кнопку "войти"
+    const handleLoginSubmit = useCallback(
+        async (e: React.FormEvent) => {
+            e.preventDefault();
+            await checkAvailability(`${authLogin}:${authPassword}`);
+        },
+        [checkAvailability, authLogin, authPassword]
+    );
+
+    // Проверяем авторизацию только при изменении основных параметров подключения
     useEffect(() => {
         void checkAvailability(`${authLogin}:${authPassword}`);
-    }, [checkAvailability, streamUrl, streamPort, camera, authLogin, authPassword]);
+    }, [checkAvailability, streamUrl, streamPort, camera]);
 
     useEffect(() => {
         const loadCameras = async () => {
@@ -172,11 +183,18 @@ export const Player: React.FC<PlayerProps> = ({
         void loadCameras();
     }, [authVerified, streamUrl, streamPort, authLogin, authPassword, camera, protocol]);
 
+    // Устанавливаем начальные значения логина и пароля без автоматической проверки
     useEffect(() => {
         setAuthLogin(login);
         setAuthPassword(password ?? '');
-        void checkAvailability(`${login}:${password ?? ''}`);
-    }, [login, password, checkAvailability, camera]);
+    }, [login, password]);
+
+    // Проверяем авторизацию при первоначальной загрузке страницы
+    useEffect(() => {
+        if (streamUrl && streamPort) {
+            void checkAvailability(`${login}:${password ?? ''}`);
+        }
+    }, [streamUrl, streamPort, login, password, checkAvailability]);
 
     const handleChangeMode = (newMode: Mode, time?: Date) => {
         setCurrentMode(newMode);
@@ -276,7 +294,7 @@ export const Player: React.FC<PlayerProps> = ({
 
     useEffect(() => {
         const handleKeyDown = async (e: KeyboardEvent) => {
-            const key = e.key.toLowerCase();
+            const key = e.key?.toLowerCase();
             const code = (e as KeyboardEvent).code;
 
             const target = e.target as HTMLElement | null;
@@ -430,7 +448,7 @@ export const Player: React.FC<PlayerProps> = ({
 
         const date = start.toISOString().split('.')[0];
 
-        const url = `${protocol}://${streamUrl}:${streamPort}/cameras/${camera ?? 0}/streaming/main.mp4?authorization=Basic%20${btoa(`${authLogin}:${authPassword}`)}&time=${date}&duration=${formatDuration(durationSeconds)}&download=1&filename=${fileName}`;
+        const url = `${protocol}://${streamUrl}:${streamPort}/cameras/${camera ?? 0}/streaming/main.mp4?authorization=Basic%20${getAuthToken(authLogin, authPassword)}&time=${date}&duration=${formatDuration(durationSeconds)}&download=1&filename=${fileName}`;
         const downloadUrl = formatUrlForDownload({
             url,
             start,
@@ -552,11 +570,7 @@ export const Player: React.FC<PlayerProps> = ({
                                     <div className={styles.overlayTitle}>Требуется авторизация</div>
                                     <form
                                         className={styles.loginForm}
-                                        onSubmit={e => {
-                                            e.preventDefault();
-                                            // Re-check availability with new credentials
-                                            void checkAvailability(`${authLogin}:${authPassword}`);
-                                        }}
+                                        onSubmit={handleLoginSubmit}
                                     >
                                         <label className={styles.label}>
                                             Логин
@@ -623,24 +637,6 @@ export const Player: React.FC<PlayerProps> = ({
                         />
                     </div>
                 </div>
-
-                {/** FIXME: убрать после завершения разработки */}
-                {createPortal(
-                    <div className={styles.debugInfo}>
-                        <h2 className="title">Debug info</h2>
-                        <div className="debug-info-content">
-                            <p>serverTime: {serverTime?.toLocaleTimeString()}</p>
-                            <p>ctxProgress: {ctxProgress}</p>
-                            <p>isPlaying: {isPlaying ? 'true' : 'false'}</p>
-                            <p>isMuted: {isMuted ? 'true' : 'false'}</p>
-                            <p>playbackSpeed: {playbackSpeed}</p>
-                            <p>currentMode: {currentMode}</p>
-                            <p>isFullscreen: {isFullscreen ? 'true' : 'false'}</p>
-                            <p>showControls: {showControls ? 'true' : 'false'}</p>
-                        </div>
-                    </div>,
-                    document.body
-                )}
             </div>
         </>
     );

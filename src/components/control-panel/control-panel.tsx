@@ -67,6 +67,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                 isMuted={isMuted}
                 isFullscreen={isFullscreen}
                 isNoSound={isNoSound}
+                isDownloadAccess={hasTimelineAccess}
                 playbackSpeed={playbackSpeed}
                 url={url}
                 port={port}
