@@ -75,7 +75,7 @@ export const Player: React.FC<PlayerProps> = ({
     const [camera, setCamera] = useState<number | undefined>(initialCamera);
     const shouldShowCameraSelect = initialCamera === undefined && availableCameras.length > 0;
     const getStreamUrl = (type: string) =>
-        `${protocol}://${streamUrl}:${streamPort}/cameras/${camera ?? 0}/streaming/main.${type}?authorization=Basic%20${getAuthToken(authLogin, authPassword)}`;
+        `${protocol}://${streamUrl}:${streamPort}/cameras/${camera ?? 0}/streaming/main.${type}?authorization=Basic%20${getAuthToken(`${authLogin}:${authPassword}`)}`;
 
     // const posterUrl = `${protocol}://${streamUrl}:${streamPort}/cameras/${camera}/image?stream=main&authorization=Basic%20${btoa(`${login}:${password}`)}`;
     const streamType = currentMode === 'record' ? 'm3u8' : 'mp4';
@@ -448,7 +448,7 @@ export const Player: React.FC<PlayerProps> = ({
 
         const date = start.toISOString().split('.')[0];
 
-        const url = `${protocol}://${streamUrl}:${streamPort}/cameras/${camera ?? 0}/streaming/main.mp4?authorization=Basic%20${getAuthToken(authLogin, authPassword)}&time=${date}&duration=${formatDuration(durationSeconds)}&download=1&filename=${fileName}`;
+        const url = `${protocol}://${streamUrl}:${streamPort}/cameras/${camera ?? 0}/streaming/main.mp4?authorization=Basic%20${getAuthToken(`${authLogin}:${authPassword}`)}&time=${date}&duration=${formatDuration(durationSeconds)}&download=1&filename=${fileName}`;
         const downloadUrl = formatUrlForDownload({
             url,
             start,
