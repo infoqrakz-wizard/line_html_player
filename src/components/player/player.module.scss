@@ -159,3 +159,10 @@
     border-radius: 8px;
     cursor: pointer;
 }
+
+.cameraSelector {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 10;
+}

@@ -19,8 +19,9 @@ const DebugPlayer: React.FC = () => {
         password: 'NLAWyYrH08nVTVthqsKk',
         mode: Mode.Live,
         muted: true,
-        camera: 0,
-        protocol: Protocol.Http
+        camera: 1,
+        protocol: Protocol.Http,
+        showCameraSelector: true
     });
 
     // Обработчик изменения параметров

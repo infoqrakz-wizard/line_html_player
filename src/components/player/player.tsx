@@ -26,6 +26,7 @@ export interface PlayerProps {
     muted?: boolean; // Делаем звук опциональным
     camera?: number;
     protocol?: Protocol;
+    showCameraSelector?: boolean;
 }
 
 export const Player: React.FC<PlayerProps> = ({
@@ -36,7 +37,8 @@ export const Player: React.FC<PlayerProps> = ({
     mode = Mode.Live,
     muted = false,
     camera: initialCamera,
-    protocol: preferredProtocol
+    protocol: preferredProtocol,
+    showCameraSelector = false
 }) => {
     // Local auth state to allow updating credentials when 401 occurs
     const [authLogin, setAuthLogin] = useState<string>(login);
@@ -73,7 +75,7 @@ export const Player: React.FC<PlayerProps> = ({
     const protocol = preferredProtocol ?? getProtocol();
     const [availableCameras, setAvailableCameras] = useState<CameraInfo[]>([]);
     const [camera, setCamera] = useState<number | undefined>(initialCamera);
-    const shouldShowCameraSelect = initialCamera === undefined && availableCameras.length > 0;
+
     const getStreamUrl = (type: string) =>
         `${protocol}://${streamUrl}:${streamPort}/cameras/${camera ?? 0}/streaming/main.${type}?authorization=Basic%20${getAuthToken(`${authLogin}:${authPassword}`)}`;
 
@@ -484,12 +486,8 @@ export const Player: React.FC<PlayerProps> = ({
                 role="region"
                 aria-label="Плеер видео"
             >
-                <div className={styles.topControls}>
-                    <ModeIndicator
-                        mode={currentMode}
-                        isPlaying={isPlaying}
-                    />
-                    {shouldShowCameraSelect && (
+                {showCameraSelector && (
+                    <div className={styles.cameraSelector}>
                         <select
                             value={camera ?? ''}
                             onChange={e => setCamera(Number(e.target.value))}
@@ -510,7 +508,14 @@ export const Player: React.FC<PlayerProps> = ({
                                 </option>
                             ))}
                         </select>
-                    )}
+                    </div>
+                )}
+
+                <div className={styles.topControls}>
+                    <ModeIndicator
+                        mode={currentMode}
+                        isPlaying={isPlaying}
+                    />
                 </div>
                 <div
                     className={styles.videoContainer}
