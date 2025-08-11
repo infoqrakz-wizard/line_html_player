@@ -194,24 +194,6 @@ export const useTimelineDrawing = ({
         }
     }, [visibleTimeRange, containerRef, loadFragments, fragmentsBufferRange, intervalIndex]);
 
-    // Авто-центрирование: если индикатор текущего времени достигает края видимого диапазона,
-    // центрируем таймлайн по индикатору
-    useEffect(() => {
-        if (!visibleTimeRange) return;
-
-        const currentTimeMs = currentTime.getTime() + progress * 1000;
-        const startMs = visibleTimeRange.start.getTime();
-        const endMs = visibleTimeRange.end.getTime();
-
-        if (currentTimeMs <= startMs || currentTimeMs >= endMs) {
-            const intervalMs = INTERVALS[intervalIndex];
-            const halfInterval = intervalMs / 2;
-            const newStart = new Date(currentTimeMs - halfInterval);
-            const newEnd = new Date(currentTimeMs + halfInterval);
-            setVisibleTimeRange({start: newStart, end: newEnd});
-        }
-    }, [visibleTimeRange, currentTime, progress, intervalIndex, setVisibleTimeRange]);
-
     // Возвращаем функцию отрисовки
     return drawTimeline;
 };
