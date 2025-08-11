@@ -1,4 +1,5 @@
-import React, {useMemo, useRef, useState} from 'react';
+import React, {useMemo, useRef, useState, useEffect, useCallback} from 'react';
+import {shift, flip} from '@floating-ui/dom';
 import DatePicker, {registerLocale} from 'react-datepicker';
 import type ReactDatePicker from 'react-datepicker';
 import {ru} from 'date-fns/locale/ru';
@@ -31,6 +32,8 @@ interface PlayerControlsProps {
     credentials?: string;
     camera?: number;
     protocol?: Protocol;
+    popperBoundaryElement?: HTMLElement | null;
+    popperPortalId?: string;
     onPlayPause: () => void;
     onMuteToggle: () => void;
     onSpeedChange: (speed: number) => void;
@@ -56,6 +59,8 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
     credentials,
     camera,
     protocol,
+    popperBoundaryElement,
+    popperPortalId,
     onPlayPause,
     onMuteToggle,
     onSpeedChange,
@@ -68,6 +73,8 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
     const {hasTimelineAccess, setTimelineAccess} = useTimelineAuth();
     const [startDate, setStartDate] = useState(new Date());
     const datePickerRef = useRef<ReactDatePicker | null>(null);
+    const rightControlsRef = useRef<HTMLDivElement>(null);
+    const [arrowOffset, setArrowOffset] = useState<number>(0);
 
     const [highlightedDates, setHighlightedDates] = useState<Date[]>([]);
     const loadedMonths = useRef<Set<string>>(new Set());
@@ -136,6 +143,45 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
         void fetchMonthAvailability(date);
     };
 
+    const calculateArrowPosition = useCallback(() => {
+        // ref и id для customInput почему-то не передаются. ищем кнопку по классу
+        const datePickerButton = document.querySelector('.datepicker-button');
+
+        if (!datePickerButton || !rightControlsRef.current) return;
+
+        const buttonRect = datePickerButton.getBoundingClientRect();
+        const containerRect = rightControlsRef.current.getBoundingClientRect();
+
+        // Вычисляем позицию кнопки календаря относительно правого края контейнера
+        const offsetFromRight = containerRect.right - (buttonRect.left + buttonRect.width * 0.75);
+        setArrowOffset(offsetFromRight);
+    }, []);
+
+    useEffect(() => {
+        calculateArrowPosition();
+
+        // Пересчитываем при изменении размера окна
+        const handleResize = () => calculateArrowPosition();
+        window.addEventListener('resize', handleResize);
+
+        return () => window.removeEventListener('resize', handleResize);
+    }, [calculateArrowPosition, hasTimelineAccess, isDownloadAccess, mode]);
+
+    // Обновляем стили стрелки через CSS переменную
+    useEffect(() => {
+        if (arrowOffset > 0) {
+            document.documentElement.style.setProperty('--datepicker-arrow-offset', `${arrowOffset}px`);
+        }
+    }, [arrowOffset]);
+
+    const datepickerPopperModifiers = useMemo(() => {
+        const boundary = popperBoundaryElement ?? 'clippingAncestors';
+        return [
+            shift({boundary, crossAxis: true}),
+            flip({boundary, fallbackPlacements: ['top', 'bottom', 'right', 'left']})
+        ];
+    }, [popperBoundaryElement]);
+
     return (
         <div className={styles.controls}>
             <div className={styles.leftControls}>
@@ -163,13 +209,16 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
                 )}
             </div>
 
-            <div className={styles.rightControls}>
+            <div
+                className={styles.rightControls}
+                ref={rightControlsRef}
+            >
                 {hasTimelineAccess && (
                     <DatePicker
                         ref={datePickerRef}
                         selected={startDate}
                         customInput={
-                            <button className={styles.controlButton}>
+                            <button className={`${styles.controlButton} datepicker-button`}>
                                 <Icons.Datepicker />
                             </button>
                         }
@@ -180,6 +229,8 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
                         showTimeCaption={false}
                         shouldCloseOnSelect={true}
                         popperPlacement="top"
+                        portalId={popperPortalId}
+                        popperModifiers={datepickerPopperModifiers}
                         calendarClassName="custom-datepicker"
                         highlightDates={highlightedDates.length ? [{'highlighted-date': highlightedDates}] : undefined}
                         filterDate={date => allowedDayKeys.size === 0 || allowedDayKeys.has(dayKey(date))}

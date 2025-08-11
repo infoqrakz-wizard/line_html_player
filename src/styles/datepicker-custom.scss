@@ -121,3 +121,22 @@ button.react-datepicker__navigation {
 .custom-datepicker .react-datepicker__time-list::-webkit-scrollbar {
     display: none;
 }
+
+/* Ensure calendar is above controls but stays inside the player portal */
+.react-datepicker-popper {
+    z-index: 50;
+}
+
+/* Position arrow dynamically based on calendar button position */
+.react-datepicker__triangle {
+    left: unset !important;
+    right: var(--datepicker-arrow-offset, 20px) !important;
+    transition: right 0.2s ease;
+}
+
+/* Remove the old static positioning rules */
+[data-placement^='top-end'] .react-datepicker__triangle,
+[data-placement^='bottom-end'] .react-datepicker__triangle {
+    left: unset !important;
+    right: var(--datepicker-arrow-offset, 20px) !important;
+}

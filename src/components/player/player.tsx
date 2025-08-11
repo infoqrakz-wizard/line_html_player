@@ -66,6 +66,7 @@ export const Player: React.FC<PlayerProps> = ({
     const [showControls, setShowControls] = useState<boolean>(false);
 
     const containerRef = useRef<HTMLDivElement>(null);
+    const datepickerPortalIdRef = useRef<string>(`datepicker-portal-${Math.random().toString(36).slice(2)}`);
     const controlAreaRef = useRef<HTMLDivElement>(null);
     const playerRef = useRef<PlayerRef | null>(null);
     const archiveTargetTimeRef = useRef<Date | null>(null);
@@ -630,6 +631,8 @@ export const Player: React.FC<PlayerProps> = ({
                             credentials={authVerified ? authorization : ''}
                             progress={ctxProgress}
                             camera={camera ?? 0}
+                            popperBoundaryElement={containerRef.current}
+                            popperPortalId={datepickerPortalIdRef.current}
                             onPlayPause={() => handlePlayPause()}
                             onMuteToggle={() => handleMuteToggle()}
                             onToggleFullscreen={() => handleToggleFullscreen()}
@@ -643,6 +646,7 @@ export const Player: React.FC<PlayerProps> = ({
                         />
                     </div>
                 </div>
+                <div id={datepickerPortalIdRef.current} />
             </div>
         </>
     );

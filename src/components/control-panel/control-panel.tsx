@@ -20,6 +20,8 @@ interface ControlPanelProps {
     progress?: number;
     camera: number;
     protocol?: Protocol;
+    popperBoundaryElement?: HTMLElement | null;
+    popperPortalId?: string;
     onPlayPause: () => void;
     onMuteToggle: () => void;
     onSpeedChange: (speed: number) => void;
@@ -45,6 +47,8 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
     progress,
     camera,
     protocol,
+    popperBoundaryElement,
+    popperPortalId,
     onPlayPause,
     onMuteToggle,
     onSpeedChange,
@@ -74,6 +78,8 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                 credentials={credentials}
                 camera={camera}
                 protocol={protocol}
+                popperBoundaryElement={popperBoundaryElement}
+                popperPortalId={popperPortalId}
                 onPlayPause={onPlayPause}
                 onMuteToggle={onMuteToggle}
                 onSpeedChange={onSpeedChange}
