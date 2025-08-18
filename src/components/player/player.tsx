@@ -15,6 +15,7 @@ import {getAuthToken} from '../../utils/getAuthToken';
 
 import type {PlayerRef} from './components/player-interface';
 import styles from './player.module.scss';
+import Select from '../select/select';
 
 export interface PlayerProps {
     // Основные пропсы из DevLinePlayerProps
@@ -489,7 +490,16 @@ export const Player: React.FC<PlayerProps> = ({
             >
                 {showCameraSelector && (
                     <div className={styles.cameraSelector}>
-                        <select
+                        <Select
+                            options={availableCameras.map(c => ({
+                                value: c.id,
+                                label: c.name ?? `Camera ${c.id}`
+                            }))}
+                            value={camera ?? ''}
+                            onChange={value => setCamera(value)}
+                            aria-label="Выбор камеры"
+                        />
+                        {/* <select
                             value={camera ?? ''}
                             onChange={e => setCamera(Number(e.target.value))}
                             aria-label="Выбор камеры"
@@ -508,7 +518,7 @@ export const Player: React.FC<PlayerProps> = ({
                                     {c.name ?? `Camera ${c.id}`}
                                 </option>
                             ))}
-                        </select>
+                        </select> */}
                     </div>
                 )}
 
