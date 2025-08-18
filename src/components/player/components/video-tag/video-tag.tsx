@@ -4,6 +4,7 @@ import {Loader} from '../loader';
 import {PlayOverlay} from '../play-overlay';
 import {VideoContainer} from '../video-container';
 import type {PlayerRef} from '../player-interface';
+
 export interface VideoTagProps {
     url: string;
     playing: boolean;
@@ -11,11 +12,23 @@ export interface VideoTagProps {
     posterUrl?: string;
     onProgress?: (progress: {currentTime: number; duration: number}) => void;
     onPlayPause?: (playing: boolean) => void;
+    updateServerTime?: () => Promise<Date | undefined>;
+    setProgress?: (seconds: number) => void;
     overlayText?: string;
 }
 
 export const VideoTag = forwardRef<PlayerRef, VideoTagProps>((props, ref) => {
-    const {url, playing = true, muted = true, posterUrl, onProgress, onPlayPause, overlayText} = props;
+    const {
+        url,
+        playing = true,
+        muted = true,
+        posterUrl,
+        onProgress,
+        onPlayPause,
+        overlayText,
+        updateServerTime,
+        setProgress
+    } = props;
     const videoRef = useRef<HTMLVideoElement>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isBuffering, setIsBuffering] = useState(false);
@@ -49,12 +62,22 @@ export const VideoTag = forwardRef<PlayerRef, VideoTagProps>((props, ref) => {
         }
     };
 
-    const handlePlayPause = () => {
+    const handlePlayPause = async () => {
         if (videoRef.current) {
             if (!playingRef.current) {
                 videoRef.current.pause();
             } else {
-                videoRef.current.play().catch(error => {
+                const video = videoRef.current;
+
+                if (updateServerTime && setProgress) {
+                    await updateServerTime();
+                    setProgress(0);
+                }
+                // хак. если переставлять время воспроизведения вручную, начинаются проблемы с буферизацией
+                // устанавливаем источник видео снова, чтобы сбросить буфер
+                video.src = video.src;
+
+                video.play().catch(error => {
                     console.error('Ошибка при попытке воспроизведения:', error);
                 });
             }
@@ -159,10 +182,8 @@ export const VideoTag = forwardRef<PlayerRef, VideoTagProps>((props, ref) => {
 
         const bufferInterval = setInterval(checkBuffering, 1000);
 
-        // Принудительно загружаем видео
         video.load();
 
-        // Очистка при размонтировании
         return () => {
             video.removeEventListener('loadstart', handleLoadStart);
             video.removeEventListener('canplay', handleCanPlay);
@@ -177,7 +198,6 @@ export const VideoTag = forwardRef<PlayerRef, VideoTagProps>((props, ref) => {
                 clearTimeout(bufferingTimeout.current);
             }
 
-            // Останавливаем воспроизведение при размонтировании
             video.pause();
             video.src = '';
 

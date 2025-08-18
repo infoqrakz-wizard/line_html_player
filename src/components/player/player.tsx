@@ -542,6 +542,8 @@ export const Player: React.FC<PlayerProps> = ({
                         <VideoTag
                             ref={playerRef}
                             {...props}
+                            updateServerTime={updateServerTime}
+                            setProgress={setProgress}
                             overlayText={isH265Codec ? '265' : undefined}
                         />
                     )}
