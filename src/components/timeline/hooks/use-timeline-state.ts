@@ -36,6 +36,8 @@ export const useTimelineState = (
     const {serverTime, setServerTime, progress: ctxProgress, skipCenterTimeline} = useTime();
     const [isLoading, setIsLoading] = useState<boolean>(true);
 
+    const [serverTimeError, setServerTimeError] = useState<boolean>(false);
+
     // Индекс текущего интервала масштабирования
     const [intervalIndex, setIntervalIndex] = useState(0);
 
@@ -95,6 +97,7 @@ export const useTimelineState = (
                 .catch(error => {
                     console.error('Ошибка при получении времени сервера:', error);
                     setIsLoading(false);
+                    setServerTimeError(true);
                 });
         };
 
@@ -192,6 +195,7 @@ export const useTimelineState = (
         cursorPosition,
         updateCursorPosition,
         resetCursorPosition,
-        updateServerTime
+        updateServerTime,
+        serverTimeError
     };
 };

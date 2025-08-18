@@ -21,6 +21,7 @@ module.exports = () => {
             hot: true,
             port: 3000,
             compress: true,
+            allowedHosts: 'all',
             client: {
                 overlay: {
                     errors: true,

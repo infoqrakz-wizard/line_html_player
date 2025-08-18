@@ -29,7 +29,8 @@ export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
             centerOnCurrentTime,
             cursorPosition,
             updateCursorPosition,
-            resetCursorPosition
+            resetCursorPosition,
+            serverTimeError
         } = useTimelineState(progress, url, port, credentials, protocol);
 
         // Используем хук для управления фрагментами
@@ -139,6 +140,10 @@ export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
                 previousModeRef.current = mode;
             }
         }, [mode, visibleTimeRange, intervalIndex, loadFragments, resetFragments]);
+
+        if (serverTimeError) {
+            return null;
+        }
 
         // Если время сервера еще не загружено, показываем загрузку
         if (!serverTime || !visibleTimeRange) {
