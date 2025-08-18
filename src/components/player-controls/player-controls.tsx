@@ -92,45 +92,66 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
 
     const fetchMonthAvailability = async (viewDate: Date) => {
         if (!url || !port || !credentials || !hasTimelineAccess) return;
-        const key = monthKey(viewDate);
-        if (loadedMonths.current.has(key)) return;
 
-        const start = startOfMonth(viewDate);
-        const end = startOfMonth(addMonths(viewDate, 1));
+        const currentMonthKey = monthKey(viewDate);
+        const previousMonthKey = monthKey(addMonths(viewDate, -1));
 
-        try {
-            const result = await getFramesTimeline({
-                url,
-                port,
-                credentials,
-                startTime: startOfDay(start),
-                endTime: startOfDay(end),
-                unitLength: 86400,
-                channel: camera,
-                protocol
+        if (loadedMonths.current.has(currentMonthKey) && loadedMonths.current.has(previousMonthKey)) return;
+
+        const monthsToLoad: Array<{key: string; start: Date; end: Date}> = [];
+
+        if (!loadedMonths.current.has(currentMonthKey)) {
+            monthsToLoad.push({
+                key: currentMonthKey,
+                start: startOfMonth(viewDate),
+                end: startOfMonth(addMonths(viewDate, 1))
             });
+        }
 
-            const days: Date[] = [];
-            const totalDays = result.timeline.length;
-            for (let i = 0; i < totalDays; i += 1) {
-                if (result.timeline[i] > 0) {
-                    const d = new Date(start);
-                    d.setDate(start.getDate() + i);
-                    days.push(d);
+        if (!loadedMonths.current.has(previousMonthKey)) {
+            monthsToLoad.push({
+                key: previousMonthKey,
+                start: startOfMonth(addMonths(viewDate, -1)),
+                end: startOfMonth(viewDate)
+            });
+        }
+
+        for (const month of monthsToLoad) {
+            try {
+                const result = await getFramesTimeline({
+                    url,
+                    port,
+                    credentials,
+                    startTime: startOfDay(month.start),
+                    endTime: startOfDay(month.end),
+                    unitLength: 86400,
+                    channel: camera,
+                    protocol
+                });
+
+                const days: Date[] = [];
+                const totalDays = result.timeline.length;
+                for (let i = 0; i < totalDays; i += 1) {
+                    if (result.timeline[i] > 0) {
+                        const d = new Date(month.start);
+                        d.setDate(month.start.getDate() + i);
+                        days.push(d);
+                    }
                 }
-            }
 
-            setHighlightedDates(prev => {
-                const map = new Map<string, Date>();
-                for (const d of prev) map.set(dayKey(d), d);
-                for (const d of days) map.set(dayKey(d), d);
-                return Array.from(map.values()).sort((a, b) => a.getTime() - b.getTime());
-            });
-            loadedMonths.current.add(key);
-        } catch (e) {
-            if (e instanceof Error && e.message === 'FORBIDDEN') {
-                setTimelineAccess(false);
-                return;
+                setHighlightedDates(prev => {
+                    const map = new Map<string, Date>();
+                    for (const d of prev) map.set(dayKey(d), d);
+                    for (const d of days) map.set(dayKey(d), d);
+                    return Array.from(map.values()).sort((a, b) => a.getTime() - b.getTime());
+                });
+
+                loadedMonths.current.add(month.key);
+            } catch (e) {
+                if (e instanceof Error && e.message === 'FORBIDDEN') {
+                    setTimelineAccess(false);
+                    return;
+                }
             }
         }
     };
