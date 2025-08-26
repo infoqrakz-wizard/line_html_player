@@ -60,6 +60,9 @@ export const Player: React.FC<PlayerProps> = ({
     const [authVerified, setAuthVerified] = useState<boolean>(false);
 
     const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const fragmetsGapRef = useRef<number>(0);
+    const nextFragmentTimeRef = useRef<Date | null>(null);
+    const isTransitioningToNextFragmentRef = useRef<boolean>(false);
 
     const [isPlaying, setIsPlaying] = useState<boolean>(true);
     const [isMuted, setIsMuted] = useState<boolean>(muted);
@@ -105,6 +108,12 @@ export const Player: React.FC<PlayerProps> = ({
             finalStreamUrl = videoUrl || '';
         }
     }
+
+    useEffect(() => {
+        fragmetsGapRef.current = 0;
+        isTransitioningToNextFragmentRef.current = false;
+        nextFragmentTimeRef.current = null;
+    }, [serverTime]);
 
     // Отслеживаем переключение режимов для определения, что это уже не первая загрузка
     useEffect(() => {
@@ -542,24 +551,46 @@ export const Player: React.FC<PlayerProps> = ({
         onPlayPause: (value?: boolean) => handlePlayPause(value),
         onProgress: p => {
             if (currentMode === Mode.Record && serverTime) {
-                // Вычисляем абсолютное время
-                const currentAbsoluteTime = new Date(serverTime.getTime() + p.currentTime * 1000);
+                // Вычисляем абсолютное время с учетом накопленного gap
+                const currentTotalProgress = p.currentTime + fragmetsGapRef.current;
+                const currentAbsoluteTime = new Date(serverTime.getTime() + currentTotalProgress * 1000);
 
                 // Проверяем, достигли ли мы конца текущего фрагмента
                 if (checkIfAtEndOfCurrentSegment(currentAbsoluteTime)) {
                     // Ищем следующий доступный фрагмент
                     const nextSegmentTime = findNextRecordingSegment(currentAbsoluteTime);
 
-                    if (nextSegmentTime) {
-                        setServerTime(nextSegmentTime, true);
-                        return; // Не обновляем progress, он будет сброшен автоматически
+                    if (nextSegmentTime && nextFragmentTimeRef.current !== nextSegmentTime) {
+                        nextFragmentTimeRef.current = nextSegmentTime;
+                        const newProgress = (nextSegmentTime.getTime() - serverTime.getTime()) / 1000;
+
+                        // Устанавливаем флаг перехода и обновляем gap
+                        isTransitioningToNextFragmentRef.current = true;
+
+                        // Gap равен разности между желаемой позицией и текущей позицией плеера
+                        fragmetsGapRef.current = newProgress - p.currentTime;
+
+                        setProgress(newProgress);
+                        return;
                     } else {
+                        console.log('No next segment found, stopping playback');
                         setIsPlaying(false);
                     }
                 }
             }
 
-            setProgress(p.currentTime);
+            // Пропускаем обычное обновление сразу после перехода к новому фрагменту
+            if (isTransitioningToNextFragmentRef.current) {
+                console.log('Skipping normal update after fragment transition');
+                isTransitioningToNextFragmentRef.current = false;
+                // Очищаем ссылку на предыдущий фрагмент, чтобы не блокировать следующие переходы
+                nextFragmentTimeRef.current = null;
+                return;
+            }
+
+            const totalProgress = p.currentTime + fragmetsGapRef.current;
+
+            setProgress(totalProgress);
         }
     };
 
