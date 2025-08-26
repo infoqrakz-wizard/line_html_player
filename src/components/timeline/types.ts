@@ -38,6 +38,13 @@ export interface TimelineRef {
     centerOnCurrentTime: () => void;
     /** Получить текущее серверное время */
     getCurrentTime: () => Date | null;
+    /** Получить данные фрагментов */
+    getFragmentsData: () => {
+        fragments: number[];
+        fragmentsBufferRange: TimeRange;
+        intervalIndex: number;
+        fragmentRanges: FragmentTimeRange[];
+    } | null;
 }
 
 /**
@@ -78,6 +85,16 @@ export interface LoadFragmentsParams {
 export interface FragmentsResponse {
     /** Массив с наличием фрагментов */
     timeline: number[];
+}
+
+/**
+ * Диапазон времени для одного фрагмента записи
+ */
+export interface FragmentTimeRange {
+    /** Начало фрагмента */
+    start: Date;
+    /** Конец фрагмента */
+    end: Date;
 }
 
 /**

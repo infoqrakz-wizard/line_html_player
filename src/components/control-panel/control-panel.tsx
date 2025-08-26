@@ -22,6 +22,7 @@ interface ControlPanelProps {
     protocol?: Protocol;
     popperBoundaryElement?: HTMLElement | null;
     popperPortalId?: string;
+    timelineRef?: React.RefObject<TimelineRef>;
     onPlayPause: () => void;
     onMuteToggle: () => void;
     onSpeedChange: (speed: number) => void;
@@ -49,6 +50,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
     protocol,
     popperBoundaryElement,
     popperPortalId,
+    timelineRef: externalTimelineRef,
     onPlayPause,
     onMuteToggle,
     onSpeedChange,
@@ -61,7 +63,8 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
     onChangeMode
 }) => {
     const {hasTimelineAccess} = useTimelineAuth();
-    const timelineRef = useRef<TimelineRef>(null);
+    const internalTimelineRef = useRef<TimelineRef>(null);
+    const timelineRef = externalTimelineRef || internalTimelineRef;
 
     return (
         <div className={styles.controlPanel}>

@@ -34,7 +34,7 @@ export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
         } = useTimelineState(progress, url, port, credentials, protocol);
 
         // Используем хук для управления фрагментами
-        const {fragments, fragmentsBufferRange, loadFragments, resetFragments} = useTimelineFragments({
+        const {fragments, fragmentsBufferRange, fragmentRanges, loadFragments, resetFragments} = useTimelineFragments({
             url,
             port,
             credentials,
@@ -91,10 +91,21 @@ export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
                 (ref as React.MutableRefObject<TimelineRef>).current = {
                     setVisibleTimeRange: (start: Date, end: Date) => setVisibleTimeRange({start, end}),
                     centerOnCurrentTime,
-                    getCurrentTime: () => serverTime
+                    getCurrentTime: () => serverTime,
+                    getFragmentsData: () => {
+                        if (!fragments || fragments.length === 0) {
+                            return null;
+                        }
+                        return {
+                            fragments,
+                            fragmentsBufferRange,
+                            intervalIndex,
+                            fragmentRanges
+                        };
+                    }
                 };
             }
-        }, [ref, setVisibleTimeRange, centerOnCurrentTime, serverTime]);
+        }, [ref, setVisibleTimeRange, centerOnCurrentTime, serverTime, fragments, fragmentsBufferRange, intervalIndex]);
 
         // Устанавливаем обработчик колесика мыши
         useEffect(() => {

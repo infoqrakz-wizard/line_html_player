@@ -72,9 +72,25 @@ export const HlsPlayer = forwardRef<PlayerRef, HlsPlayerProps>((props, ref) => {
 
     const handleTimeUpdate = () => {
         if (videoRef.current && onProgress) {
+            const currentTime = videoRef.current.currentTime;
+            const duration = videoRef.current.duration;
+
+            // Логируем каждые 5 секунд для отладки
+            if (
+                Math.floor(currentTime) % 5 === 0 &&
+                Math.floor(currentTime) !== Math.floor(lastPlayheadPosition.current)
+            ) {
+                console.log('🎬 HLS Player: Time update', {
+                    currentTime: currentTime.toFixed(2),
+                    duration: duration.toFixed(2),
+                    remaining: (duration - currentTime).toFixed(2),
+                    progress: ((currentTime / duration) * 100).toFixed(1) + '%'
+                });
+            }
+
             onProgress({
-                currentTime: videoRef.current.currentTime,
-                duration: videoRef.current.duration
+                currentTime: currentTime,
+                duration: duration
             });
         }
     };

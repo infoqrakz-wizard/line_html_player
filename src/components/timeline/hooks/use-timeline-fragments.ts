@@ -1,9 +1,9 @@
 /**
  * Хук для управления фрагментами временной шкалы
  */
-import {useState, useRef, useCallback} from 'react';
+import {useState, useRef, useCallback, useMemo} from 'react';
 import {getFramesTimeline} from '../../../utils/api';
-import {TimeRange, LoadQueueItem, TimelineFragmentsParams} from '../types';
+import {TimeRange, LoadQueueItem, TimelineFragmentsParams, FragmentTimeRange} from '../types';
 import {BUFFER_SCREENS, UNIT_LENGTHS} from '../utils/constants';
 import {useTimelineAuth} from '../../../context/timeline-auth-context';
 import {Protocol} from '../../../utils/types';
@@ -28,9 +28,61 @@ export const useTimelineFragments = (params: TimelineFragmentsParams & {protocol
 
     // Состояние загрузки фрагментов
     const [isLoadingFragments, setIsLoadingFragments] = useState(false);
-
     // Очередь загрузки фрагментов
     const loadQueue = useRef<LoadQueueItem | null>(null);
+
+    // Вычисляем диапазоны времени для каждого фрагмента
+    const fragmentRanges = useMemo((): FragmentTimeRange[] => {
+        if (!fragments || fragments.length === 0 || fragmentsBufferRange.start.getTime() === 0) {
+            return [];
+        }
+
+        const ranges: FragmentTimeRange[] = [];
+        // Получаем текущий intervalIndex из loadQueue или используем 0 по умолчанию
+        const currentIntervalIndex = loadQueue.current?.zoomIndex ?? 0;
+        const unitLength = UNIT_LENGTHS[currentIntervalIndex];
+
+        let currentFragmentStart: number | null = null;
+
+        for (let i = 0; i < fragments.length; i++) {
+            if (fragments[i] === 1) {
+                // Начало фрагмента
+                if (currentFragmentStart === null) {
+                    currentFragmentStart = i;
+                }
+            } else if (fragments[i] === 0 && currentFragmentStart !== null) {
+                // Конец фрагмента
+                const fragmentStartTime = new Date(
+                    fragmentsBufferRange.start.getTime() + currentFragmentStart * unitLength * 1000
+                );
+                const fragmentEndTime = new Date(fragmentsBufferRange.start.getTime() + i * unitLength * 1000);
+
+                ranges.push({
+                    start: fragmentStartTime,
+                    end: fragmentEndTime
+                });
+
+                currentFragmentStart = null;
+            }
+        }
+
+        // Обрабатываем случай, когда фрагмент заканчивается в конце массива
+        if (currentFragmentStart !== null) {
+            const fragmentStartTime = new Date(
+                fragmentsBufferRange.start.getTime() + currentFragmentStart * unitLength * 1000
+            );
+            const fragmentEndTime = new Date(
+                fragmentsBufferRange.start.getTime() + fragments.length * unitLength * 1000
+            );
+
+            ranges.push({
+                start: fragmentStartTime,
+                end: fragmentEndTime
+            });
+        }
+
+        return ranges;
+    }, [fragments, fragmentsBufferRange, loadQueue.current?.zoomIndex]);
 
     /**
      * Функция для запуска загрузки из очереди
@@ -136,6 +188,7 @@ export const useTimelineFragments = (params: TimelineFragmentsParams & {protocol
     return {
         fragments,
         fragmentsBufferRange,
+        fragmentRanges,
         isLoadingFragments,
         loadFragments,
         resetFragments

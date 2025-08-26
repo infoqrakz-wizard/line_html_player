@@ -8,6 +8,7 @@ import {ControlPanel} from '../control-panel';
 
 import {useTime} from '../../context/time-context';
 import {useTimelineState} from '../timeline/hooks/use-timeline-state';
+import {TimelineRef} from '../timeline/types';
 
 import {HlsPlayer, VideoTag, SaveStreamModal, ModeIndicator} from './components';
 import {PlayerComponentProps} from './components/player-interface';
@@ -70,6 +71,7 @@ export const Player: React.FC<PlayerProps> = ({
     const datepickerPortalIdRef = useRef<string>(`datepicker-portal-${Math.random().toString(36).slice(2)}`);
     const controlAreaRef = useRef<HTMLDivElement>(null);
     const playerRef = useRef<PlayerRef | null>(null);
+    const timelineRef = useRef<TimelineRef | null>(null);
     const archiveTargetTimeRef = useRef<Date | null>(null);
     const forwardAccumOffsetRef = useRef<number | null>(null);
     const wasPlayingBeforeHiddenRef = useRef<boolean>(false);
@@ -323,7 +325,6 @@ export const Player: React.FC<PlayerProps> = ({
             const isLeft = key === 'arrowleft' || code === 'ArrowLeft';
             const isRight = key === 'arrowright' || code === 'ArrowRight';
             if (isLeft || isRight) {
-                console.log('arrow click');
                 e.preventDefault();
                 // Всегда показываем Timeline и перезапускаем таймер скрытия
                 showControlsAndRestartAutoHide();
@@ -342,19 +343,15 @@ export const Player: React.FC<PlayerProps> = ({
                     let candidateAbsolute = addSecondsToDate(serverTime, ctxProgress + delta);
 
                     if (isRight) {
-                        console.log('right arrow click');
                         const baseOffset = forwardAccumOffsetRef.current ?? ctxProgress;
                         const nextOffset = baseOffset + 5;
                         forwardAccumOffsetRef.current = nextOffset;
                         candidateAbsolute = addSecondsToDate(serverTime, nextOffset);
 
                         const approxNow = new Date();
-                        console.log('approxNow', approxNow);
-                        console.log('candidateAbsolute', candidateAbsolute);
                         if (candidateAbsolute.getTime() > approxNow.getTime()) {
                             forwardAccumOffsetRef.current = null;
                             const nowServer = (await updateServerTime()) ?? new Date();
-                            console.log('switch to live', nowServer);
                             setCurrentMode(Mode.Live);
                             setServerTime(nowServer, false);
                             setProgress(0);
@@ -468,6 +465,74 @@ export const Player: React.FC<PlayerProps> = ({
         setShowSaveModal(true);
     };
 
+    // Функция для получения данных фрагментов из Timeline
+    const getFragmentsFromTimeline = useCallback(() => {
+        if (!timelineRef.current) {
+            return null;
+        }
+
+        const fragmentsData = timelineRef.current.getFragmentsData();
+        if (!fragmentsData) {
+            return null;
+        }
+
+        return fragmentsData;
+    }, []);
+
+    // Функция для поиска следующего доступного фрагмента на timeline
+    const findNextRecordingSegment = useCallback(
+        (currentAbsoluteTime: Date) => {
+            const fragmentsData = getFragmentsFromTimeline();
+            if (!fragmentsData) {
+                return null;
+            }
+
+            const {fragmentRanges} = fragmentsData;
+
+            // Ищем следующий доступный фрагмент после текущего времени
+            for (const fragment of fragmentRanges) {
+                if (fragment.start.getTime() > currentAbsoluteTime.getTime()) {
+                    return fragment.start;
+                }
+            }
+
+            return null;
+        },
+        [getFragmentsFromTimeline]
+    );
+
+    // Функция для проверки, достиг ли указатель конца текущего фрагмента
+    const checkIfAtEndOfCurrentSegment = useCallback(
+        (currentAbsoluteTime: Date) => {
+            const fragmentsData = getFragmentsFromTimeline();
+            if (!fragmentsData) {
+                return false;
+            }
+
+            const {fragmentRanges} = fragmentsData;
+
+            // Проходим по каждому фрагменту и проверяем, находится ли текущее время внутри какого-то фрагмента
+            for (let i = 0; i < fragmentRanges.length; i++) {
+                const fragmentRange = fragmentRanges[i];
+
+                // Если мы находимся в этом фрагменте
+                if (
+                    currentAbsoluteTime.getTime() >= fragmentRange.start.getTime() &&
+                    currentAbsoluteTime.getTime() <= fragmentRange.end.getTime()
+                ) {
+                    // Проверяем, близки ли мы к концу (в пределах 1 секунды)
+                    const timeToEnd = fragmentRange.end.getTime() - currentAbsoluteTime.getTime();
+                    const isNearEnd = timeToEnd <= 1000; // 1 секунда
+
+                    return isNearEnd;
+                }
+            }
+
+            return false;
+        },
+        [getFragmentsFromTimeline]
+    );
+
     const props: PlayerComponentProps = {
         url: finalStreamUrl,
         playing: isPlaying,
@@ -476,6 +541,24 @@ export const Player: React.FC<PlayerProps> = ({
         playbackSpeed,
         onPlayPause: (value?: boolean) => handlePlayPause(value),
         onProgress: p => {
+            if (currentMode === Mode.Record && serverTime) {
+                // Вычисляем абсолютное время
+                const currentAbsoluteTime = new Date(serverTime.getTime() + p.currentTime * 1000);
+
+                // Проверяем, достигли ли мы конца текущего фрагмента
+                if (checkIfAtEndOfCurrentSegment(currentAbsoluteTime)) {
+                    // Ищем следующий доступный фрагмент
+                    const nextSegmentTime = findNextRecordingSegment(currentAbsoluteTime);
+
+                    if (nextSegmentTime) {
+                        setServerTime(nextSegmentTime, true);
+                        return; // Не обновляем progress, он будет сброшен автоматически
+                    } else {
+                        setIsPlaying(false);
+                    }
+                }
+            }
+
             setProgress(p.currentTime);
         }
     };
@@ -645,6 +728,7 @@ export const Player: React.FC<PlayerProps> = ({
                             camera={camera ?? 0}
                             popperBoundaryElement={containerRef.current}
                             popperPortalId={datepickerPortalIdRef.current}
+                            timelineRef={timelineRef}
                             onPlayPause={() => handlePlayPause()}
                             onMuteToggle={() => handleMuteToggle()}
                             onToggleFullscreen={() => handleToggleFullscreen()}
