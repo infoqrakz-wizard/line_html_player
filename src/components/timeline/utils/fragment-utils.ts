@@ -1,7 +1,7 @@
 /**
  * Утилиты для работы с фрагментами временной шкалы
  */
-import { TimeRange } from '../types';
+import {TimeRange} from '../types';
 
 /**
  * Находит ближайший доступный фрагмент для указанного времени
@@ -16,18 +16,11 @@ export const findNearestAvailableFragment = (
     clickedTime: Date,
     fragments: number[],
     fragmentsBufferRange: TimeRange,
-    unitLengthSeconds: number,
-    currentTime: Date
+    unitLengthSeconds: number
 ): Date | null => {
     // Если нет фрагментов, возвращаем null
     if (fragments.length === 0) {
         return null;
-    }
-
-    // Проверяем, что clicked time в прошлом (не в будущем)
-    const isFutureTime = clickedTime.getTime() > currentTime.getTime();
-    if (isFutureTime) {
-        return null; // Для будущего времени не применяем логику поиска фрагментов
     }
 
     const unitLengthMs = unitLengthSeconds * 1000;
