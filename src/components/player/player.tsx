@@ -221,7 +221,7 @@ export const Player: React.FC<PlayerProps> = ({
         }
     };
 
-    const handleTimelineClick = async (clickedTime: Date) => {
+    const handleTimelineClick = async (clickedTime: Date, e: React.MouseEvent) => {
         // Получаем текущее время сервера или используем текущее время системы
         const currentServerTime = await updateServerTime();
 
@@ -237,6 +237,7 @@ export const Player: React.FC<PlayerProps> = ({
         } else {
             // Если время в прошлом - переключаемся на запись
             handleChangeMode(Mode.Record, clickedTime);
+            timelineRef.current?.setMaxZoom(e);
         }
 
         // При клике по таймлайну всегда запускаем воспроизведение
@@ -344,6 +345,12 @@ export const Player: React.FC<PlayerProps> = ({
                     const targetTime = addSecondsToDate(base, delta);
                     archiveTargetTimeRef.current = targetTime;
                     setCurrentMode(Mode.Record);
+
+                    // При переключении на режим записи устанавливаем максимальный масштаб timeline
+                    if (timelineRef.current) {
+                        timelineRef.current.setMaxZoom();
+                    }
+
                     setServerTime(targetTime, true);
                     return;
                 }
@@ -609,8 +616,8 @@ export const Player: React.FC<PlayerProps> = ({
                                 value: c.id,
                                 label: c.name ?? `Camera ${c.id}`
                             }))}
-                            value={camera ?? ''}
-                            onChange={value => setCamera(value)}
+                            value={camera?.toString() ?? ''}
+                            onChange={value => setCamera(value ? Number(value) : undefined)}
                             aria-label="Выбор камеры"
                         />
                         {/* <select

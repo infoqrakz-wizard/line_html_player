@@ -220,10 +220,68 @@ export const useTimelineInteractions = ({
 
                 // Если найден ближайший фрагмент, используем его время, иначе используем clicked time
                 const finalTime = nearestFragmentTime || clickedTime;
-                onTimeClick(finalTime);
+                onTimeClick(finalTime, e);
             }
         },
         [hasDragged, onTimeClick, visibleTimeRange, canvasRef, fragments, fragmentsBufferRange, intervalIndex]
+    );
+
+    const setMaxZoom = useCallback(
+        (e?: React.MouseEvent) => {
+            const newIndex = INTERVALS.length - 1;
+
+            if (newIndex !== intervalIndex) {
+                const rect = canvasRef.current!.getBoundingClientRect();
+
+                let timeUnderCursor: Date;
+                let cursorRatio: number;
+
+                if (e) {
+                    // Получаем позицию курсора относительно canvas
+                    const mouseX = e.clientX - rect.left;
+
+                    // Вычисляем время под курсором
+                    const timeRange = visibleTimeRange.end.getTime() - visibleTimeRange.start.getTime();
+                    const timeOffset = (mouseX / rect.width) * timeRange;
+                    timeUnderCursor = new Date(visibleTimeRange.start.getTime() + timeOffset);
+                    // Вычисляем новые начало и конец, сохраняя позицию времени под курсором
+                    // Вычисляем коэффициент позиции курсора в видимом диапазоне
+                    cursorRatio = mouseX / rect.width;
+                } else {
+                    timeUnderCursor = new Date(currentTime);
+                    cursorRatio = 0.5;
+                }
+
+                // Вычисляем новый временной диапазон на основе нового интервала
+                const currentRange = visibleTimeRange.end.getTime() - visibleTimeRange.start.getTime();
+                const zoomFactor = INTERVALS[newIndex] / INTERVALS[intervalIndex];
+                const newRange = currentRange * zoomFactor;
+
+                // const cursorRatio = mouseX / rect.width;
+
+                // Вычисляем новые начало и конец так, чтобы время под курсором осталось на том же месте
+                const newStart = new Date(timeUnderCursor.getTime() - cursorRatio * newRange);
+                const newEnd = new Date(newStart.getTime() + newRange);
+
+                // Сбрасываем и перезагружаем фрагменты при изменении масштаба
+                resetFragments();
+                setIntervalIndex(newIndex);
+                loadFragments(newStart, newEnd, newIndex);
+
+                setVisibleTimeRange({start: newStart, end: newEnd});
+            }
+        },
+        [
+            intervalIndex,
+            canvasRef,
+            visibleTimeRange.end,
+            visibleTimeRange.start,
+            resetFragments,
+            setIntervalIndex,
+            loadFragments,
+            setVisibleTimeRange,
+            currentTime
+        ]
     );
 
     return {
@@ -231,6 +289,7 @@ export const useTimelineInteractions = ({
         handleMouseUp,
         handleMouseMove,
         handleClick,
+        setMaxZoom,
         setupWheelHandler
     };
 };
