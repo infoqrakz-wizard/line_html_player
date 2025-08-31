@@ -39,7 +39,7 @@ export const useTimelineState = (
     const [serverTimeError, setServerTimeError] = useState<boolean>(false);
 
     // Индекс текущего интервала масштабирования
-    const [intervalIndex, setIntervalIndex] = useState(0);
+    const [intervalIndex, setIntervalIndex] = useState(8);
 
     // Видимый диапазон времени (инициализируется только после получения серверного времени)
     const [visibleTimeRange, _setVisibleTimeRangeState] = useState<TimeRange | null>(null);
