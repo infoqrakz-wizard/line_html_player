@@ -43,7 +43,7 @@ export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
         });
 
         // Используем хук для обработки взаимодействий пользователя
-        const {handleMouseDown, handleMouseUp, handleMouseMove, handleClick, setupWheelHandler, setMaxZoom} =
+        const {handleMouseDown, handleMouseUp, handleMouseMove, handleClick, setupWheelHandler} =
             useTimelineInteractions({
                 canvasRef,
                 containerRef,
@@ -102,20 +102,10 @@ export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
                             intervalIndex,
                             fragmentRanges
                         };
-                    },
-                    setMaxZoom: (e: React.MouseEvent) => setMaxZoom(e)
+                    }
                 };
             }
-        }, [
-            ref,
-            setVisibleTimeRange,
-            centerOnCurrentTime,
-            serverTime,
-            fragments,
-            fragmentsBufferRange,
-            intervalIndex,
-            setIntervalIndex
-        ]);
+        }, [ref, setVisibleTimeRange, centerOnCurrentTime, serverTime, fragments, fragmentsBufferRange, intervalIndex]);
 
         // Устанавливаем обработчик колесика мыши
         useEffect(() => {

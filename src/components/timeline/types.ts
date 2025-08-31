@@ -45,7 +45,6 @@ export interface TimelineRef {
         intervalIndex: number;
         fragmentRanges: FragmentTimeRange[];
     } | null;
-    setMaxZoom: (e?: React.MouseEvent) => void;
 }
 
 /**
