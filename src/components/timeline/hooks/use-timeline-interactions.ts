@@ -1,9 +1,16 @@
 /**
  * Хук для обработки взаимодействий пользователя с временной шкалой
  */
-import {useState, useCallback} from 'react';
+import {useState, useCallback, useRef} from 'react';
 import {TimelineInteractionsParams} from '../types';
-import {INTERVALS, WHEEL_DELTA_THRESHOLD, UNIT_LENGTHS} from '../utils/constants';
+import {
+    INTERVALS,
+    WHEEL_DELTA_THRESHOLD,
+    UNIT_LENGTHS,
+    VERTICAL_SWIPE_THRESHOLD,
+    HORIZONTAL_SWIPE_THRESHOLD,
+    ZOOM_SWIPE_DISTANCE
+} from '../utils/constants';
 import {findNearestAvailableFragment} from '../utils/fragment-utils';
 
 /**
@@ -22,7 +29,7 @@ export const useTimelineInteractions = ({
     fragmentsBufferRange,
     loadFragments,
     resetFragments,
-    currentTime,
+    currentTime, // eslint-disable-line @typescript-eslint/no-unused-vars
     onTimeClick,
     progress // eslint-disable-line @typescript-eslint/no-unused-vars
 }: TimelineInteractionsParams) => {
@@ -30,6 +37,14 @@ export const useTimelineInteractions = ({
     const [isDragging, setIsDragging] = useState(false);
     const [hasDragged, setHasDragged] = useState(false);
     const [startX, setStartX] = useState(0);
+    const [startY, setStartY] = useState(0);
+
+    // Состояние для отслеживания типа свайпа
+    const [swipeType, setSwipeType] = useState<'horizontal' | 'vertical' | null>(null);
+
+    // Ref для накопления дистанции вертикального свайпа
+    const verticalSwipeDistanceRef = useRef(0);
+    const lastVerticalDirectionRef = useRef<'up' | 'down' | null>(null);
 
     // Аккумулятор для дельты колесика мыши
     const [wheelDeltaAccumulator, setWheelDeltaAccumulator] = useState(0);
@@ -173,7 +188,6 @@ export const useTimelineInteractions = ({
         [
             visibleTimeRange,
             intervalIndex,
-            currentTime,
             wheelDeltaAccumulator,
             canvasRef,
             fragmentsBufferRange,
@@ -231,12 +245,16 @@ export const useTimelineInteractions = ({
      */
     const handleTouchStart = useCallback(
         (e: React.TouchEvent) => {
-            e.preventDefault();
+            // e.preventDefault();
             if (e.touches.length === 1) {
                 const touch = e.touches[0];
                 setIsDragging(true);
                 setHasDragged(false);
                 setStartX(touch.pageX - containerRef.current!.offsetLeft);
+                setStartY(touch.pageY - containerRef.current!.offsetTop);
+                setSwipeType(null);
+                verticalSwipeDistanceRef.current = 0;
+                lastVerticalDirectionRef.current = null;
             }
         },
         [containerRef]
@@ -247,50 +265,120 @@ export const useTimelineInteractions = ({
      */
     const handleTouchMove = useCallback(
         (e: React.TouchEvent) => {
-            e.preventDefault();
             if (!isDragging || !containerRef.current || e.touches.length !== 1) return;
 
             const touch = e.touches[0];
             const deltaX = touch.clientX - startX;
-            const containerRect = containerRef.current.getBoundingClientRect();
-            const pixelsPerMilli =
-                containerRect.width / (visibleTimeRange.end.getTime() - visibleTimeRange.start.getTime());
-            const timeDelta = deltaX / pixelsPerMilli;
+            const deltaY = touch.clientY - startY;
 
-            const newStart = new Date(visibleTimeRange.start.getTime() - timeDelta);
-            const newEnd = new Date(visibleTimeRange.end.getTime() - timeDelta);
+            if (!swipeType) {
+                const absDeltaX = Math.abs(deltaX);
+                const absDeltaY = Math.abs(deltaY);
 
-            const screenDuration = newEnd.getTime() - newStart.getTime();
-
-            const distanceToStartBuffer = newStart.getTime() - fragmentsBufferRange.start.getTime();
-            const distanceToEndBuffer = fragmentsBufferRange.end.getTime() - newEnd.getTime();
-
-            if (distanceToStartBuffer < screenDuration || distanceToEndBuffer < screenDuration) {
-                loadFragments(newStart, newEnd, intervalIndex);
+                if (absDeltaY > VERTICAL_SWIPE_THRESHOLD && absDeltaY > absDeltaX) {
+                    console.log('vertical');
+                    setSwipeType('vertical');
+                } else if (absDeltaX > HORIZONTAL_SWIPE_THRESHOLD && absDeltaX > absDeltaY) {
+                    console.log('horizontal');
+                    setSwipeType('horizontal');
+                }
             }
 
-            setStartX(touch.clientX);
-            setVisibleTimeRange({start: newStart, end: newEnd});
-            setHasDragged(true);
+            if (swipeType === 'vertical') {
+                const containerRect = containerRef.current.getBoundingClientRect();
+                const mouseX = touch.clientX - containerRect.left;
+
+                const currentDirection = deltaY < 0 ? 'up' : 'down';
+
+                if (lastVerticalDirectionRef.current && lastVerticalDirectionRef.current !== currentDirection) {
+                    verticalSwipeDistanceRef.current = 0;
+                }
+
+                lastVerticalDirectionRef.current = currentDirection;
+
+                const newDistance = verticalSwipeDistanceRef.current + Math.abs(deltaY);
+                verticalSwipeDistanceRef.current = newDistance;
+
+                if (newDistance >= ZOOM_SWIPE_DISTANCE) {
+                    const timeRange = visibleTimeRange.end.getTime() - visibleTimeRange.start.getTime();
+                    const timeOffset = (mouseX / containerRect.width) * timeRange;
+                    const timeUnderFinger = new Date(visibleTimeRange.start.getTime() + timeOffset);
+
+                    const zoomIn = currentDirection === 'up';
+                    const newIndex = Math.min(Math.max(intervalIndex + (zoomIn ? -1 : 1), 0), INTERVALS.length - 1);
+
+                    if (newIndex !== intervalIndex) {
+                        const currentRange = visibleTimeRange.end.getTime() - visibleTimeRange.start.getTime();
+                        const zoomFactor = INTERVALS[newIndex] / INTERVALS[intervalIndex];
+                        const newRange = currentRange * zoomFactor;
+
+                        const fingerRatio = mouseX / containerRect.width;
+
+                        const newStart = new Date(timeUnderFinger.getTime() - fingerRatio * newRange);
+                        const newEnd = new Date(newStart.getTime() + newRange);
+
+                        resetFragments();
+                        setIntervalIndex(newIndex);
+                        loadFragments(newStart, newEnd, newIndex);
+
+                        setVisibleTimeRange({start: newStart, end: newEnd});
+
+                        verticalSwipeDistanceRef.current = 0;
+                    }
+                }
+
+                setHasDragged(true);
+                return;
+            }
+
+            if (swipeType === 'horizontal') {
+                const containerRect = containerRef.current.getBoundingClientRect();
+                const pixelsPerMilli =
+                    containerRect.width / (visibleTimeRange.end.getTime() - visibleTimeRange.start.getTime());
+                const timeDelta = deltaX / pixelsPerMilli;
+
+                const newStart = new Date(visibleTimeRange.start.getTime() - timeDelta);
+                const newEnd = new Date(visibleTimeRange.end.getTime() - timeDelta);
+
+                const screenDuration = newEnd.getTime() - newStart.getTime();
+
+                const distanceToStartBuffer = newStart.getTime() - fragmentsBufferRange.start.getTime();
+                const distanceToEndBuffer = fragmentsBufferRange.end.getTime() - newEnd.getTime();
+
+                if (distanceToStartBuffer < screenDuration || distanceToEndBuffer < screenDuration) {
+                    loadFragments(newStart, newEnd, intervalIndex);
+                }
+
+                setStartX(touch.clientX);
+                setVisibleTimeRange({start: newStart, end: newEnd});
+                setHasDragged(true);
+            }
         },
         [
             isDragging,
             startX,
+            startY,
+            swipeType,
             containerRef,
             visibleTimeRange,
             fragmentsBufferRange,
             loadFragments,
             setVisibleTimeRange,
-            intervalIndex
+            intervalIndex,
+            resetFragments,
+            setIntervalIndex
         ]
     );
 
     const handleTouchEnd = useCallback(
         (e: React.TouchEvent) => {
-            e.preventDefault();
-
-            // Обрабатываем клик только если не было перетаскивания
-            if (!hasDragged && onTimeClick && canvasRef.current && e.changedTouches.length === 1) {
+            if (
+                !hasDragged &&
+                swipeType !== 'vertical' &&
+                onTimeClick &&
+                canvasRef.current &&
+                e.changedTouches.length === 1
+            ) {
                 const touch = e.changedTouches[0];
                 const rect = canvasRef.current.getBoundingClientRect();
                 const x = touch.clientX - rect.left;
@@ -310,8 +398,20 @@ export const useTimelineInteractions = ({
             }
 
             setIsDragging(false);
+            setSwipeType(null);
+            verticalSwipeDistanceRef.current = 0;
+            lastVerticalDirectionRef.current = null;
         },
-        [hasDragged, onTimeClick, canvasRef, visibleTimeRange, fragments, fragmentsBufferRange, intervalIndex]
+        [
+            hasDragged,
+            swipeType,
+            onTimeClick,
+            canvasRef,
+            visibleTimeRange,
+            fragments,
+            fragmentsBufferRange,
+            intervalIndex
+        ]
     );
 
     return {

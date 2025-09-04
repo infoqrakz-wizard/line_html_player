@@ -44,6 +44,21 @@ export const BUFFER_SCREENS = 2;
 export const WHEEL_DELTA_THRESHOLD = 50;
 
 /**
+ * Минимальное расстояние для определения вертикального свайпа
+ */
+export const VERTICAL_SWIPE_THRESHOLD = 30;
+
+/**
+ * Минимальное расстояние для определения горизонтального свайпа
+ */
+export const HORIZONTAL_SWIPE_THRESHOLD = 20;
+
+/**
+ * Минимальная дистанция для изменения масштаба при вертикальном свайпе
+ */
+export const ZOOM_SWIPE_DISTANCE = 75;
+
+/**
  * Константы для позиций меток на временной шкале
  */
 export const TIMELINE_POSITIONS = {
