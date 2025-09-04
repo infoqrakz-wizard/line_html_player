@@ -285,14 +285,12 @@ export const useTimelineInteractions = ({
         ]
     );
 
-    const handleTouchEnd = useCallback((e: React.TouchEvent) => {
-        e.preventDefault();
-        setIsDragging(false);
-    }, []);
-
-    const handleTouch = useCallback(
+    const handleTouchEnd = useCallback(
         (e: React.TouchEvent) => {
-            if (!hasDragged && onTimeClick && canvasRef.current && e.touches.length === 0) {
+            e.preventDefault();
+
+            // Обрабатываем клик только если не было перетаскивания
+            if (!hasDragged && onTimeClick && canvasRef.current && e.changedTouches.length === 1) {
                 const touch = e.changedTouches[0];
                 const rect = canvasRef.current.getBoundingClientRect();
                 const x = touch.clientX - rect.left;
@@ -310,8 +308,10 @@ export const useTimelineInteractions = ({
                 const finalTime = nearestFragmentTime || clickedTime;
                 onTimeClick(finalTime);
             }
+
+            setIsDragging(false);
         },
-        [hasDragged, onTimeClick, visibleTimeRange, canvasRef, fragments, fragmentsBufferRange, intervalIndex]
+        [hasDragged, onTimeClick, canvasRef, visibleTimeRange, fragments, fragmentsBufferRange, intervalIndex]
     );
 
     return {
@@ -322,7 +322,6 @@ export const useTimelineInteractions = ({
         handleTouchStart,
         handleTouchMove,
         handleTouchEnd,
-        handleTouch,
         setupWheelHandler
     };
 };

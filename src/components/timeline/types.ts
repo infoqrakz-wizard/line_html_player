@@ -143,8 +143,6 @@ export interface TimelineCanvasProps {
     onTouchMove?: (e: React.TouchEvent) => void;
     /** Обработчик окончания касания */
     onTouchEnd?: (e: React.TouchEvent) => void;
-    /** Обработчик касания (аналог клика) */
-    onTouch?: (e: React.TouchEvent) => void;
     /** Ссылка на контейнер */
     containerRef: React.RefObject<HTMLDivElement>;
     /** Ссылка на canvas */

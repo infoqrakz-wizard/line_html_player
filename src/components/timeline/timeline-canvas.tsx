@@ -28,7 +28,6 @@ export const TimelineCanvas = ({
     onTouchStart,
     onTouchMove,
     onTouchEnd,
-    onTouch,
     containerRef,
     canvasRef,
     cursorPosition
@@ -60,7 +59,6 @@ export const TimelineCanvas = ({
             onTouchStart={onTouchStart}
             onTouchMove={onTouchMove}
             onTouchEnd={onTouchEnd}
-            onTouch={onTouch}
         >
             <canvas ref={canvasRef} />
         </div>

@@ -51,7 +51,6 @@ export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
             handleTouchStart,
             handleTouchMove,
             handleTouchEnd,
-            handleTouch,
             setupWheelHandler
         } = useTimelineInteractions({
             canvasRef,
@@ -193,7 +192,6 @@ export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
                     onTouchStart={handleTouchStart}
                     onTouchMove={handleTouchMove}
                     onTouchEnd={handleTouchEnd}
-                    onTouch={handleTouch}
                     containerRef={containerRef}
                     canvasRef={canvasRef}
                     cursorPosition={cursorPosition}
