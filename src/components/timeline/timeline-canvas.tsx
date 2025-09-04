@@ -1,9 +1,11 @@
+/* eslint-disable jsx-a11y/no-static-element-interactions */
+/* eslint-disable jsx-a11y/click-events-have-key-events */
 /**
  * Компонент для отрисовки canvas временной шкалы
  */
 import React from 'react';
-import { TimelineCanvasProps } from './types';
-import { useTimelineDrawing } from './hooks/use-timeline-drawing';
+import {TimelineCanvasProps} from './types';
+import {useTimelineDrawing} from './hooks/use-timeline-drawing';
 import styles from './timeline.module.scss';
 
 /**
@@ -23,6 +25,10 @@ export const TimelineCanvas = ({
     onMouseMove,
     onMouseLeave,
     onClick,
+    onTouchStart,
+    onTouchMove,
+    onTouchEnd,
+    onTouch,
     containerRef,
     canvasRef,
     cursorPosition
@@ -51,6 +57,10 @@ export const TimelineCanvas = ({
             onMouseMove={onMouseMove}
             onMouseLeave={onMouseLeave}
             onClick={onClick}
+            onTouchStart={onTouchStart}
+            onTouchMove={onTouchMove}
+            onTouchEnd={onTouchEnd}
+            onTouch={onTouch}
         >
             <canvas ref={canvasRef} />
         </div>

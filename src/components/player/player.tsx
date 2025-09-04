@@ -69,6 +69,7 @@ export const Player: React.FC<PlayerProps> = ({
     const [playbackSpeed, setPlaybackSpeed] = useState<number>(1);
 
     const [showControls, setShowControls] = useState<boolean>(false);
+    const [isMobile, setIsMobile] = useState<boolean>(false);
 
     const containerRef = useRef<HTMLDivElement>(null);
     const datepickerPortalIdRef = useRef<string>(`datepicker-portal-${Math.random().toString(36).slice(2)}`);
@@ -412,6 +413,18 @@ export const Player: React.FC<PlayerProps> = ({
         return () => document.removeEventListener('fullscreenchange', handleFsChange);
     }, []);
 
+    // Отслеживаем размер экрана для мобильных устройств
+    useEffect(() => {
+        const checkIsMobile = () => {
+            setIsMobile(window.outerWidth < 768);
+        };
+
+        checkIsMobile();
+        window.addEventListener('resize', checkIsMobile);
+
+        return () => window.removeEventListener('resize', checkIsMobile);
+    }, []);
+
     useEffect(() => {
         const handleVisibilityChange = () => {
             const isVisible = document.visibilityState === 'visible';
@@ -748,7 +761,7 @@ export const Player: React.FC<PlayerProps> = ({
                     onMouseEnter={handleMouseEnter}
                     onMouseLeave={handleMouseLeave}
                 >
-                    <div className={`${styles.controlPanelContainer} ${showControls ? styles.show : ''}`}>
+                    <div className={`${styles.controlPanelContainer} ${showControls || isMobile ? styles.show : ''}`}>
                         <ControlPanel
                             mode={currentMode}
                             isPlaying={isPlaying}

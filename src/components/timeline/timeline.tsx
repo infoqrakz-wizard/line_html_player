@@ -43,22 +43,31 @@ export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
         });
 
         // Используем хук для обработки взаимодействий пользователя
-        const {handleMouseDown, handleMouseUp, handleMouseMove, handleClick, setupWheelHandler} =
-            useTimelineInteractions({
-                canvasRef,
-                containerRef,
-                visibleTimeRange: visibleTimeRange || {start: new Date(), end: new Date()},
-                setVisibleTimeRange,
-                intervalIndex,
-                setIntervalIndex,
-                fragments,
-                fragmentsBufferRange,
-                loadFragments,
-                resetFragments,
-                currentTime: serverTime || new Date(),
-                onTimeClick,
-                progress
-            });
+        const {
+            handleMouseDown,
+            handleMouseUp,
+            handleMouseMove,
+            handleClick,
+            handleTouchStart,
+            handleTouchMove,
+            handleTouchEnd,
+            handleTouch,
+            setupWheelHandler
+        } = useTimelineInteractions({
+            canvasRef,
+            containerRef,
+            visibleTimeRange: visibleTimeRange || {start: new Date(), end: new Date()},
+            setVisibleTimeRange,
+            intervalIndex,
+            setIntervalIndex,
+            fragments,
+            fragmentsBufferRange,
+            loadFragments,
+            resetFragments,
+            currentTime: serverTime || new Date(),
+            onTimeClick,
+            progress
+        });
 
         // Обработчик движения мыши для отслеживания позиции курсора
         const handleMouseMoveWithCursor = useCallback(
@@ -181,6 +190,10 @@ export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
                     onMouseMove={handleMouseMoveWithCursor}
                     onMouseLeave={handleMouseLeave}
                     onClick={handleClick}
+                    onTouchStart={handleTouchStart}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleTouchEnd}
+                    onTouch={handleTouch}
                     containerRef={containerRef}
                     canvasRef={canvasRef}
                     cursorPosition={cursorPosition}

@@ -137,6 +137,14 @@ export interface TimelineCanvasProps {
     onMouseLeave: (e: React.MouseEvent) => void;
     /** Обработчик клика */
     onClick: (e: React.MouseEvent) => void;
+    /** Обработчик начала касания */
+    onTouchStart?: (e: React.TouchEvent) => void;
+    /** Обработчик движения касания */
+    onTouchMove?: (e: React.TouchEvent) => void;
+    /** Обработчик окончания касания */
+    onTouchEnd?: (e: React.TouchEvent) => void;
+    /** Обработчик касания (аналог клика) */
+    onTouch?: (e: React.TouchEvent) => void;
     /** Ссылка на контейнер */
     containerRef: React.RefObject<HTMLDivElement>;
     /** Ссылка на canvas */

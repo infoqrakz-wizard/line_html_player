@@ -226,11 +226,103 @@ export const useTimelineInteractions = ({
         [hasDragged, onTimeClick, visibleTimeRange, canvasRef, fragments, fragmentsBufferRange, intervalIndex]
     );
 
+    /**
+     * Обработчик начала касания
+     */
+    const handleTouchStart = useCallback(
+        (e: React.TouchEvent) => {
+            e.preventDefault();
+            if (e.touches.length === 1) {
+                const touch = e.touches[0];
+                setIsDragging(true);
+                setHasDragged(false);
+                setStartX(touch.pageX - containerRef.current!.offsetLeft);
+            }
+        },
+        [containerRef]
+    );
+
+    /**
+     * Обработчик движения касания
+     */
+    const handleTouchMove = useCallback(
+        (e: React.TouchEvent) => {
+            e.preventDefault();
+            if (!isDragging || !containerRef.current || e.touches.length !== 1) return;
+
+            const touch = e.touches[0];
+            const deltaX = touch.clientX - startX;
+            const containerRect = containerRef.current.getBoundingClientRect();
+            const pixelsPerMilli =
+                containerRect.width / (visibleTimeRange.end.getTime() - visibleTimeRange.start.getTime());
+            const timeDelta = deltaX / pixelsPerMilli;
+
+            const newStart = new Date(visibleTimeRange.start.getTime() - timeDelta);
+            const newEnd = new Date(visibleTimeRange.end.getTime() - timeDelta);
+
+            const screenDuration = newEnd.getTime() - newStart.getTime();
+
+            const distanceToStartBuffer = newStart.getTime() - fragmentsBufferRange.start.getTime();
+            const distanceToEndBuffer = fragmentsBufferRange.end.getTime() - newEnd.getTime();
+
+            if (distanceToStartBuffer < screenDuration || distanceToEndBuffer < screenDuration) {
+                loadFragments(newStart, newEnd, intervalIndex);
+            }
+
+            setStartX(touch.clientX);
+            setVisibleTimeRange({start: newStart, end: newEnd});
+            setHasDragged(true);
+        },
+        [
+            isDragging,
+            startX,
+            containerRef,
+            visibleTimeRange,
+            fragmentsBufferRange,
+            loadFragments,
+            setVisibleTimeRange,
+            intervalIndex
+        ]
+    );
+
+    const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+        e.preventDefault();
+        setIsDragging(false);
+    }, []);
+
+    const handleTouch = useCallback(
+        (e: React.TouchEvent) => {
+            if (!hasDragged && onTimeClick && canvasRef.current && e.touches.length === 0) {
+                const touch = e.changedTouches[0];
+                const rect = canvasRef.current.getBoundingClientRect();
+                const x = touch.clientX - rect.left;
+                const timeOffset =
+                    (x / rect.width) * (visibleTimeRange.end.getTime() - visibleTimeRange.start.getTime());
+                const clickedTime = new Date(visibleTimeRange.start.getTime() + timeOffset);
+
+                const nearestFragmentTime = findNearestAvailableFragment(
+                    clickedTime,
+                    fragments,
+                    fragmentsBufferRange,
+                    UNIT_LENGTHS[intervalIndex]
+                );
+
+                const finalTime = nearestFragmentTime || clickedTime;
+                onTimeClick(finalTime);
+            }
+        },
+        [hasDragged, onTimeClick, visibleTimeRange, canvasRef, fragments, fragmentsBufferRange, intervalIndex]
+    );
+
     return {
         handleMouseDown,
         handleMouseUp,
         handleMouseMove,
         handleClick,
+        handleTouchStart,
+        handleTouchMove,
+        handleTouchEnd,
+        handleTouch,
         setupWheelHandler
     };
 };
