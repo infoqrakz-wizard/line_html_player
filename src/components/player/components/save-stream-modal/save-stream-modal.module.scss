@@ -94,7 +94,7 @@
         cursor: pointer;
         transition: all 0.2s ease;
 
-        &:hover {
+        &:hover:not(:disabled) {
             background-color: #3a80d2;
         }
 
@@ -104,8 +104,44 @@
             background-color: #3a80d2;
         }
 
-        &:active {
+        &:active:not(:disabled) {
             background-color: #2a70c2;
+        }
+
+        &:disabled {
+            background-color: #666;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+    }
+
+    .exportMessage {
+        margin-top: 1rem;
+        padding: 0.75rem;
+        border-radius: 4px;
+        font-size: 0.9rem;
+        text-align: center;
+        min-height: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        &.error {
+            background-color: rgba(244, 67, 54, 0.1);
+            color: #f44336;
+            border: 1px solid rgba(244, 67, 54, 0.3);
+        }
+
+        &.success {
+            background-color: rgba(76, 175, 80, 0.1);
+            color: #4caf50;
+            border: 1px solid rgba(76, 175, 80, 0.3);
+        }
+
+        &.info {
+            background-color: rgba(33, 150, 243, 0.1);
+            color: #2196f3;
+            border: 1px solid rgba(33, 150, 243, 0.3);
         }
     }
 }

@@ -43,6 +43,8 @@ export const SaveStreamModal: React.FC<SaveStreamProps> = ({
     const {hasTimelineAccess, setTimelineAccess} = useTimelineAuth();
     const [highlightedDates, setHighlightedDates] = useState<Date[]>([]);
     const loadedMonths = useRef<Set<string>>(new Set());
+    const [exportMessage, setExportMessage] = useState<string>('');
+    const [isExporting, setIsExporting] = useState<boolean>(false);
 
     const dayKey = (d: Date) => format(d, 'yyyy-MM-dd');
     const monthKey = (d: Date) => format(d, 'yyyy-MM');
@@ -123,6 +125,28 @@ export const SaveStreamModal: React.FC<SaveStreamProps> = ({
         void fetchMonthAvailability(date);
     };
 
+    const checkRecordAvailability = async (start: Date, end: Date): Promise<boolean> => {
+        if (!url || !port || !credentials || !hasTimelineAccess) return false;
+
+        try {
+            const result = await getFramesTimeline({
+                url,
+                port,
+                credentials,
+                startTime: startOfDay(start),
+                endTime: startOfDay(addMinutesToDate(end, 1)),
+                unitLength: 3600,
+                channel: camera,
+                protocol
+            });
+
+            return result.timeline.some(hours => hours > 0);
+        } catch (e) {
+            console.error('Error checking record availability:', e);
+            return false;
+        }
+    };
+
     // Обработка клика вне модального окна для его закрытия
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -160,21 +184,55 @@ export const SaveStreamModal: React.FC<SaveStreamProps> = ({
     const onChangeStart = (date: Date | null) => {
         if (!date) return;
         setStartDate(date);
+        setExportMessage('');
     };
 
     const onChangeEnd = (date: Date | null) => {
         if (!date) return;
         setEndDate(date);
+        setExportMessage('');
     };
 
-    const onSave = () => {
-        if (onFinish) {
+    const onSave = async () => {
+        if (!onFinish) return;
+
+        setIsExporting(true);
+        setExportMessage('');
+
+        try {
+            const hasRecords = await checkRecordAvailability(startDate, endDate);
+
+            if (!hasRecords) {
+                setExportMessage('За указанный период записи отсутствуют');
+                setIsExporting(false);
+                return;
+            }
+
+            setExportMessage('Экспорт архива начался...');
+
             onFinish(startDate, endDate);
+
+            setTimeout(() => {
+                onClose();
+            }, 1000);
+        } catch (error) {
+            console.error('Export error:', error);
+            setExportMessage('Ошибка при проверке доступности записей');
+            setIsExporting(false);
         }
-        onClose();
     };
 
     if (!isOpen) return null;
+
+    const getMessageClassName = () => {
+        if (exportMessage.includes('отсутствуют') || exportMessage.includes('Ошибка')) {
+            return styles.error;
+        }
+        if (exportMessage.includes('начался')) {
+            return styles.success;
+        }
+        return styles.info;
+    };
 
     return (
         <div className={styles.modalOverlay}>
@@ -242,9 +300,14 @@ export const SaveStreamModal: React.FC<SaveStreamProps> = ({
                 <button
                     className={styles.saveBtn}
                     onClick={onSave}
+                    disabled={isExporting}
                 >
-                    Сохранить
+                    {isExporting ? 'Проверка...' : 'Сохранить'}
                 </button>
+
+                {exportMessage && (
+                    <div className={`${styles.exportMessage} ${getMessageClassName()}`}>{exportMessage}</div>
+                )}
             </div>
         </div>
     );
