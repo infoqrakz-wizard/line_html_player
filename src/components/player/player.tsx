@@ -677,6 +677,11 @@ export const Player: React.FC<PlayerProps> = ({
                             isOpen={showSaveModal}
                             onClose={() => setShowSaveModal(false)}
                             onFinish={handleSaveStreamFinish}
+                            url={streamUrl}
+                            port={streamPort}
+                            credentials={authVerified ? authorization : ''}
+                            camera={camera}
+                            protocol={protocol}
                         />
                     )}
                     {(serverUnavailable || authRequired) && (
