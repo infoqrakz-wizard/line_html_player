@@ -416,7 +416,7 @@ export const Player: React.FC<PlayerProps> = ({
     // Отслеживаем размер экрана для мобильных устройств
     useEffect(() => {
         const checkIsMobile = () => {
-            setIsMobile(window.outerWidth < 768);
+            setIsMobile(window.outerWidth < 1024);
         };
 
         checkIsMobile();
