@@ -59,6 +59,16 @@ export const HORIZONTAL_SWIPE_THRESHOLD = 20;
 export const ZOOM_SWIPE_DISTANCE = 75;
 
 /**
+ * Минимальная дистанция для переключения камеры при горизонтальном свайпе (в процентах от ширины экрана)
+ */
+export const CAMERA_SWIPE_THRESHOLD_PERCENT = 30;
+
+/**
+ * Минимальная дистанция для определения горизонтального свайпа по плееру
+ */
+export const PLAYER_HORIZONTAL_SWIPE_THRESHOLD = 30;
+
+/**
  * Константы для позиций меток на временной шкале
  */
 export const TIMELINE_POSITIONS = {

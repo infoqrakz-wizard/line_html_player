@@ -5,6 +5,7 @@ import {getProtocol, formatUrlForDownload, clickA} from '../../utils/url-params'
 import {Mode, Protocol} from '../../utils/types';
 import {getCameraState, getCamerasList, type CameraInfo} from '../../utils/api';
 import {ControlPanel} from '../control-panel';
+import {CAMERA_SWIPE_THRESHOLD_PERCENT, PLAYER_HORIZONTAL_SWIPE_THRESHOLD} from '../timeline/utils/constants';
 
 import {useTime} from '../../context/time-context';
 import {useTimelineState} from '../timeline/hooks/use-timeline-state';
@@ -70,6 +71,12 @@ export const Player: React.FC<PlayerProps> = ({
 
     const [showControls, setShowControls] = useState<boolean>(false);
     const [isMobile, setIsMobile] = useState<boolean>(false);
+
+    // Состояние для отслеживания свайпов по плееру
+    const [isPlayerSwipeActive, setIsPlayerSwipeActive] = useState<boolean>(false);
+    const [playerSwipeStartX, setPlayerSwipeStartX] = useState<number>(0);
+    const [playerSwipeStartY, setPlayerSwipeStartY] = useState<number>(0);
+    const [hasPlayerSwiped, setHasPlayerSwiped] = useState<boolean>(false);
 
     const containerRef = useRef<HTMLDivElement>(null);
     const datepickerPortalIdRef = useRef<string>(`datepicker-portal-${Math.random().toString(36).slice(2)}`);
@@ -178,7 +185,7 @@ export const Player: React.FC<PlayerProps> = ({
     // Проверяем авторизацию только при изменении основных параметров подключения
     useEffect(() => {
         void checkAvailability(`${authLogin}:${authPassword}`);
-    }, [checkAvailability, streamUrl, streamPort, camera]);
+    }, [checkAvailability, streamUrl, streamPort, camera, authLogin, authPassword]);
 
     useEffect(() => {
         const loadCameras = async () => {
@@ -274,6 +281,84 @@ export const Player: React.FC<PlayerProps> = ({
             setShowControls(false);
         }, 10000);
     };
+
+    // Функции переключения камеры
+    const switchToNextCamera = useCallback(() => {
+        if (availableCameras.length <= 1) {
+            return;
+        }
+
+        const currentIndex = availableCameras.findIndex(c => c.id === camera);
+        const nextIndex = (currentIndex + 1) % availableCameras.length;
+        setCamera(availableCameras[nextIndex].id);
+    }, [availableCameras, camera]);
+
+    const switchToPreviousCamera = useCallback(() => {
+        if (availableCameras.length <= 1) {
+            return;
+        }
+
+        const currentIndex = availableCameras.findIndex(c => c.id === camera);
+        const prevIndex = currentIndex <= 0 ? availableCameras.length - 1 : currentIndex - 1;
+        setCamera(availableCameras[prevIndex].id);
+    }, [availableCameras, camera]);
+
+    // Обработчики свайпов по плееру
+    const handlePlayerTouchStart = useCallback(
+        (e: React.TouchEvent) => {
+            if (e.touches.length === 1 && availableCameras.length > 1) {
+                const touch = e.touches[0];
+                setIsPlayerSwipeActive(true);
+                setPlayerSwipeStartX(touch.clientX);
+                setPlayerSwipeStartY(touch.clientY);
+                setHasPlayerSwiped(false);
+            }
+        },
+        [availableCameras.length]
+    );
+
+    const handlePlayerTouchMove = useCallback(
+        (e: React.TouchEvent) => {
+            if (!isPlayerSwipeActive || e.touches.length !== 1 || availableCameras.length <= 1) return;
+
+            const touch = e.touches[0];
+            const deltaX = touch.clientX - playerSwipeStartX;
+            const deltaY = touch.clientY - playerSwipeStartY;
+
+            // Проверяем, что это горизонтальный свайп
+            if (Math.abs(deltaX) > PLAYER_HORIZONTAL_SWIPE_THRESHOLD && Math.abs(deltaX) > Math.abs(deltaY)) {
+                if (!hasPlayerSwiped && containerRef.current) {
+                    const containerWidth = containerRef.current.offsetWidth;
+                    const swipeThreshold = (containerWidth * CAMERA_SWIPE_THRESHOLD_PERCENT) / 100;
+
+                    if (Math.abs(deltaX) >= swipeThreshold) {
+                        if (deltaX > 0) {
+                            // Свайп вправо - предыдущая камера
+                            switchToPreviousCamera();
+                        } else {
+                            // Свайп влево - следующая камера
+                            switchToNextCamera();
+                        }
+                        setHasPlayerSwiped(true);
+                    }
+                }
+            }
+        },
+        [
+            isPlayerSwipeActive,
+            playerSwipeStartX,
+            playerSwipeStartY,
+            hasPlayerSwiped,
+            availableCameras.length,
+            switchToNextCamera,
+            switchToPreviousCamera
+        ]
+    );
+
+    const handlePlayerTouchEnd = useCallback(() => {
+        setIsPlayerSwipeActive(false);
+        setHasPlayerSwiped(false);
+    }, []);
 
     // Показываем панель (включая Timeline) и перезапускаем таймер авто-скрытия
     const showControlsAndRestartAutoHide = useCallback(() => {
@@ -623,7 +708,7 @@ export const Player: React.FC<PlayerProps> = ({
                                 label: c.name ?? `Camera ${c.id}`
                             }))}
                             value={camera ?? ''}
-                            onChange={value => setCamera(value)}
+                            onChange={value => setCamera(Number(value))}
                             aria-label="Выбор камеры"
                         />
                         {/* <select
@@ -658,6 +743,9 @@ export const Player: React.FC<PlayerProps> = ({
                 <div
                     className={styles.videoContainer}
                     onDoubleClick={handleToggleFullscreen}
+                    onTouchStart={handlePlayerTouchStart}
+                    onTouchMove={handlePlayerTouchMove}
+                    onTouchEnd={handlePlayerTouchEnd}
                     role="button"
                     aria-label="Переключить полноэкранный режим"
                     tabIndex={0}
