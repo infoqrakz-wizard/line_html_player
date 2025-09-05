@@ -1,14 +1,14 @@
 /**
  * Утилиты для отрисовки временной шкалы
  */
-import { TimeRange } from '../types';
+import {TimeRange} from '../types';
 
 // Импортируем функции из новых файлов
-import { drawDayAndHourMarkers } from './day-hour-markers';
-import { drawIntervalMarkers, drawSubMarkers } from './interval-markers';
+import {drawDayAndHourMarkers} from './day-hour-markers';
+import {drawIntervalMarkers, drawSubMarkers} from './interval-markers';
 
 // Экспортируем функции для обратной совместимости
-export { drawDayAndHourMarkers, drawIntervalMarkers, drawSubMarkers };
+export {drawDayAndHourMarkers, drawIntervalMarkers, drawSubMarkers};
 
 /**
  * Отрисовывает фон временной шкалы
@@ -60,6 +60,21 @@ export const drawFragments = (
     // Если нет фрагментов, выходим после отрисовки серой полосы
     if (fragments.length === 0) return;
 
+    // Сначала находим последний фрагмент среди всех фрагментов в буфере
+    fragments.forEach((hasFrame, index) => {
+        if (hasFrame) {
+            const fragmentStartTime = fragmentsBufferRange.start.getTime() + index * unitLengthMs;
+            const fragmentEndTime = fragmentStartTime + unitLengthMs;
+
+            // Обновляем информацию о последнем фрагменте (независимо от видимости)
+            if (fragmentEndTime > lastFragmentEndTime) {
+                lastFragmentEndTime = fragmentEndTime;
+                // Вычисляем X-координату последнего фрагмента
+                lastFragmentEndX = ((fragmentEndTime - visibleTimeRange.start.getTime()) / screenDuration) * width;
+            }
+        }
+    });
+
     // Теперь рисуем зеленые фрагменты поверх серой полосы
     ctx.fillStyle = '#4CAF50';
 
@@ -76,12 +91,6 @@ export const drawFragments = (
                 const visibleWidth = visibleXEnd - visibleXStart;
 
                 ctx.fillRect(visibleXStart, fragmentY, visibleWidth, fragmentHeight);
-
-                // Обновляем информацию о последнем фрагменте
-                if (fragmentEndTime > lastFragmentEndTime) {
-                    lastFragmentEndTime = fragmentEndTime;
-                    lastFragmentEndX = xEnd;
-                }
             }
         }
     });
@@ -91,14 +100,30 @@ export const drawFragments = (
         const currentTimeMs = currentTime.getTime() + progress * 1000;
         const currentX = ((currentTimeMs - visibleTimeRange.start.getTime()) / screenDuration) * width;
 
-        // Если индикатор текущего времени находится правее последнего фрагмента и виден на экране
-        if (currentX > lastFragmentEndX && currentX <= width && currentX >= 0 && currentTimeMs > lastFragmentEndTime) {
-            // Дорисовываем зеленую полосу от последнего фрагмента до индикатора
-            const visibleXStart = Math.max(0, lastFragmentEndX);
-            const visibleXEnd = Math.min(width, currentX);
+        // Если текущее время находится после последнего фрагмента
+        if (currentTimeMs > lastFragmentEndTime) {
+            // Определяем начальную позицию для зеленой полосы
+            let visibleXStart;
+
+            if (lastFragmentEndX < 0) {
+                // Если последний фрагмент находится левее видимой области, начинаем с левого края экрана
+                visibleXStart = 0;
+            } else if (lastFragmentEndX > width) {
+                // Если последний фрагмент находится правее видимой области, начинаем с левого края экрана
+                visibleXStart = 0;
+            } else {
+                // Если последний фрагмент виден, начинаем от него
+                visibleXStart = lastFragmentEndX;
+            }
+
+            // Определяем конечную позицию для зеленой полосы
+            const visibleXEnd = Math.min(width, Math.max(0, currentX));
             const visibleWidth = visibleXEnd - visibleXStart;
 
-            ctx.fillRect(visibleXStart, fragmentY, visibleWidth, fragmentHeight);
+            // Дорисовываем зеленую полосу только если есть видимая область
+            if (visibleWidth > 0) {
+                ctx.fillRect(visibleXStart, fragmentY, visibleWidth, fragmentHeight);
+            }
         }
     }
 };
@@ -142,7 +167,7 @@ export const drawCurrentTimeIndicator = (
  */
 export const drawCursorPositionIndicator = (
     ctx: CanvasRenderingContext2D,
-    cursorPosition: { x: number; time: Date },
+    cursorPosition: {x: number; time: Date},
     canvasHeight: number
 ) => {
     // Проверяем, что cursorPosition определен и содержит необходимые свойства

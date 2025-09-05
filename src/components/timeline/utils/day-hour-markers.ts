@@ -1,8 +1,8 @@
 /**
  * Утилиты для отрисовки маркеров дней и часов
  */
-import { TimeRange } from '../types';
-import { formatDay, formatTime, isStartOfDay, isStartOfHour, isStartOfSixHours, shouldShowHourText } from './time-utils';
+import {TimeRange} from '../types';
+import {formatDay, formatTime, isStartOfDay, isStartOfHour, shouldShowHourText} from './time-utils';
 
 /**
  * Отрисовывает маркеры дней и часов

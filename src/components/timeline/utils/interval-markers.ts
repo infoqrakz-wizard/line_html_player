@@ -1,7 +1,7 @@
 /**
  * Утилиты для отрисовки маркеров интервалов
  */
-import { TimeRange } from '../types';
+import {TimeRange} from '../types';
 import {
     formatTime,
     isStartOfDay,
@@ -11,7 +11,7 @@ import {
     isStartOfFiveMinutes,
     isStartOfMinute
 } from './time-utils';
-import { TIMELINE_POSITIONS } from './constants';
+import {TIMELINE_POSITIONS} from './constants';
 
 /**
  * Отрисовывает маркеры интервалов
@@ -28,10 +28,52 @@ export const drawIntervalMarkers = (
     width: number,
     height: number,
     pixelsPerMilli: number,
-    timeIntervalForMarkers: number
+    timeIntervalForMarkers: number,
+    isMobile: boolean = false
 ): void => {
     ctx.fillStyle = '#ffffff';
-    ctx.font = '12px Arial';
+
+    // Адаптивный размер шрифта в зависимости от интервала и устройства
+    let fontSize = 12;
+    if (isMobile) {
+        // Для мобильных устройств используем более крупные шрифты
+        if (timeIntervalForMarkers <= 5 * 60 * 1000) {
+            // 5 минут - средний шрифт для мобильных
+            fontSize = 10;
+        } else if (timeIntervalForMarkers <= 15 * 60 * 1000) {
+            // 10-15 минут - стандартный шрифт для мобильных
+            fontSize = 12;
+        } else if (timeIntervalForMarkers <= 60 * 60 * 1000) {
+            // 30 минут - 1 час - большой шрифт для мобильных
+            fontSize = 14;
+        } else if (timeIntervalForMarkers <= 6 * 60 * 60 * 1000) {
+            // 4-6 часов - очень большой шрифт для мобильных
+            fontSize = 16;
+        } else {
+            // 12+ часов - максимальный шрифт для мобильных
+            fontSize = 18;
+        }
+    } else {
+        // Для десктопных устройств используем стандартные размеры
+        if (timeIntervalForMarkers <= 5 * 60 * 1000) {
+            // 5 минут - маленький шрифт
+            fontSize = 8;
+        } else if (timeIntervalForMarkers <= 15 * 60 * 1000) {
+            // 10-15 минут - средний шрифт
+            fontSize = 10;
+        } else if (timeIntervalForMarkers <= 60 * 60 * 1000) {
+            // 30 минут - 1 час - стандартный шрифт
+            fontSize = 12;
+        } else if (timeIntervalForMarkers <= 6 * 60 * 60 * 1000) {
+            // 4-6 часов - большой шрифт
+            fontSize = 14;
+        } else {
+            // 12+ часов - очень большой шрифт
+            fontSize = 16;
+        }
+    }
+
+    ctx.font = `${fontSize}px Arial`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
 
@@ -133,8 +175,8 @@ export const drawIntervalMarkers = (
         const msToInterval = currentMarkerTime.getTime() % intervalForMarkers;
         currentMarkerTime = new Date(
             currentMarkerTime.getTime() -
-            msToInterval +
-            (msToInterval > intervalForMarkers / 2 ? intervalForMarkers : 0)
+                msToInterval +
+                (msToInterval > intervalForMarkers / 2 ? intervalForMarkers : 0)
         );
     }
 
@@ -243,7 +285,7 @@ export const drawSubMarkers = (
 
                     // Метка 5 минут над маркером
                     ctx.fillStyle = '#ffffff';
-                    ctx.font = '12px Arial';
+                    ctx.font = '8px Arial'; // Маленький шрифт для субмаркеров
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'top';
                     ctx.fillText(formatTime(fiveMinMarkerTime), fiveMinX, height - 35);
@@ -268,7 +310,7 @@ export const drawSubMarkers = (
 
                     // Метка 15 минут над маркером
                     ctx.fillStyle = '#ffffff';
-                    ctx.font = '12px Arial';
+                    ctx.font = '10px Arial'; // Средний шрифт для 15-минутных субмаркеров
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'top';
                     ctx.fillText(formatTime(fifteenMinMarkerTime), fifteenMinX, height - 35);

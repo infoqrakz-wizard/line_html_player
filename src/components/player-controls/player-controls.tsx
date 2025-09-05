@@ -15,6 +15,7 @@ import styles from './player-controls.module.scss';
 import {SpeedSelector} from '../speed-selector';
 
 import '../../styles/datepicker-custom.scss';
+import { useOrientation } from '../timeline/hooks/use-orientation';
 
 registerLocale('ru', ru);
 
@@ -81,6 +82,8 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
 
     const dayKey = (d: Date) => format(d, 'yyyy-MM-dd');
     const monthKey = (d: Date) => format(d, 'yyyy-MM');
+
+    const {isMobile} = useOrientation();
 
     const allowedDayKeys = useMemo(() => new Set(highlightedDates.map(dayKey)), [highlightedDates]);
     const onChangeDatepickerDate = (date: Date | null) => {
@@ -202,6 +205,10 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
             flip({boundary, fallbackPlacements: ['top', 'bottom', 'right', 'left']})
         ];
     }, [popperBoundaryElement]);
+
+    if (isMobile) {
+        return null;
+    }
 
     return (
         <div className={styles.controls}>

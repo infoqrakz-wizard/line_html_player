@@ -5,6 +5,10 @@
     display: flex;
     flex-direction: column;
     background-color: #000;
+    
+    &.withVerticalTimeline {
+        margin-right: 60px;
+    }
 }
 
 .videoContainer {

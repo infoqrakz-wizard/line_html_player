@@ -9,6 +9,7 @@ import {CAMERA_SWIPE_THRESHOLD_PERCENT, PLAYER_HORIZONTAL_SWIPE_THRESHOLD} from 
 
 import {useTime} from '../../context/time-context';
 import {useTimelineState} from '../timeline/hooks/use-timeline-state';
+import {useOrientation} from '../timeline/hooks/use-orientation';
 import {TimelineRef} from '../timeline/types';
 
 import {HlsPlayer, VideoTag, SaveStreamModal, ModeIndicator} from './components';
@@ -72,6 +73,9 @@ export const Player: React.FC<PlayerProps> = ({
     const [showControls, setShowControls] = useState<boolean>(false);
     const [isMobile, setIsMobile] = useState<boolean>(false);
 
+    // Определяем ориентацию и тип устройства
+    const {orientation, isMobile: isMobileDevice, isIos} = useOrientation();
+
     // Состояние для отслеживания свайпов по плееру
     const [isPlayerSwipeActive, setIsPlayerSwipeActive] = useState<boolean>(false);
     const [playerSwipeStartX, setPlayerSwipeStartX] = useState<number>(0);
@@ -95,7 +99,9 @@ export const Player: React.FC<PlayerProps> = ({
         `${protocol}://${streamUrl}:${streamPort}/cameras/${camera ?? 0}/streaming/main.${type}?authorization=Basic%20${getAuthToken(`${authLogin}:${authPassword}`)}${!isMuted && !isNoSound ? '&audio=1' : ''}`;
 
     // const posterUrl = `${protocol}://${streamUrl}:${streamPort}/cameras/${camera}/image?stream=main&authorization=Basic%20${btoa(`${login}:${password}`)}`;
-    const streamType = currentMode === 'record' ? 'm3u8' : 'mp4';
+
+    // Для iPhone всегда используем m3u8, так как hls.js не работает нативно
+    const streamType = isIos ? 'm3u8' : currentMode === 'record' ? 'm3u8' : 'mp4';
     const authorization = `${authLogin}:${authPassword}`;
     const videoUrl = getStreamUrl(streamType, isNoSound, isMuted);
 
@@ -692,10 +698,13 @@ export const Player: React.FC<PlayerProps> = ({
         }
     };
 
+    // Определяем, нужно ли показывать вертикальный таймлайн
+    const isVerticalTimeline = isMobileDevice && orientation === 'landscape';
+
     return (
         <>
             <div
-                className={styles.player}
+                className={`${styles.player} ${isVerticalTimeline ? styles.withVerticalTimeline : ''}`}
                 ref={containerRef}
                 role="region"
                 aria-label="Плеер видео"
@@ -757,7 +766,16 @@ export const Player: React.FC<PlayerProps> = ({
                         }
                     }}
                 >
-                    {currentMode === 'record' ? (
+                    {/* Для iPhone всегда используем VideoTag с нативным воспроизведением m3u8 */}
+                    {isIos ? (
+                        <VideoTag
+                            ref={playerRef}
+                            {...props}
+                            updateServerTime={updateServerTime}
+                            setProgress={setProgress}
+                            overlayText={isH265Codec ? '265' : undefined}
+                        />
+                    ) : currentMode === 'record' ? (
                         <HlsPlayer
                             ref={playerRef}
                             {...props}

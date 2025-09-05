@@ -12,6 +12,10 @@
         align-items: center;
     }
 
+    .leftControls.mobile {
+        display: none;
+    }
+
     .rightControls {
         display: flex;
         align-items: center;

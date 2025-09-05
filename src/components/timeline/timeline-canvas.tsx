@@ -30,7 +30,9 @@ export const TimelineCanvas = ({
     onTouchEnd,
     containerRef,
     canvasRef,
-    cursorPosition
+    cursorPosition,
+    isVertical = false,
+    isMobile = false
 }: TimelineCanvasProps) => {
     // Используем хук для отрисовки временной шкалы
     useTimelineDrawing({
@@ -44,13 +46,15 @@ export const TimelineCanvas = ({
         loadFragments,
         currentTime,
         progress,
-        cursorPosition
+        cursorPosition,
+        isVertical,
+        isMobile
     });
 
     return (
         <div
             ref={containerRef}
-            className={styles.timeline}
+            className={`${styles.timeline} ${isVertical ? styles.vertical : ''}`}
             onMouseDown={onMouseDown}
             onMouseUp={onMouseUp}
             onMouseMove={onMouseMove}

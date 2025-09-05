@@ -1,9 +1,9 @@
 /**
  * Хук для отрисовки временной шкалы
  */
-import { useCallback, useEffect, useRef } from 'react';
-import { TimelineDrawingParams } from '../types';
-import { INTERVALS, UNIT_LENGTHS } from '../utils/constants';
+import {useCallback, useEffect, useRef} from 'react';
+import {TimelineDrawingParams} from '../types';
+import {INTERVALS, UNIT_LENGTHS} from '../utils/constants';
 import {
     drawBackground,
     drawCurrentTimeIndicator,
@@ -12,6 +12,13 @@ import {
     drawFragments,
     drawIntervalMarkers
 } from '../utils/drawing-utils';
+import {
+    drawVerticalDayAndHourMarkers,
+    drawVerticalIntervalMarkers,
+    drawVerticalFragments,
+    drawVerticalCurrentTimeIndicator,
+    drawVerticalCursorPositionIndicator
+} from '../utils/vertical-drawing-utils';
 
 /**
  * Хук для отрисовки временной шкалы
@@ -22,14 +29,16 @@ export const useTimelineDrawing = ({
     canvasRef,
     containerRef,
     visibleTimeRange,
-    setVisibleTimeRange,
+    setVisibleTimeRange, // eslint-disable-line @typescript-eslint/no-unused-vars
     intervalIndex,
     fragments,
     fragmentsBufferRange,
     loadFragments,
     currentTime,
     progress,
-    cursorPosition
+    cursorPosition,
+    isVertical = false,
+    isMobile = false
 }: TimelineDrawingParams) => {
     // Сохраняем последнее известное время и прогресс
     const lastTimeRef = useRef<Date>(new Date(currentTime));
@@ -43,62 +52,105 @@ export const useTimelineDrawing = ({
         (interpolatedProgress?: number) => {
             const canvas = canvasRef.current;
             const container = containerRef.current;
-            const ctx = canvas?.getContext('2d');
-            if (!canvas || !ctx || !container) return;
+            if (!canvas || !container) return;
 
             // Получаем размеры контейнера
             const containerRect = container.getBoundingClientRect();
 
-            // Обновляем размеры canvas в соответствии с контейнером
+            // Устанавливаем размеры canvas с учетом плотности пикселей
+            const dpr = window.devicePixelRatio || 1;
+
+            // Сначала устанавливаем физические размеры (пиксели устройства)
+            canvas.width = containerRect.width * dpr;
+            canvas.height = containerRect.height * dpr;
+
+            // Затем устанавливаем CSS размеры (логические пиксели)
             canvas.style.width = `${containerRect.width}px`;
             canvas.style.height = `${containerRect.height}px`;
 
-            // Устанавливаем размеры canvas с учетом плотности пикселей
-            const dpr = window.devicePixelRatio || 1;
-            canvas.width = containerRect.width * dpr;
-            canvas.height = containerRect.height * dpr;
+            const ctx = canvas?.getContext('2d');
+
+            // Получаем контекст ПОСЛЕ установки размеров
+            if (!ctx) return;
 
             // Масштабируем все операции отрисовки
             ctx.scale(dpr, dpr);
 
-            // Очищаем canvas
+            // Очищаем canvas в логических координатах
             ctx.clearRect(0, 0, containerRect.width, containerRect.height);
 
             // Отрисовываем фон
             drawBackground(ctx, containerRect.width, containerRect.height);
-
             // Вычисляем количество пикселей на миллисекунду
-            const pixelsPerMilli =
-                containerRect.width / (visibleTimeRange.end.getTime() - visibleTimeRange.start.getTime());
+            const pixelsPerMilli = isVertical
+                ? containerRect.height / (visibleTimeRange.end.getTime() - visibleTimeRange.start.getTime())
+                : containerRect.width / (visibleTimeRange.end.getTime() - visibleTimeRange.start.getTime());
 
             // Используем интерполированный прогресс, если он передан
             const actualProgress = interpolatedProgress !== undefined ? interpolatedProgress : progress;
 
             // Отрисовываем маркеры дней и часов
-            drawDayAndHourMarkers(ctx, visibleTimeRange, containerRect.width, containerRect.height, pixelsPerMilli);
+            if (isVertical) {
+                drawVerticalDayAndHourMarkers(
+                    ctx,
+                    visibleTimeRange,
+                    containerRect.width,
+                    containerRect.height,
+                    pixelsPerMilli
+                );
+            } else {
+                drawDayAndHourMarkers(ctx, visibleTimeRange, containerRect.width, containerRect.height, pixelsPerMilli);
+            }
 
             // Отрисовываем маркеры интервалов
-            drawIntervalMarkers(
-                ctx,
-                visibleTimeRange,
-                containerRect.width,
-                containerRect.height,
-                pixelsPerMilli,
-                INTERVALS[intervalIndex]
-            );
+            if (isVertical) {
+                drawVerticalIntervalMarkers(
+                    ctx,
+                    visibleTimeRange,
+                    containerRect.width,
+                    containerRect.height,
+                    pixelsPerMilli,
+                    INTERVALS[intervalIndex],
+                    isMobile
+                );
+            } else {
+                drawIntervalMarkers(
+                    ctx,
+                    visibleTimeRange,
+                    containerRect.width,
+                    containerRect.height,
+                    pixelsPerMilli,
+                    INTERVALS[intervalIndex],
+                    isMobile
+                );
+            }
 
             // Отрисовываем фрагменты
-            drawFragments(
-                ctx,
-                fragments,
-                visibleTimeRange,
-                fragmentsBufferRange,
-                containerRect.width,
-                containerRect.height,
-                UNIT_LENGTHS[intervalIndex] * 1000,
-                currentTime,
-                actualProgress
-            );
+            if (isVertical) {
+                drawVerticalFragments(
+                    ctx,
+                    fragments,
+                    visibleTimeRange,
+                    fragmentsBufferRange,
+                    containerRect.width,
+                    containerRect.height,
+                    UNIT_LENGTHS[intervalIndex] * 1000,
+                    currentTime,
+                    actualProgress
+                );
+            } else {
+                drawFragments(
+                    ctx,
+                    fragments,
+                    visibleTimeRange,
+                    fragmentsBufferRange,
+                    containerRect.width,
+                    containerRect.height,
+                    UNIT_LENGTHS[intervalIndex] * 1000,
+                    currentTime,
+                    actualProgress
+                );
+            }
 
             // Отрисовываем индикатор текущего времени только если он находится в видимой области
             const currentTimeMs = currentTime.getTime() + actualProgress * 1000;
@@ -106,19 +158,34 @@ export const useTimelineDrawing = ({
                 currentTimeMs >= visibleTimeRange.start.getTime() && currentTimeMs <= visibleTimeRange.end.getTime();
 
             if (isCurrentTimeVisible) {
-                drawCurrentTimeIndicator(
-                    ctx,
-                    currentTime,
-                    actualProgress,
-                    visibleTimeRange,
-                    containerRect.width,
-                    containerRect.height
-                );
+                if (isVertical) {
+                    drawVerticalCurrentTimeIndicator(
+                        ctx,
+                        currentTime,
+                        actualProgress,
+                        visibleTimeRange,
+                        containerRect.width,
+                        containerRect.height
+                    );
+                } else {
+                    drawCurrentTimeIndicator(
+                        ctx,
+                        currentTime,
+                        actualProgress,
+                        visibleTimeRange,
+                        containerRect.width,
+                        containerRect.height
+                    );
+                }
             }
 
             // Отрисовываем индикатор позиции курсора, если он есть
             if (cursorPosition) {
-                drawCursorPositionIndicator(ctx, cursorPosition, containerRect.height);
+                if (isVertical) {
+                    drawVerticalCursorPositionIndicator(ctx, cursorPosition, containerRect.width);
+                } else {
+                    drawCursorPositionIndicator(ctx, cursorPosition, containerRect.height);
+                }
             }
         },
         [
@@ -130,7 +197,8 @@ export const useTimelineDrawing = ({
             fragmentsBufferRange,
             currentTime,
             progress,
-            cursorPosition
+            cursorPosition,
+            isVertical
         ]
     );
 

@@ -7,6 +7,7 @@ import {TimelineProps, TimelineRef} from './types';
 import {useTimelineState} from './hooks/use-timeline-state';
 import {useTimelineFragments} from './hooks/use-timeline-fragments';
 import {useTimelineInteractions} from './hooks/use-timeline-interactions';
+import {useOrientation} from './hooks/use-orientation';
 import {Mode} from '../../utils/types';
 
 /**
@@ -17,6 +18,22 @@ export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
         // Создаем ссылки на DOM-элементы
         const containerRef = useRef<HTMLDivElement>(null);
         const canvasRef = useRef<HTMLCanvasElement>(null);
+
+        // Определяем ориентацию и тип устройства
+        const {orientation, isMobile} = useOrientation();
+
+        // Определяем, нужно ли показывать вертикальный таймлайн
+        const isVerticalTimeline = isMobile && orientation === 'landscape';
+
+        // Отладочная информация
+        console.log(
+            'Timeline - isMobile:',
+            isMobile,
+            'orientation:',
+            orientation,
+            'isVerticalTimeline:',
+            isVerticalTimeline
+        );
 
         // Используем хук для управления состоянием временной шкалы
         const {
@@ -65,7 +82,8 @@ export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
             resetFragments,
             currentTime: serverTime || new Date(),
             onTimeClick,
-            progress
+            progress,
+            isVertical: isVerticalTimeline
         });
 
         // Обработчик движения мыши для отслеживания позиции курсора
@@ -195,6 +213,8 @@ export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
                     containerRef={containerRef}
                     canvasRef={canvasRef}
                     cursorPosition={cursorPosition}
+                    isVertical={isVerticalTimeline}
+                    isMobile={isMobile}
                 />
             </>
         );

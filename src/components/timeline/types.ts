@@ -5,7 +5,7 @@
 /**
  * Свойства компонента Timeline
  */
-import { Mode, Protocol } from '../../utils/types';
+import {Mode, Protocol} from '../../utils/types';
 
 export interface TimelineProps {
     /** URL сервера */
@@ -149,6 +149,10 @@ export interface TimelineCanvasProps {
     canvasRef: React.RefObject<HTMLCanvasElement>;
     /** Позиция курсора */
     cursorPosition: CursorPosition | null;
+    /** Вертикальный режим таймлайна */
+    isVertical?: boolean;
+    /** Мобильное устройство */
+    isMobile?: boolean;
 }
 
 /**
@@ -191,6 +195,8 @@ export interface TimelineInteractionsParams {
     onTimeClick?: (time: Date) => void;
     /** Прогресс воспроизведения в секундах */
     progress: number;
+    /** Вертикальный режим таймлайна */
+    isVertical?: boolean;
 }
 
 /**
@@ -219,6 +225,10 @@ export interface TimelineDrawingParams {
     progress: number;
     /** Позиция курсора */
     cursorPosition: CursorPosition | null;
+    /** Вертикальный режим таймлайна */
+    isVertical?: boolean;
+    /** Мобильное устройство */
+    isMobile?: boolean;
 }
 
 /**
