@@ -1,3 +1,9 @@
+.timeline.mobile {
+    @media (max-width: 1024px) {
+        height: 150px;
+    }
+}
+
 .timeline {
     position: relative;
     width: 100%;
@@ -17,16 +23,12 @@
         background: rgba(0, 0, 0, 0);
     }
 
-    @media (max-width: 1024px) {
-        height: 80px;
-    }
-
     // Вертикальный таймлайн для мобильных устройств в альбомной ориентации
     &.vertical {
         position: fixed;
         bottom: 0;
         right: 0;
-        width: 60px;
+        width: 90px;
         height: 100vh;
         z-index: 1000;
         background: rgba(0, 0, 0, 0.8);

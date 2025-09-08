@@ -180,7 +180,7 @@ export const useTimelineDrawing = ({
             }
 
             // Отрисовываем индикатор позиции курсора, если он есть
-            if (cursorPosition) {
+            if (cursorPosition && !isMobile) {
                 if (isVertical) {
                     drawVerticalCursorPositionIndicator(ctx, cursorPosition, containerRect.width);
                 } else {
@@ -191,14 +191,15 @@ export const useTimelineDrawing = ({
         [
             canvasRef,
             containerRef,
+            isVertical,
             visibleTimeRange,
+            progress,
+            currentTime,
+            cursorPosition,
+            isMobile,
             intervalIndex,
             fragments,
-            fragmentsBufferRange,
-            currentTime,
-            progress,
-            cursorPosition,
-            isVertical
+            fragmentsBufferRange
         ]
     );
 

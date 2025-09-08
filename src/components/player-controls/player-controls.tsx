@@ -13,9 +13,9 @@ import {Icons} from '../icons';
 
 import styles from './player-controls.module.scss';
 import {SpeedSelector} from '../speed-selector';
+import {useOrientation} from '../timeline/hooks/use-orientation';
 
 import '../../styles/datepicker-custom.scss';
-import { useOrientation } from '../timeline/hooks/use-orientation';
 
 registerLocale('ru', ru);
 
@@ -83,7 +83,8 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
     const dayKey = (d: Date) => format(d, 'yyyy-MM-dd');
     const monthKey = (d: Date) => format(d, 'yyyy-MM');
 
-    const {isMobile} = useOrientation();
+    const {isMobile, orientation} = useOrientation();
+    const isMobileLandscape = isMobile && orientation === 'landscape';
 
     const allowedDayKeys = useMemo(() => new Set(highlightedDates.map(dayKey)), [highlightedDates]);
     const onChangeDatepickerDate = (date: Date | null) => {
@@ -206,12 +207,8 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
         ];
     }, [popperBoundaryElement]);
 
-    if (isMobile) {
-        return null;
-    }
-
     return (
-        <div className={styles.controls}>
+        <div className={`${styles.controls} ${isMobileLandscape ? styles.mobileLandscape : ''}`}>
             <div className={styles.leftControls}>
                 <button
                     className={styles.controlButton}

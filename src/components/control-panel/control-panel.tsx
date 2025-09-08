@@ -3,6 +3,7 @@ import React, {useRef} from 'react';
 import {Timeline} from '../timeline';
 import {PlayerControls} from '../player-controls';
 import {TimelineRef} from '../timeline/types';
+import {useOrientation} from '../timeline/hooks/use-orientation';
 import styles from './control-panel.module.scss';
 import {Mode, Protocol} from '../../utils/types';
 import {useTimelineAuth} from '../../context/timeline-auth-context';
@@ -63,11 +64,13 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
     onChangeMode
 }) => {
     const {hasTimelineAccess} = useTimelineAuth();
+    const {isMobile, orientation} = useOrientation();
+    const isMobileLandscape = isMobile && orientation === 'landscape';
     const internalTimelineRef = useRef<TimelineRef>(null);
     const timelineRef = externalTimelineRef || internalTimelineRef;
 
     return (
-        <div className={styles.controlPanel}>
+        <div className={`${styles.controlPanel} ${isMobileLandscape ? styles.mobileLandscape : ''}`}>
             <PlayerControls
                 mode={mode}
                 isPlaying={isPlaying}

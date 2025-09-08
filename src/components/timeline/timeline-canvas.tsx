@@ -54,7 +54,7 @@ export const TimelineCanvas = ({
     return (
         <div
             ref={containerRef}
-            className={`${styles.timeline} ${isVertical ? styles.vertical : ''}`}
+            className={`${styles.timeline} ${isMobile ? styles.mobile : ''} ${isVertical ? styles.vertical : ''}`}
             onMouseDown={onMouseDown}
             onMouseUp={onMouseUp}
             onMouseMove={onMouseMove}

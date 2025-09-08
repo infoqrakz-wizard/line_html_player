@@ -17,8 +17,8 @@ import {PlayerComponentProps} from './components/player-interface';
 import {getAuthToken} from '../../utils/getAuthToken';
 
 import type {PlayerRef} from './components/player-interface';
-import styles from './player.module.scss';
 import Select from '../select/select';
+import styles from './player.module.scss';
 
 export interface PlayerProps {
     // Основные пропсы из DevLinePlayerProps
@@ -70,8 +70,8 @@ export const Player: React.FC<PlayerProps> = ({
     const [isMuted, setIsMuted] = useState<boolean>(muted);
     const [playbackSpeed, setPlaybackSpeed] = useState<number>(1);
 
-    const [showControls, setShowControls] = useState<boolean>(false);
     const [isMobile, setIsMobile] = useState<boolean>(false);
+    const [showControls, setShowControls] = useState<boolean>(false);
 
     // Определяем ориентацию и тип устройства
     const {orientation, isMobile: isMobileDevice, isIos} = useOrientation();
@@ -743,7 +743,7 @@ export const Player: React.FC<PlayerProps> = ({
                     </div>
                 )}
 
-                <div className={styles.topControls}>
+                <div className={`${styles.topControls} ${isVerticalTimeline ? styles.mobileLandscapeTopControls : ''}`}>
                     <ModeIndicator
                         mode={currentMode}
                         isPlaying={isPlaying}
