@@ -749,47 +749,47 @@ export const Player: React.FC<PlayerProps> = ({
                         isPlaying={isPlaying}
                     />
                 </div>
-                <div
-                    className={styles.videoContainer}
-                    onDoubleClick={handleToggleFullscreen}
-                    onTouchStart={handlePlayerTouchStart}
-                    onTouchMove={handlePlayerTouchMove}
-                    onTouchEnd={handlePlayerTouchEnd}
-                    role="button"
-                    aria-label="Переключить полноэкранный режим"
-                    tabIndex={0}
-                    onKeyDown={e => {
-                        const key = e.key.toLowerCase();
-                        if (key === 'enter') {
-                            e.preventDefault();
-                            handleToggleFullscreen();
-                        }
-                    }}
-                >
+                <div className={styles.videoContainer}>
+                    <div
+                        onDoubleClick={handleToggleFullscreen}
+                        onTouchStart={handlePlayerTouchStart}
+                        onTouchMove={handlePlayerTouchMove}
+                        onTouchEnd={handlePlayerTouchEnd}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={e => {
+                            const key = e.key.toLowerCase();
+                            if (key === 'enter') {
+                                e.preventDefault();
+                                handleToggleFullscreen();
+                            }
+                        }}
+                    >
+                        {isIos ? (
+                            <VideoTag
+                                ref={playerRef}
+                                {...props}
+                                updateServerTime={updateServerTime}
+                                setProgress={setProgress}
+                                overlayText={isH265Codec ? '265' : undefined}
+                            />
+                        ) : currentMode === 'record' ? (
+                            <HlsPlayer
+                                ref={playerRef}
+                                {...props}
+                                overlayText={isH265Codec ? '265' : undefined}
+                            />
+                        ) : (
+                            <VideoTag
+                                ref={playerRef}
+                                {...props}
+                                updateServerTime={updateServerTime}
+                                setProgress={setProgress}
+                                overlayText={isH265Codec ? '265' : undefined}
+                            />
+                        )}
+                    </div>
                     {/* Для iPhone всегда используем VideoTag с нативным воспроизведением m3u8 */}
-                    {isIos ? (
-                        <VideoTag
-                            ref={playerRef}
-                            {...props}
-                            updateServerTime={updateServerTime}
-                            setProgress={setProgress}
-                            overlayText={isH265Codec ? '265' : undefined}
-                        />
-                    ) : currentMode === 'record' ? (
-                        <HlsPlayer
-                            ref={playerRef}
-                            {...props}
-                            overlayText={isH265Codec ? '265' : undefined}
-                        />
-                    ) : (
-                        <VideoTag
-                            ref={playerRef}
-                            {...props}
-                            updateServerTime={updateServerTime}
-                            setProgress={setProgress}
-                            overlayText={isH265Codec ? '265' : undefined}
-                        />
-                    )}
                     {showSaveModal && (
                         <SaveStreamModal
                             currentTime={addSecondsToDate(serverTime ?? new Date(), ctxProgress)}

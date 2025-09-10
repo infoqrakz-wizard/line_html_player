@@ -133,8 +133,8 @@ export const SaveStreamModal: React.FC<SaveStreamProps> = ({
                 url,
                 port,
                 credentials,
-                startTime: startOfDay(start),
-                endTime: startOfDay(addMinutesToDate(end, 1)),
+                startTime: start,
+                endTime: end,
                 unitLength: 3600,
                 channel: camera,
                 protocol
