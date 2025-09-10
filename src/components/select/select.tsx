@@ -163,21 +163,23 @@ const Select = <T extends string | number>({
                     className={dropdownClassName}
                     role="listbox"
                 >
-                    {options.map((option, index) => (
-                        <div
-                            key={String(option.value)}
-                            className={`${classes.option} ${option.value === value ? classes.selected : ''} ${
-                                index === highlightedIndex ? classes.highlighted : ''
-                            } ${option.disabled ? classes.disabled : ''}`}
-                            onClick={() => handleOptionSelect(option)}
-                            onMouseEnter={() => setHighlightedIndex(index)}
-                            role="option"
-                            aria-selected={option.value === value}
-                            aria-disabled={option.disabled}
-                        >
-                            {option.label}
-                        </div>
-                    ))}
+                    {options
+                        .filter(option => option.value !== value)
+                        .map((option, index) => (
+                            <div
+                                key={String(option.value)}
+                                className={`${classes.option} ${option.value === value ? classes.selected : ''} ${
+                                    index === highlightedIndex ? classes.highlighted : ''
+                                } ${option.disabled ? classes.disabled : ''}`}
+                                onClick={() => handleOptionSelect(option)}
+                                onMouseEnter={() => setHighlightedIndex(index)}
+                                role="option"
+                                aria-selected={option.value === value}
+                                aria-disabled={option.disabled}
+                            >
+                                {option.label}
+                            </div>
+                        ))}
                 </div>
             )}
         </div>
