@@ -183,7 +183,7 @@ export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
         }
 
         // Если время сервера еще не загружено, показываем загрузку
-        if (!serverTime || !visibleTimeRange) {
+        if ((!serverTime || !visibleTimeRange) && !isVerticalTimeline) {
             return (
                 <div className="timeline-loading">
                     <span>Загрузка временной шкалы...</span>

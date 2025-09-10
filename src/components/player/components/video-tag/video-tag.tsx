@@ -15,10 +15,12 @@ export interface VideoTagProps {
     updateServerTime?: () => Promise<Date | undefined>;
     setProgress?: (seconds: number) => void;
     overlayText?: string;
+    isLandscape?: boolean;
 }
 
 export const VideoTag = forwardRef<PlayerRef, VideoTagProps>((props, ref) => {
     const {
+        isLandscape = false,
         url,
         playing = true,
         muted = true,
@@ -207,7 +209,7 @@ export const VideoTag = forwardRef<PlayerRef, VideoTagProps>((props, ref) => {
     }, [url, posterUrl]);
 
     return (
-        <VideoContainer>
+        <VideoContainer isLandscape={isLandscape}>
             {(isLoading || isBuffering) && <Loader message={isLoading ? 'Загрузка видео...' : 'Буферизация...'} />}
             {!playingRef.current && !isLoading && !isBuffering && (
                 <PlayOverlay

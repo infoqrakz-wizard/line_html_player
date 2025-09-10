@@ -16,3 +16,11 @@
         object-fit: contain;
     }
 }
+
+.landscapeVideoContainer {
+    flex-grow: 0;
+    display: block;
+    width: 100dvw;
+    aspect-ratio: unset;
+    height: 100dvh;
+}

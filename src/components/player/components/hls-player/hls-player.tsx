@@ -15,12 +15,22 @@ export interface HlsPlayerProps {
     onProgress?: (progress: {currentTime: number; duration: number}) => void;
     onPlayPause?: (playing: boolean) => void;
     overlayText?: string;
+    isLandscape?: boolean;
 }
 
 import type {PlayerRef} from '../player-interface';
 
 export const HlsPlayer = forwardRef<PlayerRef, HlsPlayerProps>((props, ref) => {
-    const {url, playing = false, onProgress, onPlayPause, playbackSpeed, muted = true, overlayText} = props;
+    const {
+        url,
+        playing = false,
+        onProgress,
+        onPlayPause,
+        playbackSpeed,
+        muted = true,
+        overlayText,
+        isLandscape = false
+    } = props;
     const videoRef = useRef<HTMLVideoElement>(null);
     const hlsRef = useRef<Hls | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -453,7 +463,7 @@ export const HlsPlayer = forwardRef<PlayerRef, HlsPlayerProps>((props, ref) => {
     }, [url]);
 
     return (
-        <VideoContainer>
+        <VideoContainer isLandscape={isLandscape}>
             {(isLoading || isBuffering) && <Loader message={isLoading ? 'Загрузка видео...' : 'Буферизация...'} />}
             {!playingRef.current && !isLoading && !isBuffering && (
                 <PlayOverlay

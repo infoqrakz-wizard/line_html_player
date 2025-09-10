@@ -165,6 +165,8 @@
         padding: 8px 4px;
         gap: 4px;
         flex-shrink: 0;
+        position: fixed;
+        right: 90px;
 
         .leftControls {
             display: flex;

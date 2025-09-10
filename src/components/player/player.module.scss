@@ -22,8 +22,16 @@
     min-height: 350px;
     aspect-ratio: 16/9;
     max-height: 100%;
-
 }
+
+.videoContainer.landscapeVideoContainer {
+    flex-grow: 0;
+    display: block;
+    width: 100dvw;
+    aspect-ratio: unset;
+    height: 100dvh;
+}
+
 
 .loader {
     color: #fff;

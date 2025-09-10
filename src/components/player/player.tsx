@@ -749,7 +749,7 @@ export const Player: React.FC<PlayerProps> = ({
                         isPlaying={isPlaying}
                     />
                 </div>
-                <div className={styles.videoContainer}>
+                <div className={`${styles.videoContainer} ${isVerticalTimeline ? styles.landscapeVideoContainer : ''}`}>
                     <div
                         onDoubleClick={handleToggleFullscreen}
                         onTouchStart={handlePlayerTouchStart}
@@ -767,6 +767,7 @@ export const Player: React.FC<PlayerProps> = ({
                     >
                         {isIos ? (
                             <VideoTag
+                                isLandscape={isVerticalTimeline}
                                 ref={playerRef}
                                 {...props}
                                 updateServerTime={updateServerTime}
@@ -775,12 +776,14 @@ export const Player: React.FC<PlayerProps> = ({
                             />
                         ) : currentMode === 'record' ? (
                             <HlsPlayer
+                                isLandscape={isVerticalTimeline}
                                 ref={playerRef}
                                 {...props}
                                 overlayText={isH265Codec ? '265' : undefined}
                             />
                         ) : (
                             <VideoTag
+                                isLandscape={isVerticalTimeline}
                                 ref={playerRef}
                                 {...props}
                                 updateServerTime={updateServerTime}
