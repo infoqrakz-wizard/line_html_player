@@ -5,9 +5,26 @@
     display: flex;
     flex-direction: column;
     background-color: #000;
+    overflow: hidden;
     
     &.withVerticalTimeline {
         flex-direction: row;
+
+        @media (max-width: 768px) and (orientation: landscape) {
+            height: 100dvh;
+            width: 100dvw;
+            max-height: 100dvh;
+            max-width: 100dvw;
+            overflow: hidden;
+        }
+
+         video {
+            width: 100%;
+            height: 100%;
+            max-height: 100dvh;
+            object-fit: contain;
+            object-position: center;
+        }
     }
 }
 
@@ -30,6 +47,24 @@
     width: 100dvw;
     aspect-ratio: unset;
     height: 100dvh;
+    max-height: 100dvh;
+    max-width: 100dvw;
+    overflow: hidden;
+
+    @media (max-width: 768px) and (orientation: landscape) {
+        height: 100dvh;
+        width: 100dvw;
+        max-height: 100dvh;
+        max-width: 100dvw;
+        position: relative;
+
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            object-position: center;
+        }
+    }
 }
 
 
@@ -39,7 +74,7 @@
 }
 
 .mobileLandscapeTopControls {
-    right: 180px !important;
+    right: 96px !important;
 }
 
 .modeIndicatorContainer {
@@ -204,4 +239,8 @@
     left: 10px;
     z-index: 10;
     color: #fff;
+}
+
+.mobileLandscapeCameraSelector {
+    left: 60px;
 }

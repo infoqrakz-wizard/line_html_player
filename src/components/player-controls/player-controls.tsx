@@ -278,6 +278,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
                         onSpeedChange={onSpeedChange}
                         disabled={disableSpeedChange}
                         isFullscreen={isFullscreen}
+                        isMobileLandscape={isMobileLandscape}
                     />
                 )}
                 <button

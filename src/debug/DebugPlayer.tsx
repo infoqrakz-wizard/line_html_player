@@ -13,14 +13,15 @@ import './DebugPlayer.scss';
 const DebugPlayer: React.FC = () => {
     // Состояние для параметров плеера
     const [params, setParams] = useState({
-        streamUrl: 'lc56.loc.devline.tv',
-        streamPort: 2376,
-        login: 'yandex',
-        password: 'NLAWyYrH08nVTVthqsKk',
-        mode: Mode.Live,
+        streamUrl: '8.devline.ru',
+        streamPort: 443,
+        login: 'h264',
+        password: '',
+        mode: 'live',
+        autoplay: true,
         muted: true,
-        camera: 1,
-        protocol: Protocol.Http,
+        camera: 2,
+        protocol: 'https',
         showCameraSelector: true
     });
 

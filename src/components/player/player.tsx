@@ -710,7 +710,9 @@ export const Player: React.FC<PlayerProps> = ({
                 aria-label="Плеер видео"
             >
                 {showCameraSelector && (
-                    <div className={styles.cameraSelector}>
+                    <div
+                        className={`${styles.cameraSelector} ${isVerticalTimeline ? styles.mobileLandscapeCameraSelector : ''}`}
+                    >
                         <Select
                             options={availableCameras.map(c => ({
                                 value: c.id,
@@ -720,26 +722,6 @@ export const Player: React.FC<PlayerProps> = ({
                             onChange={value => setCamera(Number(value))}
                             aria-label="Выбор камеры"
                         />
-                        {/* <select
-                            value={camera ?? ''}
-                            onChange={e => setCamera(Number(e.target.value))}
-                            aria-label="Выбор камеры"
-                        >
-                            <option
-                                value=""
-                                disabled
-                            >
-                                Выберите камеру
-                            </option>
-                            {availableCameras.map(c => (
-                                <option
-                                    key={c.id}
-                                    value={c.id}
-                                >
-                                    {c.name ?? `Camera ${c.id}`}
-                                </option>
-                            ))}
-                        </select> */}
                     </div>
                 )}
 

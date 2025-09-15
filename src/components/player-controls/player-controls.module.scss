@@ -166,7 +166,7 @@
         gap: 4px;
         flex-shrink: 0;
         position: fixed;
-        right: 90px;
+        left: 0px;
 
         .leftControls {
             display: flex;
@@ -185,9 +185,9 @@
         }
 
         .controlButton {
-            width: 48px;
-            height: 48px;
-            border-radius: 8px;
+            width: 36px;
+            height: 36px;
+            border-radius: 6px;
             background: rgba(255, 255, 255, 0.1);
             transition: all 0.2s ease;
 
@@ -197,12 +197,12 @@
         }
 
         .recordButton {
-            width: 48px;
-            height: 48px;
+            width: 36px;
+            height: 36px;
             display: flex;
             align-items: center;
             justify-content: center;
-            border-radius: 8px;
+            border-radius: 6px;
             background: rgba(255, 255, 255, 0.1);
             transition: all 0.2s ease;
 

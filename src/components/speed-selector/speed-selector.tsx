@@ -8,6 +8,7 @@ interface SpeedSelectorProps {
     onSpeedChange: (speed: number) => void;
     disabled?: boolean;
     isFullscreen?: boolean;
+    isMobileLandscape?: boolean;
 }
 
 const speedOptions = [
@@ -23,7 +24,8 @@ export const SpeedSelector: React.FC<SpeedSelectorProps> = ({
     playbackSpeed,
     onSpeedChange,
     disabled = false,
-    isFullscreen = false
+    isFullscreen = false,
+    isMobileLandscape = false
 }) => {
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
@@ -35,12 +37,19 @@ export const SpeedSelector: React.FC<SpeedSelectorProps> = ({
             if (!isOpen && containerRef.current) {
                 const rect = containerRef.current.getBoundingClientRect();
 
-                // В обычном режиме используем фиксированное позиционирование
-                setDropdownPosition({
-                    top: rect.top - 253,
-                    left: rect.right - 165,
-                    width: rect.width
-                });
+                if (isMobileLandscape) {
+                    setDropdownPosition({
+                        top: rect.top - 230,
+                        left: rect.left,
+                        width: rect.width
+                    });
+                } else {
+                    setDropdownPosition({
+                        top: rect.top - 253,
+                        left: rect.right - 165,
+                        width: rect.width
+                    });
+                }
             }
             setIsOpen(!isOpen);
         }
@@ -100,7 +109,7 @@ export const SpeedSelector: React.FC<SpeedSelectorProps> = ({
                 ref={containerRef}
             >
                 <button
-                    className={`${styles.trigger} ${disabled ? styles.disabled : ''}`}
+                    className={`${styles.trigger} ${isMobileLandscape ? styles.mobileLandscapeTrigger : ''} ${disabled ? styles.disabled : ''}`}
                     onClick={handleToggle}
                     disabled={disabled}
                     aria-label="Выбрать скорость воспроизведения"
@@ -113,14 +122,8 @@ export const SpeedSelector: React.FC<SpeedSelectorProps> = ({
                 (isFullscreen ? (
                     // В полноэкранном режиме отображаем без портала
                     <div
-                        className={styles.dropdown}
+                        className={`${styles.dropdown} ${styles.fullscreenDropdown} ${isMobileLandscape ? styles.mobileLandscapeDropdown : ''}`}
                         ref={dropdownRef}
-                        style={{
-                            position: 'absolute',
-                            bottom: `53px`,
-                            right: `0px`,
-                            zIndex: 99999
-                        }}
                     >
                         <div className={styles.header}>
                             <button
@@ -153,13 +156,11 @@ export const SpeedSelector: React.FC<SpeedSelectorProps> = ({
                     // В обычном режиме используем портал
                     createPortal(
                         <div
-                            className={styles.dropdown}
+                            className={`${styles.dropdown} ${styles.portalDropdown} ${isMobileLandscape ? styles.mobileLandscapePortalDropdown : ''}`}
                             ref={dropdownRef}
                             style={{
-                                position: 'fixed',
                                 top: `${dropdownPosition.top}px`,
                                 left: `${dropdownPosition.left}px`,
-                                zIndex: 99999
                             }}
                         >
                             <div className={styles.header}>

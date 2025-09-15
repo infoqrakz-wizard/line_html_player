@@ -25,6 +25,22 @@
     }
 }
 
+// Mobile landscape styles for trigger button
+.mobileLandscapeTrigger {
+    width: 36px;
+    height: 36px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.1);
+    padding: 0;
+    font-size: 11px;
+    transition: all 0.2s ease;
+
+    &:hover {
+        background: rgba(255, 255, 255, 0.2);
+        opacity: 1;
+    }
+}
+
 .dropdown {
     background: rgba(0, 0, 0, 0.9);
     padding: 10px 20px;
@@ -35,6 +51,23 @@
     overflow: hidden;
     color: #969797;
     min-width: 200px;
+}
+
+.fullscreenDropdown {
+    position: absolute;
+    bottom: 53px;
+    right: 0px;
+    z-index: 99999
+}
+
+.mobileLandscapeDropdown {
+    position: fixed;
+    left: 0;
+}
+
+.portalDropdown {
+    position: fixed;
+    z-index: 99999
 }
 
 .header {
