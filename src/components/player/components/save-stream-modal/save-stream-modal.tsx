@@ -138,7 +138,7 @@ export const SaveStreamModal: React.FC<SaveStreamProps> = ({
                 credentials,
                 startTime: start,
                 endTime: end,
-                unitLength: 3600,
+                unitLength: 1,
                 channel: camera,
                 protocol,
                 proxy
