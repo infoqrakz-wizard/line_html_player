@@ -127,6 +127,16 @@
                         </div>
 
                         <div class="control-group">
+                            <label for="proxy">Proxy:</label>
+                            <input
+                                type="text"
+                                id="proxy"
+                                value="https://proxy.devline.ru"
+                                placeholder="Leave empty to disable proxy"
+                            />
+                        </div>
+
+                        <div class="control-group">
                             <label for="streamPort">Stream Port:</label>
                             <input
                                 type="number"
@@ -240,6 +250,7 @@
                     const autoplay = document.getElementById('autoplay').checked;
                     const muted = document.getElementById('muted').checked;
                     const camera = parseInt(getStreamId(), 10);
+                    const proxy = document.getElementById('proxy').value;
 
                     // Create new player instance
                     player = new DevLinePlayer(document.getElementById('player'), {
@@ -250,7 +261,8 @@
                         mode,
                         autoplay,
                         muted,
-                        camera
+                        camera,
+                        proxy
                     });
 
                     console.log('Player initialized with options:', {
@@ -261,7 +273,8 @@
                         mode,
                         autoplay,
                         muted,
-                        camera
+                        camera,
+                        proxy,
                     });
                 });
             }

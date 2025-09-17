@@ -3,8 +3,18 @@ import {Player} from '../components/player';
 import {TimeProvider} from '../context/time-context';
 import {TimelineAuthProvider} from '../context/timeline-auth-context';
 import {Mode, Protocol} from '../utils/types';
+import type {PlayerProps} from '../components/player/player';
 
 import './DebugPlayer.scss';
+
+interface DebugPlayerParams extends PlayerProps {
+    autoplay: boolean;
+    proxy: string;
+    showCameraSelector: boolean;
+    muted: boolean;
+    mode: Mode;
+    protocol: Protocol;
+}
 
 /**
  * Компонент для отладки Player
@@ -12,17 +22,18 @@ import './DebugPlayer.scss';
  */
 const DebugPlayer: React.FC = () => {
     // Состояние для параметров плеера
-    const [params, setParams] = useState({
+    const [params, setParams] = useState<DebugPlayerParams>({
         streamUrl: '8.devline.ru',
         streamPort: 443,
         login: 'h264',
         password: '',
-        mode: 'live',
+        mode: Mode.Live,
         autoplay: true,
         muted: true,
         camera: 2,
-        protocol: 'https',
-        showCameraSelector: true
+        protocol: Protocol.Https,
+        showCameraSelector: true,
+        proxy: 'https://proxy.devline.ru'
     });
 
     // Обработчик изменения параметров
@@ -36,7 +47,11 @@ const DebugPlayer: React.FC = () => {
                     ? (e.target as HTMLInputElement).checked
                     : type === 'number'
                       ? parseInt(value, 10)
-                      : value
+                      : name === 'mode'
+                        ? (value as Mode)
+                        : name === 'protocol'
+                          ? (value as Protocol)
+                          : value
         }));
     };
 
@@ -62,6 +77,18 @@ const DebugPlayer: React.FC = () => {
                                 id="streamUrl"
                                 name="streamUrl"
                                 value={params.streamUrl}
+                                onChange={handleParamChange}
+                            />
+                        </div>
+
+                        <div className="form-group">
+                            <label htmlFor="proxy">Proxy:</label>
+                            <input
+                                type="text"
+                                id="proxy"
+                                name="proxy"
+                                value={params.proxy}
+                                placeholder="Leave empty to disable proxy"
                                 onChange={handleParamChange}
                             />
                         </div>

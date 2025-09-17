@@ -21,6 +21,7 @@ interface ControlPanelProps {
     progress?: number;
     camera: number;
     protocol?: Protocol;
+    proxy?: string;
     popperBoundaryElement?: HTMLElement | null;
     popperPortalId?: string;
     timelineRef?: React.RefObject<TimelineRef>;
@@ -49,6 +50,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
     progress,
     camera,
     protocol,
+    proxy,
     popperBoundaryElement,
     popperPortalId,
     timelineRef: externalTimelineRef,
@@ -84,6 +86,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                 credentials={credentials}
                 camera={camera}
                 protocol={protocol}
+                proxy={proxy}
                 popperBoundaryElement={popperBoundaryElement}
                 popperPortalId={popperPortalId}
                 onPlayPause={onPlayPause}
@@ -107,6 +110,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                     progress={progress}
                     protocol={protocol}
                     camera={camera}
+                    proxy={proxy}
                     mode={mode}
                 />
             )}

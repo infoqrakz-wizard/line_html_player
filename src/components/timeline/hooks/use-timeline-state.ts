@@ -30,7 +30,8 @@ export const useTimelineState = (
     url?: string,
     port?: number,
     credentials?: string,
-    protocol?: Protocol
+    protocol?: Protocol,
+    proxy?: string
 ) => {
     // Получаем время из глобального контекста
     const {serverTime, setServerTime, progress: ctxProgress, skipCenterTimeline} = useTime();
@@ -78,7 +79,7 @@ export const useTimelineState = (
 
         const fetchServerTime = () => {
             setIsLoading(true);
-            getServerTime(url, port, credentials, protocol)
+            getServerTime(url, port, credentials, protocol, proxy)
                 .then(time => {
                     setServerTime(time);
 
@@ -102,11 +103,11 @@ export const useTimelineState = (
         };
 
         fetchServerTime();
-    }, [url, port, credentials, intervalIndex]);
+    }, [url, port, credentials, intervalIndex, protocol, proxy]);
 
     const updateServerTime = async () => {
         if (!url || !port || !credentials) return;
-        const time = await getServerTime(url, port, credentials, protocol);
+        const time = await getServerTime(url, port, credentials, protocol, proxy);
         setServerTime(time);
         return time;
     };

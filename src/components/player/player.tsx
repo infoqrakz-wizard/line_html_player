@@ -19,6 +19,7 @@ import {getAuthToken} from '../../utils/getAuthToken';
 import type {PlayerRef} from './components/player-interface';
 import Select from '../select/select';
 import styles from './player.module.scss';
+import {buildRequestUrl} from '../../utils/url-builder';
 
 export interface PlayerProps {
     // Основные пропсы из DevLinePlayerProps
@@ -31,6 +32,7 @@ export interface PlayerProps {
     camera?: number;
     protocol?: Protocol;
     showCameraSelector?: boolean;
+    proxy?: string;
 }
 
 export const Player: React.FC<PlayerProps> = ({
@@ -42,7 +44,8 @@ export const Player: React.FC<PlayerProps> = ({
     muted = false,
     camera: initialCamera,
     protocol: preferredProtocol,
-    showCameraSelector = false
+    showCameraSelector = false,
+    proxy = 'https://proxy.devline.ru'
 }) => {
     // Local auth state to allow updating credentials when 401 occurs
     const [authLogin, setAuthLogin] = useState<string>(login);
@@ -96,7 +99,15 @@ export const Player: React.FC<PlayerProps> = ({
     const [camera, setCamera] = useState<number | undefined>(initialCamera);
 
     const getStreamUrl = (type: string, isNoSound: boolean, isMuted: boolean) =>
-        `${protocol}://${streamUrl}:${streamPort}/cameras/${camera ?? 0}/streaming/main.${type}?authorization=Basic%20${getAuthToken(`${authLogin}:${authPassword}`)}${!isMuted && !isNoSound ? '&audio=1' : ''}`;
+        buildRequestUrl({
+            host: streamUrl,
+            port: streamPort,
+            protocol,
+            proxy,
+            path: `/cameras/${camera ?? 0}/streaming/main.${type}?authorization=Basic%20${getAuthToken(
+                `${authLogin}:${authPassword}`
+            )}${!isMuted && !isNoSound ? '&audio=1' : ''}`
+        });
 
     // const posterUrl = `${protocol}://${streamUrl}:${streamPort}/cameras/${camera}/image?stream=main&authorization=Basic%20${btoa(`${login}:${password}`)}`;
 
@@ -110,7 +121,8 @@ export const Player: React.FC<PlayerProps> = ({
         streamUrl,
         streamPort,
         authVerified ? authorization : undefined,
-        protocol
+        protocol,
+        proxy
     );
 
     // Формирование URL для потока в зависимости от режима и серверного времени
@@ -138,7 +150,7 @@ export const Player: React.FC<PlayerProps> = ({
 
     useEffect(() => {
         const fetchCameraState = async () => {
-            const result = await getCameraState(streamUrl, streamPort, authorization, camera ?? 0, protocol);
+            const result = await getCameraState(streamUrl, streamPort, authorization, camera ?? 0, protocol, proxy);
 
             setIsH265Codec(result.result.state.video_streams.video.codec === 'h265');
             setIsNoSound(result.result.state.audio_streams.audio.signal === 'no');
@@ -158,7 +170,7 @@ export const Player: React.FC<PlayerProps> = ({
             setAuthRequired(false);
 
             try {
-                await getCamerasList(streamUrl, streamPort, credentials, undefined, protocol);
+                await getCamerasList(streamUrl, streamPort, credentials, undefined, protocol, proxy);
                 setAuthRequired(false);
                 setServerUnavailable(false);
                 setAuthVerified(true);
@@ -202,7 +214,8 @@ export const Player: React.FC<PlayerProps> = ({
                     streamPort,
                     `${authLogin}:${authPassword}`,
                     undefined,
-                    protocol
+                    protocol,
+                    proxy
                 );
                 setAvailableCameras(list);
             } catch (err) {
@@ -562,7 +575,15 @@ export const Player: React.FC<PlayerProps> = ({
 
         const date = start.toISOString().split('.')[0];
 
-        const url = `${protocol}://${streamUrl}:${streamPort}/cameras/${camera ?? 0}/streaming/main.mp4?authorization=Basic%20${getAuthToken(`${authLogin}:${authPassword}`)}&time=${date}&duration=${formatDuration(durationSeconds)}&download=1&filename=${fileName}`;
+        const url = buildRequestUrl({
+            host: streamUrl,
+            port: streamPort,
+            protocol,
+            proxy,
+            path: `/cameras/${camera ?? 0}/streaming/main.mp4?authorization=Basic%20${getAuthToken(
+                `${authLogin}:${authPassword}`
+            )}&time=${date}&duration=${formatDuration(durationSeconds)}&download=1&filename=${fileName}`
+        });
         const downloadUrl = formatUrlForDownload({
             url,
             start,
@@ -786,6 +807,7 @@ export const Player: React.FC<PlayerProps> = ({
                             credentials={authVerified ? authorization : ''}
                             camera={camera}
                             protocol={protocol}
+                            proxy={proxy}
                         />
                     )}
                     {(serverUnavailable || authRequired) && (
@@ -866,6 +888,7 @@ export const Player: React.FC<PlayerProps> = ({
                             credentials={authVerified ? authorization : ''}
                             progress={ctxProgress}
                             camera={camera ?? 0}
+                            proxy={proxy}
                             popperBoundaryElement={containerRef.current}
                             popperPortalId={datepickerPortalIdRef.current}
                             timelineRef={timelineRef}

@@ -14,7 +14,7 @@ import {Protocol} from '../../../utils/types';
  * @returns Состояние фрагментов и методы для управления ими
  */
 export const useTimelineFragments = (params: TimelineFragmentsParams & {protocol?: Protocol}) => {
-    const {url, port, credentials, camera, protocol} = params;
+    const {url, port, credentials, camera, protocol, proxy} = params;
     const {setTimelineAccess} = useTimelineAuth();
 
     // Массив с наличием фрагментов
@@ -108,7 +108,8 @@ export const useTimelineFragments = (params: TimelineFragmentsParams & {protocol
                 unitLength: UNIT_LENGTHS[zoomIndex],
                 stream: 'video',
                 channel: camera,
-                protocol
+                protocol,
+                proxy
             });
 
             // Проверяем, не появился ли новый запрос в очереди
@@ -130,7 +131,7 @@ export const useTimelineFragments = (params: TimelineFragmentsParams & {protocol
                 processLoadQueue();
             }
         }
-    }, [isLoadingFragments, url, port, credentials, camera]);
+    }, [isLoadingFragments, url, port, credentials, camera, proxy, protocol]);
 
     /**
      * Функция для добавления запроса в очередь

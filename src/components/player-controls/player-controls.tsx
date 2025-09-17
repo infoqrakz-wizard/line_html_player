@@ -33,6 +33,7 @@ interface PlayerControlsProps {
     credentials?: string;
     camera?: number;
     protocol?: Protocol;
+    proxy?: string;
     popperBoundaryElement?: HTMLElement | null;
     popperPortalId?: string;
     onPlayPause: () => void;
@@ -60,6 +61,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
     credentials,
     camera,
     protocol,
+    proxy,
     popperBoundaryElement,
     popperPortalId,
     onPlayPause,
@@ -130,7 +132,8 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
                     endTime: startOfDay(month.end),
                     unitLength: 86400,
                     channel: camera,
-                    protocol
+                    protocol,
+                    proxy
                 });
 
                 const days: Date[] = [];

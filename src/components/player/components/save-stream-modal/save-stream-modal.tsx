@@ -23,6 +23,7 @@ interface SaveStreamProps {
     credentials?: string;
     camera?: number;
     protocol?: Protocol;
+    proxy?: string;
 }
 
 export const SaveStreamModal: React.FC<SaveStreamProps> = ({
@@ -34,7 +35,8 @@ export const SaveStreamModal: React.FC<SaveStreamProps> = ({
     port,
     credentials,
     camera,
-    protocol
+    protocol,
+    proxy
 }) => {
     const modalRef = useRef<HTMLDivElement>(null);
     const [startDate, setStartDate] = useState(addMinutesToDate(currentTime, -2));
@@ -87,7 +89,8 @@ export const SaveStreamModal: React.FC<SaveStreamProps> = ({
                     endTime: startOfDay(month.end),
                     unitLength: 86400,
                     channel: camera,
-                    protocol
+                    protocol,
+                    proxy
                 });
 
                 const days: Date[] = [];
@@ -137,7 +140,8 @@ export const SaveStreamModal: React.FC<SaveStreamProps> = ({
                 endTime: end,
                 unitLength: 3600,
                 channel: camera,
-                protocol
+                protocol,
+                proxy
             });
 
             return result.timeline.some(hours => hours > 0);

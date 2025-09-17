@@ -26,6 +26,8 @@ export interface TimelineProps {
     mode?: Mode;
     /** Протокол */
     protocol?: Protocol;
+    /** Прокси-сервер */
+    proxy?: string;
 }
 
 /**
@@ -245,6 +247,8 @@ export interface TimelineFragmentsParams {
     camera: number;
     /** Протокол */
     protocol?: Protocol;
+    /** Прокси-сервер */
+    proxy?: string;
 }
 
 /**

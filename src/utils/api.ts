@@ -1,7 +1,8 @@
 import {getProtocol} from './url-params';
 import {differenceInSeconds, format} from 'date-fns';
 import {Protocol} from './types';
-import { getAuthToken } from './getAuthToken';
+import {getAuthToken} from './getAuthToken';
+import {buildRequestUrl} from './url-builder';
 
 export interface CameraInfo {
     id: number;
@@ -23,6 +24,7 @@ interface GetFramesTimelineParams {
     channel?: number;
     stream?: string;
     protocol?: Protocol;
+    proxy?: string;
 }
 
 interface TimelineResponse {
@@ -30,7 +32,7 @@ interface TimelineResponse {
 }
 
 export const getFramesTimeline = (params: GetFramesTimelineParams): Promise<TimelineResponse> => {
-    const {url, port, credentials, startTime, endTime, unitLength, channel, stream} = params;
+    const {url, port, credentials, startTime, endTime, unitLength, channel, stream, proxy} = params;
     const preferredProtocol = params.protocol ?? getProtocol();
 
     const requestParams = {
@@ -56,8 +58,13 @@ export const getFramesTimeline = (params: GetFramesTimelineParams): Promise<Time
     };
 
     return new Promise((resolve, reject) => {
-        const fullUrl = url.startsWith('http') ? url : `${preferredProtocol}://${url}`;
-        const rpcUrl = `${fullUrl}:${port}/rpc?authorization=Basic ${getAuthToken(credentials)}&content-type=application/json`;
+        const rpcUrl = buildRequestUrl({
+            host: url,
+            port,
+            protocol: preferredProtocol,
+            proxy,
+            path: `/rpc?authorization=Basic ${getAuthToken(credentials)}&content-type=application/json`
+        });
 
         const xhr = new XMLHttpRequest();
         xhr.open('POST', rpcUrl, true);
@@ -109,10 +116,21 @@ export const formatUrlForDownload = (params: UrlForDownloadParams) => {
     return downloadUrl;
 };
 
-export const getServerTime = (url: string, port: number, credentials: string, protocol?: Protocol): Promise<Date> => {
+export const getServerTime = (
+    url: string,
+    port: number,
+    credentials: string,
+    protocol?: Protocol,
+    proxy?: string
+): Promise<Date> => {
     return new Promise((resolve, reject) => {
-        const fullUrl = url.startsWith('http') ? url : `${protocol ?? getProtocol()}://${url}`;
-        const rpcUrl = `${fullUrl}:${port}/rpc?authorization=Basic ${getAuthToken(credentials)}&content-type=application/json`;
+        const rpcUrl = buildRequestUrl({
+            host: url,
+            port,
+            protocol: protocol ?? getProtocol(),
+            proxy,
+            path: `/rpc?authorization=Basic ${getAuthToken(credentials)}&content-type=application/json`
+        });
 
         const xhr = new XMLHttpRequest();
         xhr.open('POST', rpcUrl, true);
@@ -162,11 +180,17 @@ export const getCameraState = (
     port: number,
     credentials: string,
     camera: number,
-    protocol?: Protocol
+    protocol?: Protocol,
+    proxy?: string
 ): Promise<CameraStateResponse> => {
     return new Promise((resolve, reject) => {
-        const fullUrl = url.startsWith('http') ? url : `${protocol ?? getProtocol()}://${url}`;
-        const rpcUrl = `${fullUrl}:${port}/rpc?authorization=Basic ${getAuthToken(credentials)}&content-type=application/json`;
+        const rpcUrl = buildRequestUrl({
+            host: url,
+            port,
+            protocol: protocol ?? getProtocol(),
+            proxy,
+            path: `/rpc?authorization=Basic ${getAuthToken(credentials)}&content-type=application/json`
+        });
 
         const xhr = new XMLHttpRequest();
         xhr.open('POST', rpcUrl, true);
@@ -201,15 +225,21 @@ export const getCamerasList = (
     port: number,
     credentials: string,
     timeoutMs: number = 5000,
-    protocol?: Protocol
+    protocol?: Protocol,
+    proxy?: string
 ): Promise<CameraInfo[]> => {
     return new Promise(async (resolve, reject) => {
         try {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-            const fullUrl = url.startsWith('http') ? url : `${protocol ?? getProtocol()}://${url}`;
-            const requestUrl = `${fullUrl}:${port}/cameras?authorization=Basic%20${getAuthToken(credentials)}`;
+            const requestUrl = buildRequestUrl({
+                host: url,
+                port,
+                protocol: protocol ?? getProtocol(),
+                proxy,
+                path: `/cameras?authorization=Basic%20${getAuthToken(credentials)}`
+            });
 
             const res = await fetch(requestUrl, {method: 'GET', signal: controller.signal});
             clearTimeout(timeoutId);
