@@ -12,7 +12,7 @@ import {useTimelineState} from '../timeline/hooks/use-timeline-state';
 import {useOrientation} from '../timeline/hooks/use-orientation';
 import {TimelineRef} from '../timeline/types';
 
-import {HlsPlayer, VideoTag, SaveStreamModal, ModeIndicator} from './components';
+import {HlsPlayer, VideoTag, SaveStreamModal, ModeIndicator, H265Error} from './components';
 import {PlayerComponentProps} from './components/player-interface';
 import {getAuthToken} from '../../utils/getAuthToken';
 
@@ -57,6 +57,7 @@ export const Player: React.FC<PlayerProps> = ({
     const [showSaveModal, setShowSaveModal] = useState<boolean>(false);
     const [isH265Codec, setIsH265Codec] = useState<boolean>(false);
     const [isNoSound, setIsNoSound] = useState<boolean>(false);
+    const [h265NotSupported, setH265NotSupported] = useState<boolean>(false);
 
     // Availability/auth check state
     const [isCheckingAvailability, setIsCheckingAvailability] = useState<boolean>(false);
@@ -77,7 +78,7 @@ export const Player: React.FC<PlayerProps> = ({
     const [showControls, setShowControls] = useState<boolean>(false);
 
     // Определяем ориентацию и тип устройства
-    const {orientation, isMobile: isMobileDevice, isSafari} = useOrientation();
+    const {orientation, isMobile: isMobileDevice, isSafari, isAndroid, isIOS} = useOrientation();
 
     // Состояние для отслеживания свайпов по плееру
     const [isPlayerSwipeActive, setIsPlayerSwipeActive] = useState<boolean>(false);
@@ -152,14 +153,23 @@ export const Player: React.FC<PlayerProps> = ({
         const fetchCameraState = async () => {
             const result = await getCameraState(streamUrl, streamPort, authorization, camera ?? 0, protocol, proxy);
 
-            setIsH265Codec(result.result.state.video_streams.video.codec === 'h265');
+            const isH265 = result.result.state.video_streams.video.codec === 'h265';
+            setIsH265Codec(isH265);
             setIsNoSound(result.result.state.audio_streams.audio.signal === 'no');
+
+            // Проверяем поддержку H.265 для не-мобильных устройств
+            if (isH265 && !isAndroid && !isIOS) {
+                setH265NotSupported(true);
+                setIsPlaying(false); // Ставим на паузу
+            } else {
+                setH265NotSupported(false);
+            }
         };
 
         if (authVerified && streamUrl && streamPort && authorization && Number.isInteger(camera as number)) {
             void fetchCameraState();
         }
-    }, [authVerified, streamUrl, streamPort, authorization, camera, protocol]);
+    }, [authVerified, streamUrl, streamPort, authorization, camera, protocol, isAndroid, isIOS, proxy]);
 
     const checkAvailability = useCallback(
         async (credentials: string) => {
@@ -238,8 +248,15 @@ export const Player: React.FC<PlayerProps> = ({
         }
     }, [streamUrl, streamPort, login, password, checkAvailability]);
 
+    // Сбрасываем состояние ошибки H.265 при смене камеры
+    useEffect(() => {
+        setH265NotSupported(false);
+    }, [camera]);
+
     const handleChangeMode = (newMode: Mode, time?: Date) => {
         setCurrentMode(newMode);
+        // Сбрасываем состояние ошибки H.265 при смене режима
+        setH265NotSupported(false);
         if (time) {
             setServerTime(time, true);
         } else {
@@ -768,7 +785,9 @@ export const Player: React.FC<PlayerProps> = ({
                             }
                         }}
                     >
-                        {isSafari ? (
+                        {h265NotSupported ? (
+                            <H265Error />
+                        ) : isSafari ? (
                             <VideoTag
                                 isLandscape={isVerticalTimeline}
                                 ref={playerRef}
