@@ -7,7 +7,7 @@ function checkIsMobileDevice() {
     // Проверяем различные мобильные устройства
     return {
         isMobile: detected.is.mobile,
-        isIos: detected.is.iOS
+        isSafari: detected.is.safari
     };
 }
 
@@ -31,18 +31,16 @@ function getOrientation() {
 export function useOrientation() {
     const [orientation, setOrientation] = useState(getOrientation);
     const [isMobileDevice, setIsMobileDevice] = useState(false);
-    const [isIos, setIsIos] = useState(false);
+    const [isSafari, setIsSafari] = useState(false);
 
     useEffect(() => {
         // Определяем мобильное устройство
         const mobileStatus = checkIsMobileDevice();
-        console.log('useOrientation - mobile detection result:', mobileStatus);
         setIsMobileDevice(mobileStatus.isMobile);
-        setIsIos(mobileStatus.isIos);
+        setIsSafari(mobileStatus.isSafari);
 
         const update = () => {
             const newOrientation = getOrientation();
-            console.log('useOrientation - orientation changed to:', newOrientation);
             setOrientation(newOrientation);
         };
 
@@ -65,6 +63,6 @@ export function useOrientation() {
     return {
         orientation, // "portrait" или "landscape"
         isMobile: isMobileDevice,
-        isIos
+        isSafari
     };
 }

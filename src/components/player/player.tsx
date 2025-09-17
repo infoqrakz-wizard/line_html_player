@@ -77,7 +77,7 @@ export const Player: React.FC<PlayerProps> = ({
     const [showControls, setShowControls] = useState<boolean>(false);
 
     // Определяем ориентацию и тип устройства
-    const {orientation, isMobile: isMobileDevice, isIos} = useOrientation();
+    const {orientation, isMobile: isMobileDevice, isSafari} = useOrientation();
 
     // Состояние для отслеживания свайпов по плееру
     const [isPlayerSwipeActive, setIsPlayerSwipeActive] = useState<boolean>(false);
@@ -112,7 +112,7 @@ export const Player: React.FC<PlayerProps> = ({
     // const posterUrl = `${protocol}://${streamUrl}:${streamPort}/cameras/${camera}/image?stream=main&authorization=Basic%20${btoa(`${login}:${password}`)}`;
 
     // Для iPhone всегда используем m3u8, так как hls.js не работает нативно
-    const streamType = isIos ? 'm3u8' : currentMode === 'record' ? 'm3u8' : 'mp4';
+    const streamType = isSafari ? 'm3u8' : currentMode === 'record' ? 'm3u8' : 'mp4';
     const authorization = `${authLogin}:${authPassword}`;
     const videoUrl = getStreamUrl(streamType, isNoSound, isMuted);
 
@@ -768,7 +768,7 @@ export const Player: React.FC<PlayerProps> = ({
                             }
                         }}
                     >
-                        {isIos ? (
+                        {isSafari ? (
                             <VideoTag
                                 isLandscape={isVerticalTimeline}
                                 ref={playerRef}
