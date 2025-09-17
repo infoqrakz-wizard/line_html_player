@@ -764,6 +764,10 @@ export const Player: React.FC<PlayerProps> = ({
                 </div>
                 <div className={`${styles.videoContainer} ${isVerticalTimeline ? styles.landscapeVideoContainer : ''}`}>
                     <div
+                        style={{
+                            width: '100%',
+                            height: '100%'
+                        }}
                         onDoubleClick={handleToggleFullscreen}
                         onTouchStart={handlePlayerTouchStart}
                         onTouchMove={handlePlayerTouchMove}
