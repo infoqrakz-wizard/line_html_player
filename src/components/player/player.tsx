@@ -57,6 +57,7 @@ export const Player: React.FC<PlayerProps> = ({
     const [showSaveModal, setShowSaveModal] = useState<boolean>(false);
     const [isH265Codec, setIsH265Codec] = useState<boolean>(false);
     const [isNoSound, setIsNoSound] = useState<boolean>(false);
+    const [showH265Warning, setShowH265Warning] = useState<boolean>(false);
 
     // Availability/auth check state
     const [isCheckingAvailability, setIsCheckingAvailability] = useState<boolean>(false);
@@ -77,7 +78,7 @@ export const Player: React.FC<PlayerProps> = ({
     const [showControls, setShowControls] = useState<boolean>(false);
 
     // Определяем ориентацию и тип устройства
-    const {orientation, isMobile: isMobileDevice, isSafari} = useOrientation();
+    const {orientation, isMobile: isMobileDevice, isSafari, isAndroid, isIOS} = useOrientation();
 
     // Состояние для отслеживания свайпов по плееру
     const [isPlayerSwipeActive, setIsPlayerSwipeActive] = useState<boolean>(false);
@@ -152,14 +153,23 @@ export const Player: React.FC<PlayerProps> = ({
         const fetchCameraState = async () => {
             const result = await getCameraState(streamUrl, streamPort, authorization, camera ?? 0, protocol, proxy);
 
-            setIsH265Codec(result.result.state.video_streams.video.codec === 'h265');
+            const isH265 = result.result.state.video_streams.video.codec === 'h265';
+            setIsH265Codec(isH265);
             setIsNoSound(result.result.state.audio_streams.audio.signal === 'no');
+
+            // Если кодек H.265 и это не Android/iOS, показываем предупреждение и не запускаем воспроизведение
+            if (isH265 && !isAndroid && !isIOS) {
+                setShowH265Warning(true);
+                setIsPlaying(false); // Отключаем автовоспроизведение
+            } else {
+                setShowH265Warning(false);
+            }
         };
 
         if (authVerified && streamUrl && streamPort && authorization && Number.isInteger(camera as number)) {
             void fetchCameraState();
         }
-    }, [authVerified, streamUrl, streamPort, authorization, camera, protocol]);
+    }, [authVerified, streamUrl, streamPort, authorization, camera, protocol, proxy, isAndroid, isIOS]);
 
     const checkAvailability = useCallback(
         async (credentials: string) => {
@@ -188,7 +198,7 @@ export const Player: React.FC<PlayerProps> = ({
                 setIsCheckingAvailability(false);
             }
         },
-        [streamUrl, streamPort, protocol]
+        [streamUrl, streamPort, protocol, proxy]
     );
 
     // Функция для проверки авторизации при клике на кнопку "войти"
@@ -223,7 +233,7 @@ export const Player: React.FC<PlayerProps> = ({
             }
         };
         void loadCameras();
-    }, [authVerified, streamUrl, streamPort, authLogin, authPassword, camera, protocol]);
+    }, [authVerified, streamUrl, streamPort, authLogin, authPassword, camera, protocol, proxy]);
 
     // Устанавливаем начальные значения логина и пароля без автоматической проверки
     useEffect(() => {
@@ -810,7 +820,7 @@ export const Player: React.FC<PlayerProps> = ({
                             proxy={proxy}
                         />
                     )}
-                    {(serverUnavailable || authRequired) && (
+                    {(serverUnavailable || authRequired || showH265Warning) && (
                         <div
                             className={styles.overlay}
                             aria-live="polite"
@@ -863,6 +873,16 @@ export const Player: React.FC<PlayerProps> = ({
                                             </button>
                                         </div>
                                     </form>
+                                </div>
+                            )}
+                            {showH265Warning && (
+                                <div
+                                    className={styles.overlayCard}
+                                    role="alert"
+                                >
+                                    <div className={styles.overlayText}>
+                                        Ваш браузер не поддерживает кодек H.265 (HEVC).
+                                    </div>
                                 </div>
                             )}
                         </div>
