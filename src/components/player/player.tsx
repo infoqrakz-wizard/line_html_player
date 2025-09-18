@@ -33,6 +33,7 @@ export interface PlayerProps {
     protocol?: Protocol;
     showCameraSelector?: boolean;
     proxy?: string;
+    isUseProxy?: boolean;
 }
 
 export const Player: React.FC<PlayerProps> = ({
@@ -45,7 +46,8 @@ export const Player: React.FC<PlayerProps> = ({
     camera: initialCamera,
     protocol: preferredProtocol,
     showCameraSelector = false,
-    proxy = 'https://proxy.devline.ru'
+    proxy,
+    isUseProxy
 }) => {
     // Local auth state to allow updating credentials when 401 occurs
     const [authLogin, setAuthLogin] = useState<string>(login);
@@ -99,12 +101,15 @@ export const Player: React.FC<PlayerProps> = ({
     const [availableCameras, setAvailableCameras] = useState<CameraInfo[]>([]);
     const [camera, setCamera] = useState<number | undefined>(initialCamera);
 
+    // Обрабатываем логику proxy на уровне Player
+    const effectiveProxy = isUseProxy ? (proxy ?? 'https://proxy.devline.ru') : undefined;
+
     const getStreamUrl = (type: string, isNoSound: boolean, isMuted: boolean) =>
         buildRequestUrl({
             host: streamUrl,
             port: streamPort,
             protocol,
-            proxy,
+            proxy: effectiveProxy,
             path: `/cameras/${camera ?? 0}/streaming/main.${type}?authorization=Basic%20${getAuthToken(
                 `${authLogin}:${authPassword}`
             )}${!isMuted && !isNoSound ? '&audio=1' : ''}`
@@ -123,7 +128,7 @@ export const Player: React.FC<PlayerProps> = ({
         streamPort,
         authVerified ? authorization : undefined,
         protocol,
-        proxy
+        effectiveProxy
     );
 
     // Формирование URL для потока в зависимости от режима и серверного времени
@@ -151,7 +156,14 @@ export const Player: React.FC<PlayerProps> = ({
 
     useEffect(() => {
         const fetchCameraState = async () => {
-            const result = await getCameraState(streamUrl, streamPort, authorization, camera ?? 0, protocol, proxy);
+            const result = await getCameraState(
+                streamUrl,
+                streamPort,
+                authorization,
+                camera ?? 0,
+                protocol,
+                effectiveProxy
+            );
 
             const isH265 = result.result.state.video_streams.video.codec === 'h265';
             setIsH265Codec(isH265);
@@ -169,7 +181,7 @@ export const Player: React.FC<PlayerProps> = ({
         if (authVerified && streamUrl && streamPort && authorization && Number.isInteger(camera as number)) {
             void fetchCameraState();
         }
-    }, [authVerified, streamUrl, streamPort, authorization, camera, protocol, proxy, isAndroid, isIOS]);
+    }, [authVerified, streamUrl, streamPort, authorization, camera, protocol, effectiveProxy, isAndroid, isIOS]);
 
     const checkAvailability = useCallback(
         async (credentials: string) => {
@@ -180,7 +192,7 @@ export const Player: React.FC<PlayerProps> = ({
             setAuthRequired(false);
 
             try {
-                await getCamerasList(streamUrl, streamPort, credentials, undefined, protocol, proxy);
+                await getCamerasList(streamUrl, streamPort, credentials, 5000, protocol, effectiveProxy);
                 setAuthRequired(false);
                 setServerUnavailable(false);
                 setAuthVerified(true);
@@ -198,7 +210,7 @@ export const Player: React.FC<PlayerProps> = ({
                 setIsCheckingAvailability(false);
             }
         },
-        [streamUrl, streamPort, protocol, proxy]
+        [streamUrl, streamPort, protocol, effectiveProxy]
     );
 
     // Функция для проверки авторизации при клике на кнопку "войти"
@@ -223,9 +235,9 @@ export const Player: React.FC<PlayerProps> = ({
                     streamUrl,
                     streamPort,
                     `${authLogin}:${authPassword}`,
-                    undefined,
+                    5000,
                     protocol,
-                    proxy
+                    effectiveProxy
                 );
                 setAvailableCameras(list);
             } catch (err) {
@@ -233,7 +245,7 @@ export const Player: React.FC<PlayerProps> = ({
             }
         };
         void loadCameras();
-    }, [authVerified, streamUrl, streamPort, authLogin, authPassword, camera, protocol, proxy]);
+    }, [authVerified, streamUrl, streamPort, authLogin, authPassword, camera, protocol, effectiveProxy]);
 
     // Устанавливаем начальные значения логина и пароля без автоматической проверки
     useEffect(() => {
@@ -589,7 +601,7 @@ export const Player: React.FC<PlayerProps> = ({
             host: streamUrl,
             port: streamPort,
             protocol,
-            proxy,
+            proxy: effectiveProxy,
             path: `/cameras/${camera ?? 0}/streaming/main.mp4?authorization=Basic%20${getAuthToken(
                 `${authLogin}:${authPassword}`
             )}&time=${date}&duration=${formatDuration(durationSeconds)}&download=1&filename=${fileName}`
@@ -821,7 +833,7 @@ export const Player: React.FC<PlayerProps> = ({
                             credentials={authVerified ? authorization : ''}
                             camera={camera}
                             protocol={protocol}
-                            proxy={proxy}
+                            proxy={effectiveProxy}
                         />
                     )}
                     {(serverUnavailable || authRequired || showH265Warning) && (
@@ -912,7 +924,7 @@ export const Player: React.FC<PlayerProps> = ({
                             credentials={authVerified ? authorization : ''}
                             progress={ctxProgress}
                             camera={camera ?? 0}
-                            proxy={proxy}
+                            proxy={effectiveProxy}
                             popperBoundaryElement={containerRef.current}
                             popperPortalId={datepickerPortalIdRef.current}
                             timelineRef={timelineRef}
