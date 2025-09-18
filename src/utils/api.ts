@@ -63,11 +63,17 @@ export const getFramesTimeline = (params: GetFramesTimelineParams): Promise<Time
             port,
             protocol: preferredProtocol,
             proxy,
-            path: `/rpc?authorization=Basic ${getAuthToken(credentials)}&content-type=application/json`
+            path: proxy ? '/rpc' : `/rpc?authorization=Basic ${getAuthToken(credentials)}&content-type=application/json`
         });
 
         const xhr = new XMLHttpRequest();
         xhr.open('POST', rpcUrl, true);
+
+        // Если используется прокси, передаем через заголовки
+        if (proxy) {
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            xhr.setRequestHeader('Authorization', `Basic ${getAuthToken(credentials)}`);
+        }
 
         xhr.onload = function () {
             if (xhr.status >= 200 && xhr.status < 300) {
@@ -129,11 +135,17 @@ export const getServerTime = (
             port,
             protocol: protocol ?? getProtocol(),
             proxy,
-            path: `/rpc?authorization=Basic ${getAuthToken(credentials)}&content-type=application/json`
+            path: proxy ? '/rpc' : `/rpc?authorization=Basic ${getAuthToken(credentials)}&content-type=application/json`
         });
 
         const xhr = new XMLHttpRequest();
         xhr.open('POST', rpcUrl, true);
+
+        // Если используется прокси, передаем через заголовки
+        if (proxy) {
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            xhr.setRequestHeader('Authorization', `Basic ${getAuthToken(credentials)}`);
+        }
 
         xhr.onload = function () {
             if (xhr.status >= 200 && xhr.status < 300) {
@@ -189,11 +201,17 @@ export const getCameraState = (
             port,
             protocol: protocol ?? getProtocol(),
             proxy,
-            path: `/rpc?authorization=Basic ${getAuthToken(credentials)}&content-type=application/json`
+            path: proxy ? '/rpc' : `/rpc?authorization=Basic ${getAuthToken(credentials)}&content-type=application/json`
         });
 
         const xhr = new XMLHttpRequest();
         xhr.open('POST', rpcUrl, true);
+
+        // Если используется прокси, передаем через заголовки
+        if (proxy) {
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            xhr.setRequestHeader('Authorization', `Basic ${getAuthToken(credentials)}`);
+        }
 
         xhr.onload = function () {
             if (xhr.status >= 200 && xhr.status < 300) {
