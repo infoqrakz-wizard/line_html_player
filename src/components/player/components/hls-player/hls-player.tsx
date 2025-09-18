@@ -69,6 +69,22 @@ export const HlsPlayer = forwardRef<PlayerRef, HlsPlayerProps>((props, ref) => {
         }
     }, [playing, playingRef]);
 
+    // Дополнительный эффект для принудительного обновления воспроизведения
+    useEffect(() => {
+        const video = videoRef.current;
+        if (!video) return;
+
+        if (playing && video.paused) {
+            // Если должно воспроизводиться, но видео на паузе - запускаем
+            video.play().catch(error => {
+                console.error('Ошибка при принудительном запуске воспроизведения HLS:', error);
+            });
+        } else if (!playing && !video.paused) {
+            // Если не должно воспроизводиться, но видео играет - ставим на паузу
+            video.pause();
+        }
+    }, [playing]);
+
     useEffect(() => {
         mutedRef.current = muted;
         handleMuteToggle();
@@ -102,9 +118,29 @@ export const HlsPlayer = forwardRef<PlayerRef, HlsPlayerProps>((props, ref) => {
 
         if (isLoading) return;
 
-        video.play().catch(error => {
-            console.error('Ошибка при попытке воспроизведения:', error);
-        });
+        // Проверяем, что видео готово к воспроизведению
+        if (video.readyState >= 2) {
+            // HAVE_CURRENT_DATA
+            video.play().catch(error => {
+                console.error('Ошибка при попытке воспроизведения HLS:', error);
+                // Если воспроизведение не удалось, пробуем перезагрузить HLS
+                if (hlsRef.current) {
+                    hlsRef.current.startLoad();
+                }
+                setTimeout(() => {
+                    video.play().catch(console.error);
+                }, 100);
+            });
+        } else {
+            // Если видео еще не готово, ждем события canplay
+            const handleCanPlay = () => {
+                video.removeEventListener('canplay', handleCanPlay);
+                video.play().catch(error => {
+                    console.error('Ошибка при попытке воспроизведения HLS после canplay:', error);
+                });
+            };
+            video.addEventListener('canplay', handleCanPlay);
+        }
     };
 
     const handleMuteToggle = () => {

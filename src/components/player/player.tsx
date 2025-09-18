@@ -21,6 +21,8 @@ import Select from '../select/select';
 import styles from './player.module.scss';
 import {buildRequestUrl} from '../../utils/url-builder';
 
+const OVERLAY_TEXT_265 = 'Ваш браузер не поддерживает кодек H.265 (HEVC).';
+
 export interface PlayerProps {
     // Основные пропсы из DevLinePlayerProps
     streamUrl: string;
@@ -57,7 +59,6 @@ export const Player: React.FC<PlayerProps> = ({
     const [isFullscreen, setIsFullscreen] = useState(false);
     const {serverTime, setServerTime, progress: ctxProgress, setProgress} = useTime();
     const [showSaveModal, setShowSaveModal] = useState<boolean>(false);
-    const [isH265Codec, setIsH265Codec] = useState<boolean>(false);
     const [isNoSound, setIsNoSound] = useState<boolean>(false);
     const [showH265Warning, setShowH265Warning] = useState<boolean>(false);
 
@@ -166,7 +167,6 @@ export const Player: React.FC<PlayerProps> = ({
             );
 
             const isH265 = result.result.state.video_streams.video.codec === 'h265';
-            setIsH265Codec(isH265);
             setIsNoSound(result.result.state.audio_streams.audio.signal === 'no');
 
             // Если кодек H.265 и это не Android/iOS, показываем предупреждение и не запускаем воспроизведение
@@ -573,6 +573,16 @@ export const Player: React.FC<PlayerProps> = ({
 
                 if (wasPlayingBeforeHiddenRef.current) {
                     setIsPlaying(true);
+                    setTimeout(() => {
+                        if (playerRef.current) {
+                            const videoElement = playerRef.current as {videoRef?: {current?: HTMLVideoElement}};
+                            if (videoElement?.videoRef?.current) {
+                                videoElement.videoRef.current.play().catch((error: Error) => {
+                                    console.error('Ошибка при возобновлении воспроизведения:', error);
+                                });
+                            }
+                        }
+                    }, 100);
                 }
             };
 
@@ -801,14 +811,14 @@ export const Player: React.FC<PlayerProps> = ({
                                 {...props}
                                 updateServerTime={updateServerTime}
                                 setProgress={setProgress}
-                                overlayText={isH265Codec ? '265' : undefined}
+                                overlayText={showH265Warning ? OVERLAY_TEXT_265 : undefined}
                             />
                         ) : currentMode === 'record' ? (
                             <HlsPlayer
                                 isLandscape={isVerticalTimeline}
                                 ref={playerRef}
                                 {...props}
-                                overlayText={isH265Codec ? '265' : undefined}
+                                overlayText={showH265Warning ? OVERLAY_TEXT_265 : undefined}
                             />
                         ) : (
                             <VideoTag
@@ -817,7 +827,7 @@ export const Player: React.FC<PlayerProps> = ({
                                 {...props}
                                 updateServerTime={updateServerTime}
                                 setProgress={setProgress}
-                                overlayText={isH265Codec ? '265' : undefined}
+                                overlayText={showH265Warning ? OVERLAY_TEXT_265 : undefined}
                             />
                         )}
                     </div>
@@ -836,7 +846,7 @@ export const Player: React.FC<PlayerProps> = ({
                             proxy={effectiveProxy}
                         />
                     )}
-                    {(serverUnavailable || authRequired || showH265Warning) && (
+                    {(serverUnavailable || authRequired) && (
                         <div
                             className={styles.overlay}
                             aria-live="polite"
@@ -889,16 +899,6 @@ export const Player: React.FC<PlayerProps> = ({
                                             </button>
                                         </div>
                                     </form>
-                                </div>
-                            )}
-                            {showH265Warning && (
-                                <div
-                                    className={styles.overlayCard}
-                                    role="alert"
-                                >
-                                    <div className={styles.overlayText}>
-                                        Ваш браузер не поддерживает кодек H.265 (HEVC).
-                                    </div>
                                 </div>
                             )}
                         </div>
