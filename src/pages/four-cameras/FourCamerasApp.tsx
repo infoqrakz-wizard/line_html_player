@@ -1,5 +1,7 @@
 import React, {useState, useCallback} from 'react';
 import {Player} from '../../components/player/player';
+import {CameraMenu} from '../../components/camera-menu';
+import {HamburgerMenu} from '../../components/hamburger-menu';
 import {Mode, Protocol} from '../../utils/types';
 import {TimeProvider} from '../../context/time-context';
 import {TimelineAuthProvider} from '../../context/timeline-auth-context';
@@ -18,54 +20,36 @@ interface CameraConfig {
 
 interface FourCamerasAppProps {}
 
+const streamUrl = '8.devline.ru';
+const streamPort = 443;
+const login = 'monit';
+const password = 'monit';
+const protocol = Protocol.Https;
+
+const cameraMockData = {
+    id: 0,
+    name: 'Camera 1',
+    streamUrl,
+    streamPort,
+    login,
+    password,
+    protocol
+}
+
+type GridSize = 4 | 6 | 8 | 12;
+
 export const FourCamerasApp: React.FC<FourCamerasAppProps> = () => {
     const [expandedCamera, setExpandedCamera] = useState<number | null>(null);
+    const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
+    const [selectedCameraId, setSelectedCameraId] = useState<number | null>(null);
+    const [gridSize, setGridSize] = useState<GridSize>(4);
 
-    const streamUrl = '8.devline.ru';
-    const streamPort = 443;
-    const login = 'monit';
-    const password = 'monit';
-    const protocol = Protocol.Https;
 
     // Конфигурация камер - можно будет сделать настраиваемой через пропсы
-    const cameras: CameraConfig[] = [
-        {
-            id: 0,
-            name: 'Camera 1',
-            streamUrl,
-            streamPort,
-            login,
-            password,
-            protocol
-        },
-        {
-            id: 1,
-            name: 'Camera 2',
-            streamUrl,
-            streamPort,
-            login,
-            password,
-            protocol
-        },
-        {
-            id: 2,
-            name: 'Camera 3',
-            streamUrl,
-            streamPort,
-            login,
-            password,
-            protocol
-        },
-        {
-            id: 6,
-            name: 'Camera 4',
-            streamUrl,
-            streamPort,
-            login,
-            password,
-            protocol
-        }
-    ];
+    const cameras: CameraConfig[] = Array.from({length: 20}, (_, index) => ({
+        ...cameraMockData,
+        id: index
+    }));
 
     const handleCameraClick = useCallback((cameraId: number) => {
         setExpandedCamera(prev => (prev === cameraId ? null : cameraId));
@@ -73,6 +57,27 @@ export const FourCamerasApp: React.FC<FourCamerasAppProps> = () => {
 
     const handleCameraClose = useCallback(() => {
         setExpandedCamera(null);
+    }, []);
+
+    const handleCameraDoubleClick = useCallback((cameraId: number) => {
+        setExpandedCamera(cameraId);
+    }, []);
+
+    const handleMenuToggle = useCallback(() => {
+        setIsMenuOpen(prev => !prev);
+    }, []);
+
+    const handleMenuClose = useCallback(() => {
+        setIsMenuOpen(false);
+    }, []);
+
+    const handleCameraSelect = useCallback((cameraId: number) => {
+        setSelectedCameraId(cameraId);
+        setExpandedCamera(cameraId);
+    }, []);
+
+    const handleGridSizeChange = useCallback((newGridSize: GridSize) => {
+        setGridSize(newGridSize);
     }, []);
 
     // Если камера развернута, показываем только её
@@ -103,6 +108,7 @@ export const FourCamerasApp: React.FC<FourCamerasAppProps> = () => {
                                 protocol={camera.protocol}
                                 showCameraSelector={false}
                                 useSubStream={false}
+                                onDoubleClick={handleCameraClose}
                             />
                         </TimelineAuthProvider>
                     </TimeProvider>
@@ -115,21 +121,41 @@ export const FourCamerasApp: React.FC<FourCamerasAppProps> = () => {
     return (
         <div className={styles.fourCamerasView}>
             <div className={styles.header}>
-                <h1 className={styles.title}>Four Cameras View</h1>
+                <div className={styles.headerLeft}>
+                    <HamburgerMenu
+                        isOpen={isMenuOpen}
+                        onToggle={handleMenuToggle}
+                    />
+                    <h1 className={styles.title}>Cameras View</h1>
+                </div>
+                <div className={styles.gridSizeSelector}>
+                    <span className={styles.gridSizeLabel}>Сетка:</span>
+                    <div className={styles.gridSizeButtons}>
+                        {([4, 6, 8, 12] as const).map((size) => (
+                            <button
+                                key={size}
+                                className={`${styles.gridSizeButton} ${gridSize === size ? styles.active : ''}`}
+                                onClick={() => handleGridSizeChange(size)}
+                                aria-label={`Сетка ${size} камер`}
+                            >
+                                {size}
+                            </button>
+                        ))}
+                    </div>
+                </div>
             </div>
-            <div className={styles.camerasGrid}>
-                {cameras.map(camera => (
+            <div className={`${styles.camerasGrid} ${styles[`grid${gridSize}`]}`}>
+                {cameras.slice(0, gridSize).map(camera => (
                     <div
                         key={camera.id}
                         className={styles.cameraContainer}
-                        onClick={() => handleCameraClick(camera.id)}
                         role="button"
                         tabIndex={0}
-                        aria-label={`Развернуть ${camera.name}`}
+                        aria-label={`Развернуть ${camera.name} двойным кликом`}
                         onKeyDown={e => {
                             if (e.key === 'Enter' || e.key === ' ') {
                                 e.preventDefault();
-                                handleCameraClick(camera.id);
+                                handleCameraDoubleClick(camera.id);
                             }
                         }}
                     >
@@ -151,13 +177,21 @@ export const FourCamerasApp: React.FC<FourCamerasAppProps> = () => {
                                         showCameraSelector={false}
                                         muted={true} // Звук отключен для мини-плееров
                                         useSubStream={true} // Используем sub.mp4 для мини-плееров
+                                        hideControlsOnMouseLeave={true} // Скрываем контролы сразу при уходе мыши
+                                        onDoubleClick={() => handleCameraDoubleClick(camera.id)}
                                     />
                                 </TimelineAuthProvider>
                             </TimeProvider>
                         </div>
                     </div>
-                ))}
+                    ))}
             </div>
+            <CameraMenu
+                cameras={cameras}
+                isOpen={isMenuOpen}
+                onClose={handleMenuClose}
+                onCameraSelect={handleCameraSelect}
+            />
         </div>
     );
 };

@@ -14,6 +14,61 @@
     border-bottom: 1px solid #333;
     flex-shrink: 0;
     min-height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.headerLeft {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.gridSizeSelector {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.gridSizeLabel {
+    color: #ccc;
+    font-size: 0.9rem;
+    white-space: nowrap;
+}
+
+.gridSizeButtons {
+    display: flex;
+    gap: 0.25rem;
+}
+
+.gridSizeButton {
+    background: none;
+    border: 1px solid #555;
+    color: #ccc;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: all 0.2s ease;
+    min-width: 32px;
+
+    &:hover {
+        border-color: #777;
+        color: #fff;
+    }
+
+    &:focus {
+        outline: 2px solid #007acc;
+        outline-offset: 2px;
+    }
+
+    &.active {
+        background-color: #007acc;
+        border-color: #007acc;
+        color: #fff;
+    }
 }
 
 .title {
@@ -25,12 +80,31 @@
 .camerasGrid {
     flex: 1;
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    grid-template-rows: 1fr 1fr;
     gap: 2px;
     background-color: #333;
     padding: 2px;
     overflow: hidden;
+}
+
+// Размеры сетки
+.grid4 {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+}
+
+.grid6 {
+    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+}
+
+.grid8 {
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+}
+
+.grid12 {
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    grid-template-rows: 1fr 1fr 1fr;
 }
 
 .cameraContainer {
@@ -149,9 +223,53 @@
 
 // Responsive design for mobile devices
 @media (max-width: 768px) {
+    .header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+        padding: 0.75rem;
+    }
+    
+    .headerLeft {
+        width: 100%;
+        justify-content: space-between;
+    }
+    
+    .gridSizeSelector {
+        flex-wrap: wrap;
+        gap: 0.25rem;
+    }
+    
+    .gridSizeLabel {
+        font-size: 0.8rem;
+    }
+    
+    .gridSizeButton {
+        padding: 0.2rem 0.4rem;
+        font-size: 0.75rem;
+        min-width: 28px;
+    }
+    
+    // На мобильных устройствах используем вертикальную сетку
     .camerasGrid {
         grid-template-columns: 1fr;
+        grid-template-rows: repeat(auto-fit, 1fr);
+    }
+    
+    .grid4 {
         grid-template-rows: repeat(4, 1fr);
+    }
+    
+    .grid6 {
+        grid-template-rows: repeat(6, 1fr);
+    }
+    
+    .grid8 {
+        grid-template-rows: repeat(8, 1fr);
+    }
+    
+    .grid12 {
+        grid-template-rows: repeat(12, 1fr);
     }
     
     .cameraHeader {
@@ -171,6 +289,25 @@
 @media (max-width: 768px) and (orientation: landscape) {
     .camerasGrid {
         grid-template-columns: 1fr 1fr;
+    }
+    
+    .grid4 {
+        grid-template-columns: 1fr 1fr;
         grid-template-rows: 1fr 1fr;
+    }
+    
+    .grid6 {
+        grid-template-columns: 1fr 1fr 1fr;
+        grid-template-rows: 1fr 1fr;
+    }
+    
+    .grid8 {
+        grid-template-columns: 1fr 1fr 1fr 1fr;
+        grid-template-rows: 1fr 1fr;
+    }
+    
+    .grid12 {
+        grid-template-columns: 1fr 1fr 1fr 1fr;
+        grid-template-rows: 1fr 1fr 1fr;
     }
 }

@@ -37,6 +37,8 @@ export interface PlayerProps {
     proxy?: string;
     isUseProxy?: boolean;
     useSubStream?: boolean; // Флаг для использования sub.mp4 вместо main.mp4
+    hideControlsOnMouseLeave?: boolean; // Флаг для скрытия контролов сразу при уходе мыши
+    onDoubleClick?: () => void; // Обработчик двойного клика для кастомного поведения
 }
 
 export const Player: React.FC<PlayerProps> = ({
@@ -51,7 +53,9 @@ export const Player: React.FC<PlayerProps> = ({
     showCameraSelector = false,
     proxy,
     isUseProxy,
-    useSubStream = false
+    useSubStream = false,
+    hideControlsOnMouseLeave = false,
+    onDoubleClick
 }) => {
     // Local auth state to allow updating credentials when 401 occurs
     const [authLogin, setAuthLogin] = useState<string>(login);
@@ -322,9 +326,15 @@ export const Player: React.FC<PlayerProps> = ({
     };
 
     const handleMouseLeave = () => {
-        hideTimeoutRef.current = setTimeout(() => {
+        if (hideControlsOnMouseLeave) {
+            // Если флаг установлен - скрываем контролы сразу
             setShowControls(false);
-        }, 10000);
+        } else {
+            // По умолчанию - скрываем через 10 секунд
+            hideTimeoutRef.current = setTimeout(() => {
+                setShowControls(false);
+            }, 10000);
+        }
     };
 
     // Функции переключения камеры
@@ -765,6 +775,8 @@ export const Player: React.FC<PlayerProps> = ({
                 ref={containerRef}
                 role="region"
                 aria-label="Плеер видео"
+                onMouseEnter={hideControlsOnMouseLeave ? handleMouseEnter : undefined}
+                onMouseLeave={hideControlsOnMouseLeave ? handleMouseLeave : undefined}
             >
                 {showCameraSelector && (
                     <div
@@ -794,7 +806,7 @@ export const Player: React.FC<PlayerProps> = ({
                             width: '100%',
                             height: '100%'
                         }}
-                        onDoubleClick={handleToggleFullscreen}
+                        onDoubleClick={onDoubleClick || handleToggleFullscreen}
                         onTouchStart={handlePlayerTouchStart}
                         onTouchMove={handlePlayerTouchMove}
                         onTouchEnd={handlePlayerTouchEnd}
@@ -911,8 +923,8 @@ export const Player: React.FC<PlayerProps> = ({
                 <div
                     className={styles.controlArea}
                     ref={controlAreaRef}
-                    onMouseEnter={handleMouseEnter}
-                    onMouseLeave={handleMouseLeave}
+                    onMouseEnter={hideControlsOnMouseLeave ? undefined : handleMouseEnter}
+                    onMouseLeave={hideControlsOnMouseLeave ? undefined : handleMouseLeave}
                 >
                     <div className={`${styles.controlPanelContainer} ${showControls || isMobile ? styles.show : ''}`}>
                         <ControlPanel
