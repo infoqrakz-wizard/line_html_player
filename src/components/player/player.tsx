@@ -36,6 +36,7 @@ export interface PlayerProps {
     showCameraSelector?: boolean;
     proxy?: string;
     isUseProxy?: boolean;
+    useSubStream?: boolean; // Флаг для использования sub.mp4 вместо main.mp4
 }
 
 export const Player: React.FC<PlayerProps> = ({
@@ -49,7 +50,8 @@ export const Player: React.FC<PlayerProps> = ({
     protocol: preferredProtocol,
     showCameraSelector = false,
     proxy,
-    isUseProxy
+    isUseProxy,
+    useSubStream = false
 }) => {
     // Local auth state to allow updating credentials when 401 occurs
     const [authLogin, setAuthLogin] = useState<string>(login);
@@ -105,16 +107,18 @@ export const Player: React.FC<PlayerProps> = ({
     // Обрабатываем логику proxy на уровне Player
     const effectiveProxy = isUseProxy ? (proxy ?? 'https://proxy.devline.ru') : undefined;
 
-    const getStreamUrl = (type: string, isNoSound: boolean, isMuted: boolean) =>
-        buildRequestUrl({
+    const getStreamUrl = (type: string, isNoSound: boolean, isMuted: boolean) => {
+        const streamType = useSubStream ? 'sub' : 'main';
+        return buildRequestUrl({
             host: streamUrl,
             port: streamPort,
             protocol,
             proxy: effectiveProxy,
-            path: `/cameras/${camera ?? 0}/streaming/main.${type}?authorization=Basic%20${getAuthToken(
+            path: `/cameras/${camera ?? 0}/streaming/${streamType}.${type}?authorization=Basic%20${getAuthToken(
                 `${authLogin}:${authPassword}`
             )}${!isMuted && !isNoSound ? '&audio=1' : ''}`
         });
+    };
 
     // const posterUrl = `${protocol}://${streamUrl}:${streamPort}/cameras/${camera}/image?stream=main&authorization=Basic%20${btoa(`${login}:${password}`)}`;
 

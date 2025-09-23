@@ -14,6 +14,7 @@ module.exports = () => {
                 rewrites: [
                     {from: /^\/debug/, to: '/debug.html'},
                     {from: /^\/demo/, to: '/demo.html'},
+                    {from: /^\/four-cameras/, to: '/four-cameras.html'},
                     {from: /./, to: '/debug.html'}
                 ]
             },
@@ -126,6 +127,12 @@ module.exports = () => {
                 template: paths.templates.player,
                 filename: 'player.html',
                 chunks: []
+            }),
+            // HTML-плагин для четырех камер
+            new HtmlWebpackPlugin({
+                template: paths.templates.fourCameras,
+                filename: 'four-cameras.html',
+                chunks: ['fourCameras']
             })
         ]
     });
@@ -133,7 +140,8 @@ module.exports = () => {
     // Настройка точек входа
     config.entry = {
         'devline-player': paths.entries.library,
-        debug: paths.entries.debug
+        debug: paths.entries.debug,
+        fourCameras: paths.entries.fourCameras
     };
 
     return config;

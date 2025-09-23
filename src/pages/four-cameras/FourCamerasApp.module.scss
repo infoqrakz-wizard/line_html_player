@@ -1,0 +1,176 @@
+.fourCamerasView {
+    width: 100vw;
+    height: 100vh;
+    background-color: #000;
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.header {
+    padding: 0.5rem 1rem;
+    background-color: #1a1a1a;
+    border-bottom: 1px solid #333;
+    flex-shrink: 0;
+    min-height: 40px;
+}
+
+.title {
+    margin: 0;
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+.camerasGrid {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 2px;
+    background-color: #333;
+    padding: 2px;
+    overflow: hidden;
+}
+
+.cameraContainer {
+    background-color: #000;
+    display: flex;
+    flex-direction: column;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+    overflow: hidden;
+    min-height: 0; // Важно для правильного сжатия в grid
+
+    &:hover {
+        background-color: #111;
+        
+        .expandIcon {
+            opacity: 1;
+            transform: scale(1.1);
+        }
+    }
+
+    &:focus {
+        outline: 2px solid #007acc;
+        outline-offset: -2px;
+    }
+}
+
+.cameraHeader {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 10;
+    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.8), transparent);
+    padding: 0.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    pointer-events: none;
+}
+
+.cameraName {
+    margin: 0;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #fff;
+}
+
+.expandIcon {
+    font-size: 1rem;
+    opacity: 0.7;
+    transition: all 0.2s ease;
+    color: #fff;
+}
+
+.cameraPlayer {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    min-height: 0; // Важно для правильного сжатия
+}
+
+.expandedView {
+    width: 100vw;
+    height: 100vh;
+    background-color: #000;
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.expandedHeader {
+    padding: 0.5rem 1rem;
+    background-color: #1a1a1a;
+    border-bottom: 1px solid #333;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+    min-height: 40px;
+}
+
+.expandedTitle {
+    margin: 0;
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+.closeButton {
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: 4px;
+    transition: background-color 0.2s ease;
+
+    &:hover {
+        background-color: #333;
+    }
+
+    &:focus {
+        outline: 2px solid #007acc;
+        outline-offset: 2px;
+    }
+}
+
+.expandedPlayer {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    min-height: 0;
+}
+
+// Responsive design for mobile devices
+@media (max-width: 768px) {
+    .camerasGrid {
+        grid-template-columns: 1fr;
+        grid-template-rows: repeat(4, 1fr);
+    }
+    
+    .cameraHeader {
+        padding: 0.5rem;
+    }
+    
+    .cameraName {
+        font-size: 0.9rem;
+    }
+    
+    .expandIcon {
+        font-size: 1rem;
+    }
+}
+
+// Landscape orientation for mobile
+@media (max-width: 768px) and (orientation: landscape) {
+    .camerasGrid {
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: 1fr 1fr;
+    }
+}

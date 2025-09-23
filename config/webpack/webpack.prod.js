@@ -114,6 +114,12 @@ module.exports = () => {
                 filename: 'player.html',
                 chunks: [] // Не включаем никакие чанки, так как используем загрузчик
             }),
+            // Add HTML plugin for the four cameras page
+            new HtmlWebpackPlugin({
+                template: paths.templates.fourCameras,
+                filename: 'four-cameras.html',
+                chunks: ['fourCameras']
+            }),
             // Generate manifest file
             new WebpackManifestPlugin({
                 fileName: 'asset-manifest.json',
@@ -159,9 +165,10 @@ module.exports = () => {
         ]
     });
 
-    // Set entry point for the library
+    // Set entry points for the library and four cameras app
     config.entry = {
-        'devline-player': paths.entries.library
+        'devline-player': paths.entries.library,
+        fourCameras: paths.entries.fourCameras
     };
 
     return config;
