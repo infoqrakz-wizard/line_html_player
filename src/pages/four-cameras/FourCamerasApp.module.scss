@@ -4,32 +4,189 @@
     background-color: #000;
     color: #fff;
     display: flex;
+    flex-direction: row;
+    overflow: hidden;
+    position: relative;
+}
+
+// Вертикальная панель управления
+.controlPanel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 60px;
+    height: 100vh;
+    background-color: #1a1a1a;
+    border-left: 1px solid #333;
+    display: flex;
     flex-direction: column;
+    z-index: 1000;
+    transition: width 0.3s ease;
+}
+
+.controlPanel.expanded {
+    width: 320px;
+}
+
+.panelIcons {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 1rem 0;
+    gap: 1rem;
+}
+
+.gridIconContainer {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.gridIconButton {
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: background-color 0.2s ease;
+
+    &:hover {
+        background-color: rgba(255, 255, 255, 0.1);
+    }
+
+    &:focus {
+        outline: 2px solid #007acc;
+        outline-offset: 2px;
+    }
+}
+
+.gridIcon {
+    color: #ccc;
+    transition: color 0.2s ease;
+    
+    .gridIconButton:hover & {
+        color: #fff;
+    }
+}
+
+.gridTooltip {
+    position: absolute;
+    right: 70px;
+    top: 50%;
+    transform: translateY(-50%);
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    z-index: 1001;
+    animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-50%) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(-50%) scale(1);
+    }
+}
+
+.gridTooltipContent {
+    background-color: #2a2a2a;
+    border: 1px solid #555;
+    border-radius: 8px;
+    padding: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.gridTooltipButton {
+    background: none;
+    border: 1px solid #555;
+    color: #ccc;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: all 0.2s ease;
+    min-width: 32px;
+    text-align: center;
+
+    &:hover {
+        border-color: #777;
+        color: #fff;
+    }
+
+    &:focus {
+        outline: 2px solid #007acc;
+        outline-offset: 2px;
+    }
+
+    &.active {
+        background-color: #007acc;
+        border-color: #007acc;
+        color: #fff;
+    }
+}
+
+.panelHeader {
+    display: flex;
+    justify-content: flex-end;
+    padding: 1rem 1rem 0.5rem 1rem;
+    flex-shrink: 0;
+}
+
+.closeButton {
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: 4px;
+    transition: background-color 0.2s ease;
+
+    &:hover {
+        background-color: rgba(255, 255, 255, 0.1);
+    }
+
+    &:focus {
+        outline: 2px solid #007acc;
+        outline-offset: 2px;
+    }
+}
+
+.panelContent {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
     overflow: hidden;
 }
 
-.header {
-    padding: 0.5rem 1rem;
-    background-color: #1a1a1a;
-    border-bottom: 1px solid #333;
+.panelControls {
+    padding: 0 1rem;
     flex-shrink: 0;
-    min-height: 40px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
 }
 
-.headerLeft {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
+.panelTitle {
+    margin: 0 0 1.5rem 0;
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #fff;
 }
 
 .gridSizeSelector {
     display: flex;
-    align-items: center;
+    flex-direction: column;
     gap: 0.5rem;
+    margin-bottom: 1.5rem;
 }
 
 .gridSizeLabel {
@@ -41,6 +198,7 @@
 .gridSizeButtons {
     display: flex;
     gap: 0.25rem;
+    flex-wrap: wrap;
 }
 
 .gridSizeButton {
@@ -49,7 +207,7 @@
     color: #ccc;
     padding: 0.25rem 0.5rem;
     border-radius: 4px;
-    // cursor: pointer;
+    cursor: pointer;
     font-size: 0.8rem;
     transition: all 0.2s ease;
     min-width: 32px;
@@ -71,6 +229,166 @@
     }
 }
 
+// Фильтр камер
+.filterSection {
+    margin-bottom: 1.5rem;
+}
+
+.filterInput {
+    width: 100%;
+    padding: 0.5rem;
+    background-color: #2a2a2a;
+    border: 1px solid #555;
+    border-radius: 4px;
+    color: #fff;
+    font-size: 0.9rem;
+    transition: border-color 0.2s ease;
+
+    &:focus {
+        outline: none;
+        border-color: #007acc;
+    }
+
+    &::placeholder {
+        color: #888;
+    }
+}
+
+// Список камер
+.camerasListTitle {
+    color: #ccc;
+    font-size: 0.9rem;
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+    margin-top: 1rem;
+}
+
+.camerasListContent {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    overflow-y: auto;
+    flex: 1;
+    padding: 0 1rem 1rem 1rem;
+}
+
+.cameraListItem {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    background-color: #2a2a2a;
+    border: 1px solid #555;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-bottom: 0.5rem;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+
+    &:hover {
+        background-color: #333;
+    }
+
+    &:focus {
+        outline: 2px solid #007acc;
+        outline-offset: -2px;
+    }
+}
+
+// Стили для списка камер в правой панели
+.listCameraHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.listCameraNameContainer {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.listCameraName {
+    margin: 0;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #fff;
+    flex: 1;
+}
+
+.listStatusIndicator {
+    width: 8px;
+    height: 8px;
+    background-color: #4ade80;
+    border-radius: 50%;
+    flex-shrink: 0;
+    box-shadow: 0 0 4px rgba(74, 222, 128, 0.5);
+}
+
+// Стили для камер в основной сетке
+.cameraHeader {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 10;
+    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.8), transparent);
+    padding: 0.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    pointer-events: none;
+}
+
+.cameraNameContainer {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.cameraName {
+    margin: 0;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #fff;
+}
+
+.statusIndicator {
+    width: 8px;
+    height: 8px;
+    background-color: #4ade80;
+    border-radius: 50%;
+    flex-shrink: 0;
+    box-shadow: 0 0 4px rgba(74, 222, 128, 0.5);
+}
+
+.cameraPreview {
+    width: 100%;
+    height: 140px;
+    border-radius: 4px;
+    overflow: hidden;
+    background-color: #333;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.previewImage {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.noPreview {
+    color: #666;
+    font-size: 0.8rem;
+    text-align: center;
+    padding: 0.5rem;
+}
+
 .title {
     margin: 0;
     font-size: 1.2rem;
@@ -84,6 +402,12 @@
     background-color: #333;
     padding: 2px;
     overflow: hidden;
+    margin-right: 60px; // Отступ для панели управления
+    transition: margin-right 0.3s ease;
+}
+
+.fourCamerasView:has(.controlPanel.expanded) .camerasGrid {
+    margin-right: 320px; // Отступ для расширенной панели
 }
 
 // Размеры сетки
@@ -227,31 +551,64 @@
 
 // Responsive design for mobile devices
 @media (max-width: 768px) {
-    .header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 0.5rem;
-        padding: 0.75rem;
+    .controlPanel {
+        width: 50px;
     }
     
-    .headerLeft {
-        width: 100%;
-        justify-content: space-between;
+    .controlPanel.expanded {
+        width: 280px;
+    }
+    
+    .camerasGrid {
+        margin-right: 50px;
+    }
+    
+    .fourCamerasView:has(.controlPanel.expanded) .camerasGrid {
+        margin-right: 280px;
+    }
+    
+    .panelHeader {
+        padding: 0.75rem 0.75rem 0.4rem 0.75rem;
+    }
+    
+    .panelControls {
+        padding: 0 0.75rem;
+    }
+    
+    .camerasListContent {
+        padding: 0 0.75rem 0.75rem 0.75rem;
     }
     
     .gridSizeSelector {
-        flex-wrap: wrap;
-        gap: 0.25rem;
+        margin-bottom: 1rem;
     }
     
-    .gridSizeLabel {
+    .filterSection {
+        margin-bottom: 1rem;
+    }
+    
+    
+    .cameraListItem {
+        padding: 0.5rem;
+        gap: 0.4rem;
+    }
+    
+    .cameraPreview {
+        height: 60px;
+    }
+    
+    .listCameraName {
         font-size: 0.8rem;
     }
     
-    .gridSizeButton {
-        padding: 0.2rem 0.4rem;
-        font-size: 0.75rem;
-        min-width: 28px;
+    .noPreview {
+        font-size: 0.7rem;
+        padding: 0.3rem;
+    }
+    
+    .listStatusIndicator {
+        width: 6px;
+        height: 6px;
     }
     
     // На мобильных устройствах используем вертикальную сетку

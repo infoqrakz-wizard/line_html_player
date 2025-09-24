@@ -11,7 +11,7 @@ const LoaderGeneratorPlugin = require('./plugins/LoaderGeneratorPlugin');
 const PlayerStandalonePlugin = require('./plugins/PlayerStandalonePlugin');
 const path = require('path');
 
-module.exports = () => {
+module.exports = (env = {}) => {
     const config = merge(commonConfig, {
         mode: 'production',
         devtool: 'source-map',
@@ -118,7 +118,8 @@ module.exports = () => {
             new HtmlWebpackPlugin({
                 template: paths.templates.fourCameras,
                 filename: 'four-cameras.html',
-                chunks: ['fourCameras']
+                chunks: ['fourCameras'],
+                publicPath: env.fourCamerasPath ? `/${env.fourCamerasPath}/` : './'
             }),
             // Generate manifest file
             new WebpackManifestPlugin({

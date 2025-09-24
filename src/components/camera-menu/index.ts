@@ -1,1 +1,0 @@
-export {CameraMenu} from './CameraMenu';

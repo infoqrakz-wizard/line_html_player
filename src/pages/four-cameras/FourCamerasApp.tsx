@@ -1,5 +1,5 @@
 /* eslint-disable jsx-a11y/no-static-element-interactions */
-import React, {useState, useCallback} from 'react';
+import React, {useState, useCallback, useEffect, useRef} from 'react';
 import {
     DndContext,
     closestCenter,
@@ -12,8 +12,8 @@ import {
 } from '@dnd-kit/core';
 import {SortableContext, sortableKeyboardCoordinates, rectSortingStrategy, useSortable} from '@dnd-kit/sortable';
 import {Player} from '../../components/player/player';
-import {CameraMenu} from '../../components/camera-menu';
 import {HamburgerMenu} from '../../components/hamburger-menu';
+import {GridIcon} from '../../components/icons/GridIcon';
 import {Mode, Protocol} from '../../utils/types';
 import {TimeProvider} from '../../context/time-context';
 import {TimelineAuthProvider} from '../../context/timeline-auth-context';
@@ -69,20 +69,23 @@ const SortableCamera: React.FC<SortableCameraProps> = ({camera, onDoubleClick, i
     };
 
     // Обработчик для предотвращения перетаскивания при клике в controlArea
-    const handlePointerDown = useCallback((event: React.PointerEvent) => {
-        const target = event.target as HTMLElement;
-        // Проверяем, произошло ли событие в области контролов плеера
-        if (
-            target.closest('[class*="controlArea"]') ||
-            target.closest('[class*="controlPanel"]') ||
-            target.closest('[class*="timeline"]')
-        ) {
-            event.stopPropagation();
-            return;
-        }
+    const handlePointerDown = useCallback(
+        (event: React.PointerEvent) => {
+            const target = event.target as HTMLElement;
+            // Проверяем, произошло ли событие в области контролов плеера
+            if (
+                target.closest('[class*="controlArea"]') ||
+                target.closest('[class*="controlPanel"]') ||
+                target.closest('[class*="timeline"]')
+            ) {
+                event.stopPropagation();
+                return;
+            }
 
-        listeners?.onPointerDown(event);
-    }, []);
+            listeners?.onPointerDown(event);
+        },
+        [listeners]
+    );
 
     return (
         <div
@@ -133,6 +136,9 @@ const SortableCamera: React.FC<SortableCameraProps> = ({camera, onDoubleClick, i
 export const FourCamerasApp: React.FC<FourCamerasAppProps> = () => {
     const [expandedCamera, setExpandedCamera] = useState<number | null>(null);
     const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
+    const [isPanelExpanded, setIsPanelExpanded] = useState<boolean>(false);
+    const [filterText, setFilterText] = useState<string>('');
+    const [isGridTooltipOpen, setIsGridTooltipOpen] = useState<boolean>(false);
     const [gridSize, setGridSize] = useState<GridSize>(4);
     const [cameraOrder, setCameraOrder] = useState<number[]>([
         0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19
@@ -156,10 +162,12 @@ export const FourCamerasApp: React.FC<FourCamerasAppProps> = () => {
 
     const handleMenuToggle = useCallback(() => {
         setIsMenuOpen(prev => !prev);
+        setIsPanelExpanded(prev => !prev);
     }, []);
 
     const handleMenuClose = useCallback(() => {
         setIsMenuOpen(false);
+        setIsPanelExpanded(false);
     }, []);
 
     const handleCameraSelect = useCallback((cameraId: number) => {
@@ -168,7 +176,65 @@ export const FourCamerasApp: React.FC<FourCamerasAppProps> = () => {
 
     const handleGridSizeChange = useCallback((newGridSize: GridSize) => {
         setGridSize(newGridSize);
+        setIsGridTooltipOpen(false); // Закрываем тултип после выбора
     }, []);
+
+    const handleGridIconClick = useCallback(() => {
+        setIsGridTooltipOpen(prev => !prev);
+    }, []);
+
+    const handleFilterChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+        setFilterText(e.target.value);
+    }, []);
+
+    // Фильтрация камер
+    const filteredCameras = cameras.filter(camera => camera.name.toLowerCase().includes(filterText.toLowerCase()));
+
+    // Функция для получения URL превью камеры
+    const getCameraPreviewUrl = useCallback(
+        (
+            cameraId: number,
+            streamUrl: string,
+            streamPort: number,
+            login: string,
+            password: string = '',
+            protocol: Protocol = Protocol.Https
+        ) => {
+            if (!streamUrl || !streamPort || !login) {
+                return '';
+            }
+
+            const credentials = btoa(`${login}:${password}`);
+            const protocolString = protocol === Protocol.Http ? 'http' : 'https';
+
+            if (protocol === Protocol.Http) {
+                return `https://proxy.devline.ru/${streamUrl}/${streamPort}/cameras/${cameraId}/image?authorization=Basic%20${credentials}&stream=main`;
+            }
+
+            return `${protocolString}://${streamUrl}:${streamPort}/cameras/${cameraId}/image?authorization=Basic%20${credentials}&stream=main`;
+        },
+        []
+    );
+
+    // Ref для тултипа грида
+    const gridTooltipRef = useRef<HTMLDivElement>(null);
+
+    // Обработка кликов вне тултипа грида
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (gridTooltipRef.current && !gridTooltipRef.current.contains(event.target as Node)) {
+                setIsGridTooltipOpen(false);
+            }
+        };
+
+        if (isGridTooltipOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [isGridTooltipOpen]);
 
     // Настройка сенсоров для drag and drop
     const sensors = useSensors(
@@ -297,29 +363,156 @@ export const FourCamerasApp: React.FC<FourCamerasAppProps> = () => {
             onDragEnd={handleDragEnd}
         >
             <div className={styles.fourCamerasView}>
-                <div className={styles.header}>
-                    <div className={styles.headerLeft}>
-                        <HamburgerMenu
-                            isOpen={isMenuOpen}
-                            onToggle={handleMenuToggle}
-                        />
-                        <h1 className={styles.title}>Cameras View</h1>
-                    </div>
-                    <div className={styles.gridSizeSelector}>
-                        <span className={styles.gridSizeLabel}>Сетка:</span>
-                        <div className={styles.gridSizeButtons}>
-                            {([4, 6, 8, 12] as const).map(size => (
+                {/* Вертикальная панель управления */}
+                <div className={`${styles.controlPanel} ${isPanelExpanded ? styles.expanded : ''}`}>
+                    {/* Иконки в свернутом виде */}
+                    {!isPanelExpanded && (
+                        <div className={styles.panelIcons}>
+                            <HamburgerMenu
+                                isOpen={isMenuOpen}
+                                onToggle={handleMenuToggle}
+                            />
+                            <div className={styles.gridIconContainer}>
                                 <button
-                                    key={size}
-                                    className={`${styles.gridSizeButton} ${gridSize === size ? styles.active : ''}`}
-                                    onClick={() => handleGridSizeChange(size)}
-                                    aria-label={`Сетка ${size} камер`}
+                                    className={styles.gridIconButton}
+                                    onClick={handleGridIconClick}
+                                    aria-label="Выбрать размер сетки"
+                                    aria-expanded={isGridTooltipOpen}
                                 >
-                                    {size}
+                                    <GridIcon
+                                        className={styles.gridIcon}
+                                        size={20}
+                                    />
                                 </button>
-                            ))}
+                                {isGridTooltipOpen && (
+                                    <div
+                                        className={styles.gridTooltip}
+                                        ref={gridTooltipRef}
+                                    >
+                                        <div className={styles.gridTooltipContent}>
+                                            {([4, 6, 8, 12] as const).map(size => (
+                                                <button
+                                                    key={size}
+                                                    className={`${styles.gridTooltipButton} ${gridSize === size ? styles.active : ''}`}
+                                                    onClick={() => handleGridSizeChange(size)}
+                                                    aria-label={`Сетка ${size} камер`}
+                                                >
+                                                    {size}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
                         </div>
-                    </div>
+                    )}
+
+                    {/* Кнопка закрытия в правом верхнем углу при раскрытой панели */}
+                    {isPanelExpanded && (
+                        <div className={styles.panelHeader}>
+                            <button
+                                className={styles.closeButton}
+                                onClick={handleMenuToggle}
+                                aria-label="Закрыть панель"
+                            >
+                                ✕
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Расширенная панель */}
+                    {isPanelExpanded && (
+                        <div className={styles.panelContent}>
+                            {/* Фиксированные элементы управления */}
+                            <div className={styles.panelControls}>
+                                {/* Селектор сетки */}
+                                <div className={styles.gridSizeSelector}>
+                                    <span className={styles.gridSizeLabel}>Сетка:</span>
+                                    <div className={styles.gridSizeButtons}>
+                                        {([4, 6, 8, 12] as const).map(size => (
+                                            <button
+                                                key={size}
+                                                className={`${styles.gridSizeButton} ${gridSize === size ? styles.active : ''}`}
+                                                onClick={() => handleGridSizeChange(size)}
+                                                aria-label={`Сетка ${size} камер`}
+                                            >
+                                                {size}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Фильтр камер */}
+                                <div className={styles.filterSection}>
+                                    <input
+                                        type="text"
+                                        placeholder="Фильтр камер..."
+                                        value={filterText}
+                                        onChange={handleFilterChange}
+                                        className={styles.filterInput}
+                                    />
+                                </div>
+
+                                {/* Заголовок списка камер */}
+                                <div className={styles.camerasListTitle}>Все камеры:</div>
+                            </div>
+
+                            {/* Скроллируемый список камер */}
+                            <div className={styles.camerasListContent}>
+                                {filteredCameras.map(camera => {
+                                    const previewUrl = getCameraPreviewUrl(
+                                        camera.id,
+                                        camera.streamUrl,
+                                        camera.streamPort,
+                                        camera.login,
+                                        camera.password,
+                                        camera.protocol
+                                    );
+                                    const isActive = cameraOrder.slice(0, gridSize).includes(camera.id);
+
+                                    return (
+                                        <div
+                                            key={camera.id}
+                                            className={`${styles.cameraListItem}`}
+                                            onClick={() => handleCameraSelect(camera.id)}
+                                            onKeyDown={e => {
+                                                if (e.key === 'Enter' || e.key === ' ') {
+                                                    e.preventDefault();
+                                                    handleCameraSelect(camera.id);
+                                                }
+                                            }}
+                                            tabIndex={0}
+                                            role="button"
+                                            aria-label={`Выбрать ${camera.name}`}
+                                        >
+                                            <div className={styles.listCameraHeader}>
+                                                <div className={styles.listCameraNameContainer}>
+                                                    <h4 className={styles.listCameraName}>{camera.name}</h4>
+                                                    {isActive && <div className={styles.listStatusIndicator}></div>}
+                                                </div>
+                                            </div>
+                                            <div className={styles.cameraPreview}>
+                                                {previewUrl ? (
+                                                    <img
+                                                        src={previewUrl}
+                                                        alt={`Предпросмотр ${camera.name}`}
+                                                        className={styles.previewImage}
+                                                        onError={e => {
+                                                            (e.target as HTMLImageElement).style.display = 'none';
+                                                        }}
+                                                    />
+                                                ) : (
+                                                    <div className={styles.noPreview}>
+                                                        <span>Нет изображения</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
                 </div>
                 <div className={`${styles.camerasGrid} ${styles[`grid${gridSize}`]}`}>
                     <SortableContext
@@ -342,13 +535,6 @@ export const FourCamerasApp: React.FC<FourCamerasAppProps> = () => {
                         })}
                     </SortableContext>
                 </div>
-                <CameraMenu
-                    cameras={cameras}
-                    isOpen={isMenuOpen}
-                    onClose={handleMenuClose}
-                    onCameraSelect={handleCameraSelect}
-                    activeCameraIds={cameraOrder.slice(0, gridSize)}
-                />
             </div>
         </DndContext>
     );

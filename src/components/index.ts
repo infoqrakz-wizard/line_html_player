@@ -5,5 +5,4 @@ export {LivePlayer} from './live-player';
 export {RecordDownload} from './record-download';
 export {Poster} from './poster';
 export {Player} from './player';
-export {CameraMenu} from './camera-menu';
 export {HamburgerMenu} from './hamburger-menu';

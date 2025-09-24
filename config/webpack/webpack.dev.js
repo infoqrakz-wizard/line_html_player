@@ -5,7 +5,7 @@ const HtmlWebpackPlugin = require('html-webpack-plugin');
 const ReactRefreshWebpackPlugin = require('@pmmmwh/react-refresh-webpack-plugin');
 const commonConfig = require('./webpack.common');
 
-module.exports = () => {
+module.exports = (env = {}) => {
     const config = merge(commonConfig, {
         mode: 'development',
         devtool: 'inline-source-map',
@@ -132,7 +132,8 @@ module.exports = () => {
             new HtmlWebpackPlugin({
                 template: paths.templates.fourCameras,
                 filename: 'four-cameras.html',
-                chunks: ['fourCameras']
+                chunks: ['fourCameras'],
+                publicPath: env.fourCamerasPath ? `/${env.fourCamerasPath}/` : './'
             })
         ]
     });
