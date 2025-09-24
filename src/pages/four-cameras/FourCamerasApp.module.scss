@@ -134,56 +134,14 @@
         opacity: 0.5;
         z-index: 1000;
         cursor: grabbing !important;
+        transform: none !important;
     }
 
     &.hovered {
-        outline: solid blue;
-        background-color: rgba(0, 122, 204, 0.1);
-        // transform: scale(1.02);
+        outline: 2px solid #007acc;
     }
 }
 
-// Индикаторы вставки через псевдоэлементы
-.insertionBefore {
-    &::before {
-        content: '';
-        position: absolute;
-        top: -2px;
-        left: 0;
-        right: 0;
-        height: 4px;
-        background-color: #007acc;
-        border-radius: 2px;
-        opacity: 0.8;
-        z-index: 1001;
-        animation: pulse 1s ease-in-out infinite;
-    }
-}
-
-.insertionAfter {
-    &::after {
-        content: '';
-        position: absolute;
-        bottom: -2px;
-        left: 0;
-        right: 0;
-        height: 4px;
-        background-color: #007acc;
-        border-radius: 2px;
-        opacity: 0.8;
-        z-index: 1001;
-        animation: pulse 1s ease-in-out infinite;
-    }
-}
-
-@keyframes pulse {
-    0%, 100% {
-        opacity: 0.8;
-    }
-    50% {
-        opacity: 0.4;
-    }
-}
 
 .cameraHeader {
     position: absolute;

@@ -8,17 +8,9 @@ import {
     useSensor,
     useSensors,
     DragEndEvent,
-    DragOverEvent,
-    DragStartEvent
+    DragOverEvent
 } from '@dnd-kit/core';
-import {
-    arrayMove,
-    SortableContext,
-    sortableKeyboardCoordinates,
-    rectSortingStrategy,
-    useSortable
-} from '@dnd-kit/sortable';
-import {CSS} from '@dnd-kit/utilities';
+import {SortableContext, sortableKeyboardCoordinates, rectSortingStrategy, useSortable} from '@dnd-kit/sortable';
 import {Player} from '../../components/player/player';
 import {CameraMenu} from '../../components/camera-menu';
 import {HamburgerMenu} from '../../components/hamburger-menu';
@@ -64,25 +56,15 @@ interface SortableCameraProps {
     onDoubleClick: (cameraId: number) => void;
     isHovered: boolean;
     index: number;
-    showInsertionBefore: boolean;
-    showInsertionAfter: boolean;
 }
 
-const SortableCamera: React.FC<SortableCameraProps> = ({
-    camera,
-    onDoubleClick,
-    isHovered,
-    index,
-    showInsertionBefore,
-    showInsertionAfter
-}) => {
-    const {attributes, listeners, setNodeRef, transform, transition, isDragging} = useSortable({
+const SortableCamera: React.FC<SortableCameraProps> = ({camera, onDoubleClick, isHovered, index}) => {
+    const {attributes, listeners, setNodeRef, transition, isDragging} = useSortable({
         id: `${index}-${camera.id}`
     });
 
     const style = {
-        transform: CSS.Transform.toString(transform),
-        transition,
+        transition: isDragging ? 'none' : transition,
         opacity: isDragging ? 0.5 : 1
     };
 
@@ -108,7 +90,7 @@ const SortableCamera: React.FC<SortableCameraProps> = ({
             data-index={index}
             data-camera-id={camera.id}
             style={style}
-            className={`${styles.cameraContainer} ${isDragging ? styles.dragging : ''} ${isHovered ? styles.hovered : ''} ${showInsertionBefore ? styles.insertionBefore : ''} ${showInsertionAfter ? styles.insertionAfter : ''}`}
+            className={`${styles.cameraContainer} ${isDragging ? styles.dragging : ''} ${isHovered ? styles.hovered : ''}`}
             aria-label={`Перетащить и развернуть ${camera.name} двойным кликом`}
             onKeyDown={e => {
                 if (e.key === 'Enter' || e.key === ' ') {
@@ -151,14 +133,11 @@ const SortableCamera: React.FC<SortableCameraProps> = ({
 export const FourCamerasApp: React.FC<FourCamerasAppProps> = () => {
     const [expandedCamera, setExpandedCamera] = useState<number | null>(null);
     const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
-    const [selectedCameraId, setSelectedCameraId] = useState<number | null>(null);
     const [gridSize, setGridSize] = useState<GridSize>(4);
     const [cameraOrder, setCameraOrder] = useState<number[]>([
         0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19
     ]);
-    const [draggedCamera, setDraggedCamera] = useState<number | null>(null);
     const [hoveredCameraId, setHoveredCameraId] = useState<string | null>(null);
-    const [insertionIndex, setInsertionIndex] = useState<number | null>(null);
 
     // Конфигурация камер - можно будет сделать настраиваемой через пропсы
     const cameras: CameraConfig[] = Array.from({length: 20}, (_, index) => ({
@@ -184,7 +163,6 @@ export const FourCamerasApp: React.FC<FourCamerasAppProps> = () => {
     }, []);
 
     const handleCameraSelect = useCallback((cameraId: number) => {
-        setSelectedCameraId(cameraId);
         setExpandedCamera(cameraId);
     }, []);
 
@@ -205,44 +183,20 @@ export const FourCamerasApp: React.FC<FourCamerasAppProps> = () => {
     );
 
     // Обработчик начала перетаскивания
-    const handleDragStart = useCallback((event: DragStartEvent) => {
-        const {active} = event;
-        const activeId = active.id as number;
-        setDraggedCamera(activeId);
-
+    const handleDragStart = useCallback(() => {
         // Добавляем класс на body для курсора
         document.body.classList.add('dragging-active');
     }, []);
 
     // Обработчик hover при перетаскивании
     const handleDragOver = useCallback((event: DragOverEvent) => {
-        const {over, active} = event;
+        const {over} = event;
 
         if (over) {
             const overId = over.id as string;
             setHoveredCameraId(overId);
-
-            // Вычисляем индекс вставки на основе позиции элемента
-            const overIndex = parseInt(overId.split('-')[0]);
-            const activeId = active.id as string;
-
-            // Если перетаскиваем внутри сетки
-            if (!activeId.startsWith('camera-')) {
-                const activeIndex = parseInt(activeId.split('-')[0]);
-
-                // Определяем направление вставки
-                if (activeIndex < overIndex) {
-                    setInsertionIndex(overIndex + 1);
-                } else {
-                    setInsertionIndex(overIndex);
-                }
-            } else {
-                // Если перетаскиваем из меню, вставляем перед элементом
-                setInsertionIndex(overIndex);
-            }
         } else {
             setHoveredCameraId(null);
-            setInsertionIndex(null);
         }
     }, []);
 
@@ -251,10 +205,7 @@ export const FourCamerasApp: React.FC<FourCamerasAppProps> = () => {
         const {active, over} = event;
         const activeId = active.id as string;
 
-        // Сброс состояний
-        setDraggedCamera(null);
         setHoveredCameraId(null);
-        setInsertionIndex(null);
 
         // Удаляем класс с body
         document.body.classList.remove('dragging-active');
@@ -264,7 +215,6 @@ export const FourCamerasApp: React.FC<FourCamerasAppProps> = () => {
         // Если перетаскиваем камеру из меню
         if (typeof activeId === 'string' && activeId.startsWith('camera-')) {
             const draggedCameraId = Number(activeId.replace('camera-', ''));
-
             const targetCameraId = Number((over.id as string).split('-')[1]);
 
             // Заменяем камеру в сетке
@@ -281,10 +231,12 @@ export const FourCamerasApp: React.FC<FourCamerasAppProps> = () => {
             // Обычная перестановка камер в сетке
             if (over && active.id !== over.id) {
                 setCameraOrder(items => {
-                    const oldIndex = items.indexOf(Number(active.id));
-                    const newIndex = items.indexOf(Number(over.id));
+                    const [activeCameraIndex, activeCameraId] = (active.id as string).split('-').map(Number);
+                    const [overCameraIndex, overCameraId] = (over.id as string).split('-').map(Number);
 
-                    return arrayMove(items, oldIndex, newIndex);
+                    items[activeCameraIndex] = overCameraId;
+                    items[overCameraIndex] = activeCameraId;
+                    return items;
                 });
             }
         }
@@ -373,11 +325,10 @@ export const FourCamerasApp: React.FC<FourCamerasAppProps> = () => {
                     <SortableContext
                         items={cameraOrder.slice(0, gridSize).map((cameraId, index) => `${index}-${cameraId}`)}
                         strategy={rectSortingStrategy}
+                        // disabled={true}
                     >
                         {cameraOrder.slice(0, gridSize).map((cameraId, index) => {
                             const camera = cameras[cameraId];
-                            const showInsertionBefore = insertionIndex === index;
-                            const showInsertionAfter = insertionIndex === index + 1;
 
                             return (
                                 <SortableCamera
@@ -386,8 +337,6 @@ export const FourCamerasApp: React.FC<FourCamerasAppProps> = () => {
                                     camera={camera}
                                     onDoubleClick={handleCameraDoubleClick}
                                     isHovered={hoveredCameraId === `${index}-${camera.id}`}
-                                    showInsertionBefore={showInsertionBefore}
-                                    showInsertionAfter={showInsertionAfter}
                                 />
                             );
                         })}
