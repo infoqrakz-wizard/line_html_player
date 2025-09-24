@@ -141,11 +141,27 @@
     gap: 0.25rem;
 }
 
+.cameraNameContainer {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
 .cameraName {
     margin: 0;
     font-size: 1rem;
     font-weight: 500;
     color: #fff;
+    flex: 1;
+}
+
+.statusIndicator {
+    width: 8px;
+    height: 8px;
+    background-color: #4ade80;
+    border-radius: 50%;
+    flex-shrink: 0;
+    box-shadow: 0 0 4px rgba(74, 222, 128, 0.5);
 }
 
 .cameraId {

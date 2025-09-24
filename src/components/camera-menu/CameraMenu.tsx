@@ -19,15 +19,17 @@ interface CameraMenuProps {
     isOpen: boolean;
     onClose: () => void;
     onCameraSelect: (cameraId: number) => void;
+    activeCameraIds: number[];
 }
 
 // Компонент для перетаскиваемой камеры в меню
 interface DraggableCameraItemProps {
     camera: CameraInfo;
     onCameraSelect: (cameraId: number) => void;
+    isActive: boolean;
 }
 
-const DraggableCameraItem: React.FC<DraggableCameraItemProps> = ({camera, onCameraSelect}) => {
+const DraggableCameraItem: React.FC<DraggableCameraItemProps> = ({camera, onCameraSelect, isActive}) => {
     const {attributes, listeners, setNodeRef, transform, isDragging} = useDraggable({
         id: `camera-${camera.id}`,
         data: {
@@ -104,14 +106,17 @@ const DraggableCameraItem: React.FC<DraggableCameraItemProps> = ({camera, onCame
                 )}
             </div>
             <div className={styles.cameraInfo}>
-                <h4 className={styles.cameraName}>{camera.name}</h4>
+                <div className={styles.cameraNameContainer}>
+                    <h4 className={styles.cameraName}>{camera.name}</h4>
+                    {isActive && <div className={styles.statusIndicator}></div>}
+                </div>
                 <span className={styles.cameraId}>ID: {camera.id}</span>
             </div>
         </div>
     );
 };
 
-export const CameraMenu: React.FC<CameraMenuProps> = ({cameras, isOpen, onClose, onCameraSelect}) => {
+export const CameraMenu: React.FC<CameraMenuProps> = ({cameras, isOpen, onClose, onCameraSelect, activeCameraIds}) => {
     const handleCameraClick = useCallback(
         (cameraId: number) => {
             onCameraSelect(cameraId);
@@ -123,10 +128,6 @@ export const CameraMenu: React.FC<CameraMenuProps> = ({cameras, isOpen, onClose,
     if (!isOpen) return null;
 
     return (
-        // <div
-        //     className={styles.backdrop}
-        //     onClick={handleBackdropClick}
-        // >
         <div className={styles.menu}>
             <div className={styles.header}>
                 <h3 className={styles.title}>Выбор камеры</h3>
@@ -138,16 +139,16 @@ export const CameraMenu: React.FC<CameraMenuProps> = ({cameras, isOpen, onClose,
                     ✕
                 </button>
             </div>
-            <div className={styles.camerasList}>
-                {cameras.map(camera => (
-                    <DraggableCameraItem
-                        key={camera.id}
-                        camera={camera}
-                        onCameraSelect={handleCameraClick}
-                    />
-                ))}
-            </div>
+                <div className={styles.camerasList}>
+                    {cameras.map(camera => (
+                        <DraggableCameraItem
+                            key={camera.id}
+                            camera={camera}
+                            onCameraSelect={handleCameraClick}
+                            isActive={activeCameraIds.includes(camera.id)}
+                        />
+                    ))}
+                </div>
         </div>
-        // </div>
     );
 };

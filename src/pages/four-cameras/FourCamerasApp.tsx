@@ -68,7 +68,14 @@ interface SortableCameraProps {
     showInsertionAfter: boolean;
 }
 
-const SortableCamera: React.FC<SortableCameraProps> = ({camera, onDoubleClick, isHovered, index, showInsertionBefore, showInsertionAfter}) => {
+const SortableCamera: React.FC<SortableCameraProps> = ({
+    camera,
+    onDoubleClick,
+    isHovered,
+    index,
+    showInsertionBefore,
+    showInsertionAfter
+}) => {
     const {attributes, listeners, setNodeRef, transform, transition, isDragging} = useSortable({
         id: `${index}-${camera.id}`
     });
@@ -360,35 +367,36 @@ export const FourCamerasApp: React.FC<FourCamerasAppProps> = () => {
                         </div>
                     </div>
                 </div>
-                 <div className={`${styles.camerasGrid} ${styles[`grid${gridSize}`]}`}>
-                     <SortableContext
-                         items={cameraOrder.slice(0, gridSize).map((cameraId, index) => `${index}-${cameraId}`)}
-                         strategy={rectSortingStrategy}
-                     >
-                         {cameraOrder.slice(0, gridSize).map((cameraId, index) => {
-                             const camera = cameras[cameraId];
-                             const showInsertionBefore = insertionIndex === index;
-                             const showInsertionAfter = insertionIndex === index + 1;
+                <div className={`${styles.camerasGrid} ${styles[`grid${gridSize}`]}`}>
+                    <SortableContext
+                        items={cameraOrder.slice(0, gridSize).map((cameraId, index) => `${index}-${cameraId}`)}
+                        strategy={rectSortingStrategy}
+                    >
+                        {cameraOrder.slice(0, gridSize).map((cameraId, index) => {
+                            const camera = cameras[cameraId];
+                            const showInsertionBefore = insertionIndex === index;
+                            const showInsertionAfter = insertionIndex === index + 1;
 
-                             return (
-                                 <SortableCamera
-                                     key={`camera-${camera.id}-${index}`}
-                                     index={index}
-                                     camera={camera}
-                                     onDoubleClick={handleCameraDoubleClick}
-                                     isHovered={hoveredCameraId === `${index}-${camera.id}`}
-                                     showInsertionBefore={showInsertionBefore}
-                                     showInsertionAfter={showInsertionAfter}
-                                 />
-                             );
-                         })}
-                     </SortableContext>
-                 </div>
+                            return (
+                                <SortableCamera
+                                    key={`camera-${camera.id}-${index}`}
+                                    index={index}
+                                    camera={camera}
+                                    onDoubleClick={handleCameraDoubleClick}
+                                    isHovered={hoveredCameraId === `${index}-${camera.id}`}
+                                    showInsertionBefore={showInsertionBefore}
+                                    showInsertionAfter={showInsertionAfter}
+                                />
+                            );
+                        })}
+                    </SortableContext>
+                </div>
                 <CameraMenu
                     cameras={cameras}
                     isOpen={isMenuOpen}
                     onClose={handleMenuClose}
                     onCameraSelect={handleCameraSelect}
+                    activeCameraIds={cameraOrder.slice(0, gridSize)}
                 />
             </div>
         </DndContext>
