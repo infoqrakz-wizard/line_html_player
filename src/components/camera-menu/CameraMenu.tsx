@@ -1,4 +1,7 @@
-import React, {useState, useCallback} from 'react';
+/* eslint-disable jsx-a11y/no-static-element-interactions */
+import React, {useCallback} from 'react';
+import {useDraggable} from '@dnd-kit/core';
+import {CSS} from '@dnd-kit/utilities';
 import styles from './CameraMenu.module.scss';
 
 interface CameraInfo {
@@ -18,15 +21,27 @@ interface CameraMenuProps {
     onCameraSelect: (cameraId: number) => void;
 }
 
-export const CameraMenu: React.FC<CameraMenuProps> = ({
-    cameras,
-    isOpen,
-    onClose,
-    onCameraSelect
-}) => {
-    const [activeCamera, setActiveCamera] = useState<number | null>(null);
+// Компонент для перетаскиваемой камеры в меню
+interface DraggableCameraItemProps {
+    camera: CameraInfo;
+    onCameraSelect: (cameraId: number) => void;
+}
 
-    const getCameraPreviewUrl = useCallback((
+const DraggableCameraItem: React.FC<DraggableCameraItemProps> = ({camera, onCameraSelect}) => {
+    const {attributes, listeners, setNodeRef, transform, isDragging} = useDraggable({
+        id: `camera-${camera.id}`,
+        data: {
+            type: 'camera',
+            camera
+        }
+    });
+
+    const style = {
+        transform: CSS.Translate.toString(transform),
+        opacity: isDragging ? 0.5 : 1
+    };
+
+    const getCameraPreviewUrl = (
         cameraId: number,
         streamUrl: string,
         streamPort: number,
@@ -41,93 +56,98 @@ export const CameraMenu: React.FC<CameraMenuProps> = ({
         const credentials = btoa(`${login}:${password}`);
 
         if (protocol === 'http') {
-            // Для HTTP используем прокси
             return `https://proxy.devline.ru/${streamUrl}/${streamPort}/cameras/${cameraId}/image?authorization=Basic%20${credentials}&stream=main`;
         }
 
-        // Для HTTPS используем прямое подключение
         return `${protocol}://${streamUrl}:${streamPort}/cameras/${cameraId}/image?authorization=Basic%20${credentials}&stream=main`;
-    }, []);
+    };
 
-    const handleCameraClick = useCallback((cameraId: number) => {
-        setActiveCamera(cameraId);
-        onCameraSelect(cameraId);
-        onClose();
-    }, [onCameraSelect, onClose]);
+    const previewUrl = getCameraPreviewUrl(
+        camera.id,
+        camera.streamUrl,
+        camera.streamPort,
+        camera.login,
+        camera.password,
+        camera.protocol
+    );
 
-    const handleBackdropClick = useCallback((e: React.MouseEvent) => {
-        if (e.target === e.currentTarget) {
+    return (
+        <div
+            ref={setNodeRef}
+            style={style}
+            className={`${styles.cameraItem} ${isDragging ? styles.dragging : ''}`}
+            onClick={() => onCameraSelect(camera.id)}
+            aria-label={`Перетащить или выбрать ${camera.name}`}
+            onKeyDown={e => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onCameraSelect(camera.id);
+                }
+            }}
+            {...attributes}
+            {...listeners}
+        >
+            <div className={styles.preview}>
+                {previewUrl ? (
+                    <img
+                        src={previewUrl}
+                        alt={`Предпросмотр ${camera.name}`}
+                        className={styles.previewImage}
+                        onError={e => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                        }}
+                    />
+                ) : (
+                    <div className={styles.noPreview}>
+                        <span>Нет изображения</span>
+                    </div>
+                )}
+            </div>
+            <div className={styles.cameraInfo}>
+                <h4 className={styles.cameraName}>{camera.name}</h4>
+                <span className={styles.cameraId}>ID: {camera.id}</span>
+            </div>
+        </div>
+    );
+};
+
+export const CameraMenu: React.FC<CameraMenuProps> = ({cameras, isOpen, onClose, onCameraSelect}) => {
+    const handleCameraClick = useCallback(
+        (cameraId: number) => {
+            onCameraSelect(cameraId);
             onClose();
-        }
-    }, [onClose]);
+        },
+        [onCameraSelect, onClose]
+    );
 
     if (!isOpen) return null;
 
     return (
-        <div className={styles.backdrop} onClick={handleBackdropClick}>
-            <div className={styles.menu}>
-                <div className={styles.header}>
-                    <h3 className={styles.title}>Выбор камеры</h3>
-                    <button
-                        className={styles.closeButton}
-                        onClick={onClose}
-                        aria-label="Закрыть меню"
-                    >
-                        ✕
-                    </button>
-                </div>
-                <div className={styles.camerasList}>
-                    {cameras.map((camera) => {
-                        const previewUrl = getCameraPreviewUrl(
-                            camera.id,
-                            camera.streamUrl,
-                            camera.streamPort,
-                            camera.login,
-                            camera.password,
-                            camera.protocol
-                        );
-                        
-                        return (
-                            <div
-                                key={camera.id}
-                                className={`${styles.cameraItem} ${activeCamera === camera.id ? styles.active : ''}`}
-                                onClick={() => handleCameraClick(camera.id)}
-                                role="button"
-                                tabIndex={0}
-                                aria-label={`Выбрать ${camera.name}`}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter' || e.key === ' ') {
-                                        e.preventDefault();
-                                        handleCameraClick(camera.id);
-                                    }
-                                }}
-                            >
-                                <div className={styles.preview}>
-                                    {previewUrl ? (
-                                        <img
-                                            src={previewUrl}
-                                            alt={`Предпросмотр ${camera.name}`}
-                                            className={styles.previewImage}
-                                            onError={(e) => {
-                                                // Скрываем изображение при ошибке загрузки
-                                                (e.target as HTMLImageElement).style.display = 'none';
-                                            }}
-                                        />
-                                    ) : (
-                                        <div className={styles.noPreview}>
-                                            <span>Нет изображения</span>
-                                        </div>
-                                    )}
-                                </div>
-                                <div className={styles.cameraInfo}>
-                                    <h4 className={styles.cameraName}>{camera.name}</h4>
-                                    <span className={styles.cameraId}>ID: {camera.id}</span>
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
+        // <div
+        //     className={styles.backdrop}
+        //     onClick={handleBackdropClick}
+        // >
+        <div className={styles.menu}>
+            <div className={styles.header}>
+                <h3 className={styles.title}>Выбор камеры</h3>
+                <button
+                    className={styles.closeButton}
+                    onClick={onClose}
+                    aria-label="Закрыть меню"
+                >
+                    ✕
+                </button>
+            </div>
+            <div className={styles.camerasList}>
+                {cameras.map(camera => (
+                    <DraggableCameraItem
+                        key={camera.id}
+                        camera={camera}
+                        onCameraSelect={handleCameraClick}
+                    />
+                ))}
             </div>
         </div>
+        // </div>
     );
 };

@@ -5,3 +5,12 @@
     padding: 0;
     box-sizing: border-box;
 }
+
+// Стили для активного перетаскивания
+body.dragging-active {
+    cursor: grabbing !important;
+    
+    * {
+        cursor: grabbing !important;
+    }
+}

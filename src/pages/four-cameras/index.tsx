@@ -1,6 +1,7 @@
 import React from 'react';
 import {createRoot} from 'react-dom/client';
 import {FourCamerasApp} from './FourCamerasApp';
+import '@styles/global.scss';
 
 const container = document.getElementById('root');
 if (!container) {

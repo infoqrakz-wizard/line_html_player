@@ -49,7 +49,7 @@
     color: #ccc;
     padding: 0.25rem 0.5rem;
     border-radius: 4px;
-    cursor: pointer;
+    // cursor: pointer;
     font-size: 0.8rem;
     transition: all 0.2s ease;
     min-width: 32px;
@@ -111,24 +111,77 @@
     background-color: #000;
     display: flex;
     flex-direction: column;
-    cursor: pointer;
+    cursor: default;
     transition: all 0.2s ease;
     position: relative;
     overflow: hidden;
     min-height: 0; // Важно для правильного сжатия в grid
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
 
     &:hover {
         background-color: #111;
-        
-        .expandIcon {
-            opacity: 1;
-            transform: scale(1.1);
-        }
     }
 
     &:focus {
         outline: 2px solid #007acc;
         outline-offset: -2px;
+    }
+
+    &.dragging {
+        opacity: 0.5;
+        z-index: 1000;
+        cursor: grabbing !important;
+    }
+
+    &.hovered {
+        outline: solid blue;
+        background-color: rgba(0, 122, 204, 0.1);
+        // transform: scale(1.02);
+    }
+}
+
+// Индикаторы вставки через псевдоэлементы
+.insertionBefore {
+    &::before {
+        content: '';
+        position: absolute;
+        top: -2px;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background-color: #007acc;
+        border-radius: 2px;
+        opacity: 0.8;
+        z-index: 1001;
+        animation: pulse 1s ease-in-out infinite;
+    }
+}
+
+.insertionAfter {
+    &::after {
+        content: '';
+        position: absolute;
+        bottom: -2px;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background-color: #007acc;
+        border-radius: 2px;
+        opacity: 0.8;
+        z-index: 1001;
+        animation: pulse 1s ease-in-out infinite;
+    }
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 0.8;
+    }
+    50% {
+        opacity: 0.4;
     }
 }
 
@@ -150,13 +203,6 @@
     margin: 0;
     font-size: 0.9rem;
     font-weight: 500;
-    color: #fff;
-}
-
-.expandIcon {
-    font-size: 1rem;
-    opacity: 0.7;
-    transition: all 0.2s ease;
     color: #fff;
 }
 
@@ -278,10 +324,6 @@
     
     .cameraName {
         font-size: 0.9rem;
-    }
-    
-    .expandIcon {
-        font-size: 1rem;
     }
 }
 
