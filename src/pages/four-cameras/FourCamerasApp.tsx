@@ -98,6 +98,8 @@ const SortableCamera: React.FC<SortableCameraProps> = ({
             event.stopPropagation();
             return;
         }
+
+        listeners?.onPointerDown(event);
     }, []);
 
     return (
@@ -115,9 +117,9 @@ const SortableCamera: React.FC<SortableCameraProps> = ({
                 }
             }}
             onDoubleClick={() => onDoubleClick(camera.id)}
-            onPointerDown={handlePointerDown}
             {...attributes}
             {...listeners}
+            onPointerDown={handlePointerDown}
         >
             <div className={styles.cameraHeader}>
                 <h3 className={styles.cameraName}>{camera.name}</h3>
