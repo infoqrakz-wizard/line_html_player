@@ -296,6 +296,29 @@
         outline: 2px solid #007acc;
         outline-offset: -2px;
     }
+
+    &.draggableCamera {
+        cursor: grab;
+        
+        &:active {
+            cursor: grabbing;
+        }
+        
+        &:hover {
+            background-color: #333;
+            border-color: #007acc;
+        }
+    }
+
+    &.disabledCamera {
+        cursor: default;
+        // opacity: 0.6;
+        
+        // &:hover {
+        //     background-color: #2a2a2a;
+        //     border-color: #555;
+        // }
+    }
 }
 
 // Стили для списка камер в правой панели
@@ -666,5 +689,88 @@
     .grid12 {
         grid-template-columns: 1fr 1fr 1fr 1fr;
         grid-template-rows: 1fr 1fr 1fr;
+    }
+}
+
+// Стили для состояний загрузки и ошибок
+.loadingScreen {
+    width: 100vw;
+    height: 100vh;
+    background-color: #000;
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+}
+
+.loadingSpinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid #333;
+    border-top: 3px solid #fff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.loadingText {
+    font-size: 1.2rem;
+    margin: 0;
+}
+
+.errorScreen {
+    width: 100vw;
+    height: 100vh;
+    background-color: #000;
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    padding: 2rem;
+    text-align: center;
+}
+
+.errorIcon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+}
+
+.errorTitle {
+    font-size: 1.8rem;
+    margin: 0 0 1rem 0;
+    color: #ff6b6b;
+}
+
+.errorMessage {
+    font-size: 1.1rem;
+    margin: 0 0 2rem 0;
+    color: #ccc;
+    max-width: 500px;
+}
+
+.retryButton {
+    background-color: #007bff;
+    color: #fff;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 4px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+
+    &:hover {
+        background-color: #0056b3;
+    }
+
+    &:active {
+        background-color: #004085;
     }
 }

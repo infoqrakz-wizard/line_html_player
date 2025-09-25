@@ -39,6 +39,7 @@ export interface PlayerProps {
     useSubStream?: boolean; // Флаг для использования sub.mp4 вместо main.mp4
     hideControlsOnMouseLeave?: boolean; // Флаг для скрытия контролов сразу при уходе мыши
     onDoubleClick?: () => void; // Обработчик двойного клика для кастомного поведения
+    timelineHoverMode?: 'instant' | 'delayed'; // Режим отображения таймлайна при наведении
 }
 
 export const Player: React.FC<PlayerProps> = ({
@@ -55,7 +56,8 @@ export const Player: React.FC<PlayerProps> = ({
     isUseProxy,
     useSubStream = false,
     hideControlsOnMouseLeave = false,
-    onDoubleClick
+    onDoubleClick,
+    timelineHoverMode = 'instant'
 }) => {
     // Local auth state to allow updating credentials when 401 occurs
     const [authLogin, setAuthLogin] = useState<string>(login);
@@ -75,6 +77,7 @@ export const Player: React.FC<PlayerProps> = ({
     const [authVerified, setAuthVerified] = useState<boolean>(false);
 
     const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const controlAreaHoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const fragmetsGapRef = useRef<number>(0);
     const nextFragmentTimeRef = useRef<Date | null>(null);
     const isTransitioningToNextFragmentRef = useRef<boolean>(false);
@@ -84,7 +87,7 @@ export const Player: React.FC<PlayerProps> = ({
     const [playbackSpeed, setPlaybackSpeed] = useState<number>(1);
 
     const [isMobile, setIsMobile] = useState<boolean>(false);
-    const [showControls, setShowControls] = useState<boolean>(false);
+    const [showControlArea, setShowControlArea] = useState<boolean>(false);
 
     // Определяем ориентацию и тип устройства
     const {orientation, isMobile: isMobileDevice, isSafari, isAndroid, isIOS} = useOrientation();
@@ -123,8 +126,6 @@ export const Player: React.FC<PlayerProps> = ({
             )}${!isMuted && !isNoSound ? '&audio=1' : ''}`
         });
     };
-
-    // const posterUrl = `${protocol}://${streamUrl}:${streamPort}/cameras/${camera}/image?stream=main&authorization=Basic%20${btoa(`${login}:${password}`)}`;
 
     // Для iPhone всегда используем m3u8, так как hls.js не работает нативно
     const streamType = isSafari ? 'm3u8' : currentMode === 'record' ? 'm3u8' : 'mp4';
@@ -237,7 +238,8 @@ export const Player: React.FC<PlayerProps> = ({
 
     useEffect(() => {
         const loadCameras = async () => {
-            if (!authVerified || !streamUrl || !streamPort) return;
+            // Запрашиваем список камер только если нужен селектор камер
+            if (!authVerified || !streamUrl || !streamPort || !showCameraSelector) return;
             try {
                 const list = await getCamerasList(
                     streamUrl,
@@ -253,7 +255,17 @@ export const Player: React.FC<PlayerProps> = ({
             }
         };
         void loadCameras();
-    }, [authVerified, streamUrl, streamPort, authLogin, authPassword, camera, protocol, effectiveProxy]);
+    }, [
+        authVerified,
+        streamUrl,
+        streamPort,
+        authLogin,
+        authPassword,
+        camera,
+        protocol,
+        effectiveProxy,
+        showCameraSelector
+    ]);
 
     // Устанавливаем начальные значения логина и пароля без автоматической проверки
     useEffect(() => {
@@ -322,46 +334,41 @@ export const Player: React.FC<PlayerProps> = ({
         if (hideTimeoutRef.current) {
             clearTimeout(hideTimeoutRef.current);
         }
-        setShowControls(true);
+        // Не показываем controlArea при наведении на плеер
     };
 
     const handleMouseLeave = () => {
-        if (hideControlsOnMouseLeave) {
-            // Если флаг установлен - скрываем контролы сразу
-            setShowControls(false);
-        } else {
-            // По умолчанию - скрываем через 10 секунд
-            hideTimeoutRef.current = setTimeout(() => {
-                setShowControls(false);
-            }, 10000);
+        if (hideTimeoutRef.current) {
+            clearTimeout(hideTimeoutRef.current);
         }
+        // Не скрываем controlArea при уходе с плеера
     };
 
     // Функции переключения камеры
     const switchToNextCamera = useCallback(() => {
-        if (availableCameras.length <= 1) {
+        if (!showCameraSelector || availableCameras.length <= 1) {
             return;
         }
 
         const currentIndex = availableCameras.findIndex(c => c.id === camera);
         const nextIndex = (currentIndex + 1) % availableCameras.length;
         setCamera(availableCameras[nextIndex].id);
-    }, [availableCameras, camera]);
+    }, [availableCameras, camera, showCameraSelector]);
 
     const switchToPreviousCamera = useCallback(() => {
-        if (availableCameras.length <= 1) {
+        if (!showCameraSelector || availableCameras.length <= 1) {
             return;
         }
 
         const currentIndex = availableCameras.findIndex(c => c.id === camera);
         const prevIndex = currentIndex <= 0 ? availableCameras.length - 1 : currentIndex - 1;
         setCamera(availableCameras[prevIndex].id);
-    }, [availableCameras, camera]);
+    }, [availableCameras, camera, showCameraSelector]);
 
     // Обработчики свайпов по плееру
     const handlePlayerTouchStart = useCallback(
         (e: React.TouchEvent) => {
-            if (e.touches.length === 1 && availableCameras.length > 1) {
+            if (e.touches.length === 1 && showCameraSelector && availableCameras.length > 1) {
                 const touch = e.touches[0];
                 setIsPlayerSwipeActive(true);
                 setPlayerSwipeStartX(touch.clientX);
@@ -369,12 +376,12 @@ export const Player: React.FC<PlayerProps> = ({
                 setHasPlayerSwiped(false);
             }
         },
-        [availableCameras.length]
+        [availableCameras.length, showCameraSelector]
     );
 
     const handlePlayerTouchMove = useCallback(
         (e: React.TouchEvent) => {
-            if (!isPlayerSwipeActive || e.touches.length !== 1 || availableCameras.length <= 1) return;
+            if (!isPlayerSwipeActive || e.touches.length !== 1 || !showCameraSelector || availableCameras.length <= 1) return;
 
             const touch = e.touches[0];
             const deltaX = touch.clientX - playerSwipeStartX;
@@ -405,6 +412,7 @@ export const Player: React.FC<PlayerProps> = ({
             playerSwipeStartY,
             hasPlayerSwiped,
             availableCameras.length,
+            showCameraSelector,
             switchToNextCamera,
             switchToPreviousCamera
         ]
@@ -420,10 +428,32 @@ export const Player: React.FC<PlayerProps> = ({
         if (hideTimeoutRef.current) {
             clearTimeout(hideTimeoutRef.current);
         }
-        setShowControls(true);
+        setShowControlArea(true);
         hideTimeoutRef.current = setTimeout(() => {
-            setShowControls(false);
+            setShowControlArea(false);
         }, 10000);
+    }, []);
+
+    // Обработчики для controlArea
+    const handleControlAreaMouseEnter = useCallback(() => {
+        if (controlAreaHoverTimeoutRef.current) {
+            clearTimeout(controlAreaHoverTimeoutRef.current);
+        }
+
+        if (timelineHoverMode === 'instant') {
+            setShowControlArea(true);
+        } else if (timelineHoverMode === 'delayed') {
+            controlAreaHoverTimeoutRef.current = setTimeout(() => {
+                setShowControlArea(true);
+            }, 3000);
+        }
+    }, [timelineHoverMode]);
+
+    const handleControlAreaMouseLeave = useCallback(() => {
+        if (controlAreaHoverTimeoutRef.current) {
+            clearTimeout(controlAreaHoverTimeoutRef.current);
+        }
+        setShowControlArea(false);
     }, []);
 
     const toggleFullscreen = useCallback(() => {
@@ -606,6 +636,15 @@ export const Player: React.FC<PlayerProps> = ({
         document.addEventListener('visibilitychange', handleVisibilityChange);
         return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
     }, [isPlaying, currentMode, updateServerTime, setProgress]);
+
+    // Очистка таймеров при размонтировании
+    useEffect(() => {
+        return () => {
+            if (controlAreaHoverTimeoutRef.current) {
+                clearTimeout(controlAreaHoverTimeoutRef.current);
+            }
+        };
+    }, []);
 
     const handleSaveStreamFinish = (start: Date, end: Date) => {
         const fileName = `record_${formatDate(start, 'yyyy-MM-dd_HH-mm')}_${formatDate(end, 'yyyy-MM-dd_HH-mm')}`;
@@ -923,10 +962,12 @@ export const Player: React.FC<PlayerProps> = ({
                 <div
                     className={styles.controlArea}
                     ref={controlAreaRef}
-                    onMouseEnter={hideControlsOnMouseLeave ? undefined : handleMouseEnter}
-                    onMouseLeave={hideControlsOnMouseLeave ? undefined : handleMouseLeave}
+                    onMouseEnter={handleControlAreaMouseEnter}
+                    onMouseLeave={handleControlAreaMouseLeave}
                 >
-                    <div className={`${styles.controlPanelContainer} ${showControls || isMobile ? styles.show : ''}`}>
+                    <div
+                        className={`${styles.controlPanelContainer} ${showControlArea || isMobile ? styles.show : ''}`}
+                    >
                         <ControlPanel
                             mode={currentMode}
                             isPlaying={isPlaying}

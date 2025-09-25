@@ -31,7 +31,7 @@ interface TimelineResponse {
     timeline: number[];
 }
 
-export const getFramesTimeline = (params: GetFramesTimelineParams): Promise<TimelineResponse> => {
+export const getFramesTimeline = async (params: GetFramesTimelineParams): Promise<TimelineResponse> => {
     const {url, port, credentials, startTime, endTime, unitLength, channel, stream, proxy} = params;
     const preferredProtocol = params.protocol ?? getProtocol();
 
@@ -57,7 +57,7 @@ export const getFramesTimeline = (params: GetFramesTimelineParams): Promise<Time
         ...(stream !== undefined && {stream})
     };
 
-    return new Promise((resolve, reject) => {
+    try {
         const rpcUrl = buildRequestUrl({
             host: url,
             port,
@@ -66,41 +66,38 @@ export const getFramesTimeline = (params: GetFramesTimelineParams): Promise<Time
             path: proxy ? '/rpc' : `/rpc?authorization=Basic ${getAuthToken(credentials)}&content-type=application/json`
         });
 
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', rpcUrl, true);
+        const headers: HeadersInit = {};
 
         // Если используется прокси, передаем через заголовки
         if (proxy) {
-            xhr.setRequestHeader('Content-Type', 'application/json');
-            xhr.setRequestHeader('Authorization', `Basic ${getAuthToken(credentials)}`);
+            headers['Content-Type'] = 'application/json';
+            headers['Authorization'] = `Basic ${getAuthToken(credentials)}`;
         }
 
-        xhr.onload = function () {
-            if (xhr.status >= 200 && xhr.status < 300) {
-                try {
-                    const data = JSON.parse(xhr.responseText);
+        const response = await fetch(rpcUrl, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({method: 'archive.get_frames_timeline', params: requestParams, version: 13})
+        });
 
-                    // Проверяем наличие ошибки авторизации
-                    if (data.error && data.error.type === 'auth' && data.error.message === 'forbidden') {
-                        reject(new Error('FORBIDDEN'));
-                        return;
-                    }
+        if (!response.ok) {
+            throw new Error('Failed to fetch timeline data');
+        }
 
-                    resolve(data.result);
-                } catch (parseError) {
-                    reject(new Error('Failed to parse timeline data'));
-                }
-            } else {
-                reject(new Error('Failed to fetch timeline data'));
-            }
-        };
+        const data = await response.json();
 
-        xhr.onerror = function () {
-            reject(new Error('Failed to fetch timeline data'));
-        };
+        // Проверяем наличие ошибки авторизации
+        if (data.error && data.error.type === 'auth' && data.error.message === 'forbidden') {
+            throw new Error('FORBIDDEN');
+        }
 
-        xhr.send(JSON.stringify({method: 'archive.get_frames_timeline', params: requestParams, version: 13}));
-    });
+        return data.result;
+    } catch (error) {
+        if (error instanceof Error && error.message === 'FORBIDDEN') {
+            throw error;
+        }
+        throw new Error('Failed to fetch timeline data');
+    }
 };
 
 interface UrlForDownloadParams {
@@ -122,14 +119,14 @@ export const formatUrlForDownload = (params: UrlForDownloadParams) => {
     return downloadUrl;
 };
 
-export const getServerTime = (
+export const getServerTime = async (
     url: string,
     port: number,
     credentials: string,
     protocol?: Protocol,
     proxy?: string
 ): Promise<Date> => {
-    return new Promise((resolve, reject) => {
+    try {
         const rpcUrl = buildRequestUrl({
             host: url,
             port,
@@ -138,44 +135,42 @@ export const getServerTime = (
             path: proxy ? '/rpc' : `/rpc?authorization=Basic ${getAuthToken(credentials)}&content-type=application/json`
         });
 
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', rpcUrl, true);
+        const headers: HeadersInit = {};
 
         // Если используется прокси, передаем через заголовки
         if (proxy) {
-            xhr.setRequestHeader('Content-Type', 'application/json');
-            xhr.setRequestHeader('Authorization', `Basic ${getAuthToken(credentials)}`);
+            headers['Content-Type'] = 'application/json';
+            headers['Authorization'] = `Basic ${getAuthToken(credentials)}`;
         }
 
-        xhr.onload = function () {
-            if (xhr.status >= 200 && xhr.status < 300) {
-                try {
-                    const data = JSON.parse(xhr.responseText);
-                    const localTime = data.result.info.local_time;
+        const response = await fetch(rpcUrl, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({method: 'get_server_info', version: 12})
+        });
 
-                    if (Array.isArray(localTime) && localTime.length >= 7) {
-                        // local_time format: [year, month, day, hour, minute, second, millisecond]
-                        // Note: JavaScript months are 0-indexed, but the API returns 1-indexed months
-                        const [year, month, day, hour, minute, second, millisecond] = localTime;
-                        const serverDate = new Date(year, month - 1, day, hour, minute, second, millisecond);
-                        resolve(serverDate);
-                    } else {
-                        reject(new Error('Invalid server time format'));
-                    }
-                } catch (error) {
-                    reject(new Error('Failed to parse server time response'));
-                }
-            } else {
-                reject(new Error('Failed to fetch server time'));
-            }
-        };
+        if (!response.ok) {
+            throw new Error('Failed to fetch server time');
+        }
 
-        xhr.onerror = function () {
-            reject(new Error('Failed to fetch server time'));
-        };
+        const data = await response.json();
+        const localTime = data.result.info.local_time;
 
-        xhr.send(JSON.stringify({method: 'get_server_info', version: 12}));
-    });
+        if (Array.isArray(localTime) && localTime.length >= 7) {
+            // local_time format: [year, month, day, hour, minute, second, millisecond]
+            // Note: JavaScript months are 0-indexed, but the API returns 1-indexed months
+            const [year, month, day, hour, minute, second, millisecond] = localTime;
+            const serverDate = new Date(year, month - 1, day, hour, minute, second, millisecond);
+            return serverDate;
+        } else {
+            throw new Error('Invalid server time format');
+        }
+    } catch (error) {
+        if (error instanceof Error && error.message.includes('Invalid server time format')) {
+            throw error;
+        }
+        throw new Error('Failed to fetch server time');
+    }
 };
 
 interface CameraStateResponse {
@@ -187,7 +182,7 @@ interface CameraStateResponse {
     };
 }
 
-export const getCameraState = (
+export const getCameraState = async (
     url: string,
     port: number,
     credentials: string,
@@ -195,7 +190,7 @@ export const getCameraState = (
     protocol?: Protocol,
     proxy?: string
 ): Promise<CameraStateResponse> => {
-    return new Promise((resolve, reject) => {
+    try {
         const rpcUrl = buildRequestUrl({
             host: url,
             port,
@@ -204,35 +199,29 @@ export const getCameraState = (
             path: proxy ? '/rpc' : `/rpc?authorization=Basic ${getAuthToken(credentials)}&content-type=application/json`
         });
 
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', rpcUrl, true);
+        const headers: HeadersInit = {};
 
         // Если используется прокси, передаем через заголовки
         if (proxy) {
-            xhr.setRequestHeader('Content-Type', 'application/json');
-            xhr.setRequestHeader('Authorization', `Basic ${getAuthToken(credentials)}`);
+            headers['Content-Type'] = 'application/json';
+            headers['Authorization'] = `Basic ${getAuthToken(credentials)}`;
         }
 
-        xhr.onload = function () {
-            if (xhr.status >= 200 && xhr.status < 300) {
-                try {
-                    const data = JSON.parse(xhr.responseText) as CameraStateResponse;
+        const response = await fetch(rpcUrl, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({method: 'get_camera_state', params: {camera: String(camera)}, version: 13})
+        });
 
-                    resolve(data);
-                } catch (error) {
-                    reject(new Error('Failed to parse server time response'));
-                }
-            } else {
-                reject(new Error('Failed to fetch server time'));
-            }
-        };
+        if (!response.ok) {
+            throw new Error('Failed to fetch camera state');
+        }
 
-        xhr.onerror = function () {
-            reject(new Error('Failed to fetch server time'));
-        };
-
-        xhr.send(JSON.stringify({method: 'get_camera_state', params: {camera: String(camera)}, version: 13}));
-    });
+        const data = (await response.json()) as CameraStateResponse;
+        return data;
+    } catch (error) {
+        throw new Error('Failed to fetch camera state');
+    }
 };
 
 /**

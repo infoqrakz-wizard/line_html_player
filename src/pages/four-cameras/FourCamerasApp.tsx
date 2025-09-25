@@ -1,5 +1,5 @@
 /* eslint-disable jsx-a11y/no-static-element-interactions */
-import React, {useState, useCallback, useEffect, useRef} from 'react';
+import React, {useState, useCallback, useEffect, useRef, useMemo} from 'react';
 import {
     DndContext,
     closestCenter,
@@ -17,12 +17,12 @@ import {GridIcon} from '../../components/icons/GridIcon';
 import {Mode, Protocol} from '../../utils/types';
 import {TimeProvider} from '../../context/time-context';
 import {TimelineAuthProvider} from '../../context/timeline-auth-context';
+import {useCamerasList} from '../../hooks/useCamerasList';
+import {CameraInfo} from '../../utils/api';
 
 import styles from './FourCamerasApp.module.scss';
 
-interface CameraConfig {
-    id: number;
-    name: string;
+interface CameraConfig extends CameraInfo {
     streamUrl: string;
     streamPort: number;
     login: string;
@@ -32,20 +32,13 @@ interface CameraConfig {
 
 interface FourCamerasAppProps {}
 
-const streamUrl = '8.devline.ru';
-const streamPort = 443;
-const login = 'monit';
-const password = 'monit';
-const protocol = Protocol.Https;
-
-const cameraMockData = {
-    id: 0,
-    name: 'Camera 1',
-    streamUrl,
-    streamPort,
-    login,
-    password,
-    protocol
+// Получаем конфигурацию сервера из HTML
+const getServerConfig = () => {
+    const configElement = document.getElementById('server-config');
+    if (!configElement) {
+        throw new Error('Server configuration not found');
+    }
+    return JSON.parse(configElement.textContent || '{}');
 };
 
 type GridSize = 4 | 6 | 8 | 12;
@@ -113,6 +106,7 @@ const SortableCamera: React.FC<SortableCameraProps> = ({camera, onDoubleClick, i
                 <TimeProvider>
                     <TimelineAuthProvider>
                         <Player
+                            timelineHoverMode="delayed"
                             streamUrl={camera.streamUrl}
                             streamPort={camera.streamPort}
                             login={camera.login}
@@ -140,17 +134,35 @@ export const FourCamerasApp: React.FC<FourCamerasAppProps> = () => {
     const [filterText, setFilterText] = useState<string>('');
     const [isGridTooltipOpen, setIsGridTooltipOpen] = useState<boolean>(false);
     const [gridSize, setGridSize] = useState<GridSize>(4);
-    const [cameraOrder, setCameraOrder] = useState<number[]>([
-        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19
-    ]);
     const [hoveredCameraId, setHoveredCameraId] = useState<string | null>(null);
 
-    // Конфигурация камер - можно будет сделать настраиваемой через пропсы
-    const cameras: CameraConfig[] = Array.from({length: 20}, (_, index) => ({
-        ...cameraMockData,
-        name: `Camera ${index + 1}`,
-        id: index
-    }));
+    // Получаем список камер с сервера
+    const {cameras: camerasList, isLoading, error, refetch} = useCamerasList();
+
+    // Преобразуем список камер в нужный формат
+    const cameras: CameraConfig[] = useMemo(() => {
+        if (!camerasList.length) return [];
+
+        const serverConfig = getServerConfig();
+        return camerasList.map(camera => ({
+            ...camera,
+            streamUrl: serverConfig.streamUrl,
+            streamPort: serverConfig.streamPort,
+            login: serverConfig.login,
+            password: serverConfig.password,
+            protocol: serverConfig.protocol === 'https' ? Protocol.Https : Protocol.Http
+        }));
+    }, [camerasList]);
+
+    // Инициализируем порядок камер на основе полученного списка
+    const [cameraOrder, setCameraOrder] = useState<number[]>([]);
+
+    // Обновляем порядок камер когда загружается список
+    useEffect(() => {
+        if (cameras.length > 0) {
+            setCameraOrder(cameras.map(camera => camera.id));
+        }
+    }, [cameras]);
 
     const handleCameraClose = useCallback(() => {
         setExpandedCamera(null);
@@ -163,15 +175,6 @@ export const FourCamerasApp: React.FC<FourCamerasAppProps> = () => {
     const handleMenuToggle = useCallback(() => {
         setIsMenuOpen(prev => !prev);
         setIsPanelExpanded(prev => !prev);
-    }, []);
-
-    const handleMenuClose = useCallback(() => {
-        setIsMenuOpen(false);
-        setIsPanelExpanded(false);
-    }, []);
-
-    const handleCameraSelect = useCallback((cameraId: number) => {
-        setExpandedCamera(cameraId);
     }, []);
 
     const handleGridSizeChange = useCallback((newGridSize: GridSize) => {
@@ -188,7 +191,7 @@ export const FourCamerasApp: React.FC<FourCamerasAppProps> = () => {
     }, []);
 
     // Фильтрация камер
-    const filteredCameras = cameras.filter(camera => camera.name.toLowerCase().includes(filterText.toLowerCase()));
+    const filteredCameras = cameras.filter(camera => camera.name?.toLowerCase().includes(filterText.toLowerCase()));
 
     // Функция для получения URL превью камеры
     const getCameraPreviewUrl = useCallback(
@@ -297,20 +300,80 @@ export const FourCamerasApp: React.FC<FourCamerasAppProps> = () => {
             // Обычная перестановка камер в сетке
             if (over && active.id !== over.id) {
                 setCameraOrder(items => {
-                    const [activeCameraIndex, activeCameraId] = (active.id as string).split('-').map(Number);
-                    const [overCameraIndex, overCameraId] = (over.id as string).split('-').map(Number);
+                    const [activeIndex, activeCameraId] = (active.id as string).split('-').map(Number);
+                    const [overIndex, overCameraId] = (over.id as string).split('-').map(Number);
 
-                    items[activeCameraIndex] = overCameraId;
-                    items[overCameraIndex] = activeCameraId;
-                    return items;
+                    const newItems = [...items];
+                    newItems[activeIndex] = overCameraId;
+                    newItems[overIndex] = activeCameraId;
+                    return newItems;
                 });
             }
         }
     }, []);
 
+    // Компонент для отображения состояния загрузки
+    const LoadingScreen: React.FC = () => (
+        <div className={styles.loadingScreen}>
+            <div className={styles.loadingSpinner}></div>
+            <p className={styles.loadingText}>Загрузка камер...</p>
+        </div>
+    );
+
+    // Компонент для отображения ошибки
+    const ErrorScreen: React.FC<{error: string; onRetry: () => void}> = ({error, onRetry}) => (
+        <div className={styles.errorScreen}>
+            <div className={styles.errorIcon}>⚠️</div>
+            <h2 className={styles.errorTitle}>Ошибка загрузки камер</h2>
+            <p className={styles.errorMessage}>{error}</p>
+            <button
+                className={styles.retryButton}
+                onClick={onRetry}
+            >
+                Повторить попытку
+            </button>
+        </div>
+    );
+
+    // Если загружается список камер
+    if (isLoading) {
+        return <LoadingScreen />;
+    }
+
+    // Если произошла ошибка при загрузке
+    if (error) {
+        return (
+            <ErrorScreen
+                error={error}
+                onRetry={refetch}
+            />
+        );
+    }
+
+    // Если нет камер
+    if (!cameras.length) {
+        return (
+            <div className={styles.errorScreen}>
+                <div className={styles.errorIcon}>📹</div>
+                <h2 className={styles.errorTitle}>Камеры не найдены</h2>
+                <p className={styles.errorMessage}>На сервере не найдено доступных камер</p>
+                <button
+                    className={styles.retryButton}
+                    onClick={refetch}
+                >
+                    Обновить
+                </button>
+            </div>
+        );
+    }
+
     // Если камера развернута, показываем только её
     if (expandedCamera !== null) {
-        const camera = cameras[expandedCamera];
+        const camera = cameras.find(c => c.id === expandedCamera);
+        if (!camera) {
+            setExpandedCamera(null);
+            return null;
+        }
         return (
             <DndContext
                 sensors={sensors}
@@ -473,17 +536,26 @@ export const FourCamerasApp: React.FC<FourCamerasAppProps> = () => {
                                     return (
                                         <div
                                             key={camera.id}
-                                            className={`${styles.cameraListItem}`}
-                                            onClick={() => handleCameraSelect(camera.id)}
-                                            onKeyDown={e => {
-                                                if (e.key === 'Enter' || e.key === ' ') {
+                                            id={`camera-${camera.id}`}
+                                            className={`${styles.cameraListItem} ${!isActive ? styles.draggableCamera : styles.disabledCamera}`}
+                                            aria-label={
+                                                isActive
+                                                    ? `${camera.name} уже используется`
+                                                    : `Перетащить ${camera.name} в сетку`
+                                            }
+                                            draggable={!isActive}
+                                            onDragStart={e => {
+                                                if (isActive) {
                                                     e.preventDefault();
-                                                    handleCameraSelect(camera.id);
+                                                    return;
                                                 }
+                                                e.dataTransfer.effectAllowed = 'move';
+                                                e.dataTransfer.setData('text/plain', `camera-${camera.id}`);
+                                                document.body.classList.add('dragging-active');
                                             }}
-                                            tabIndex={0}
-                                            role="button"
-                                            aria-label={`Выбрать ${camera.name}`}
+                                            onDragEnd={() => {
+                                                document.body.classList.remove('dragging-active');
+                                            }}
                                         >
                                             <div className={styles.listCameraHeader}>
                                                 <div className={styles.listCameraNameContainer}>
@@ -514,14 +586,46 @@ export const FourCamerasApp: React.FC<FourCamerasAppProps> = () => {
                         </div>
                     )}
                 </div>
-                <div className={`${styles.camerasGrid} ${styles[`grid${gridSize}`]}`}>
+                <div
+                    className={`${styles.camerasGrid} ${styles[`grid${gridSize}`]}`}
+                    onDragOver={e => {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = 'move';
+                    }}
+                    onDrop={e => {
+                        e.preventDefault();
+                        const draggedCameraId = e.dataTransfer.getData('text/plain');
+
+                        if (draggedCameraId.startsWith('camera-')) {
+                            const cameraId = Number(draggedCameraId.replace('camera-', ''));
+                            const targetElement = e.target as HTMLElement;
+                            const cameraContainer = targetElement.closest(`[data-camera-id]`);
+
+                            if (cameraContainer) {
+                                const targetCameraId = Number(cameraContainer.getAttribute('data-camera-id'));
+
+                                // Заменяем камеру в сетке
+                                setCameraOrder(items => {
+                                    const targetIndex = items.indexOf(targetCameraId);
+                                    if (targetIndex !== -1) {
+                                        const newItems = [...items];
+                                        newItems[targetIndex] = cameraId;
+                                        return newItems;
+                                    }
+                                    return items;
+                                });
+                            }
+                        }
+                    }}
+                >
                     <SortableContext
                         items={cameraOrder.slice(0, gridSize).map((cameraId, index) => `${index}-${cameraId}`)}
                         strategy={rectSortingStrategy}
                         // disabled={true}
                     >
                         {cameraOrder.slice(0, gridSize).map((cameraId, index) => {
-                            const camera = cameras[cameraId];
+                            const camera = cameras.find(c => c.id === cameraId);
+                            if (!camera) return null;
 
                             return (
                                 <SortableCamera
