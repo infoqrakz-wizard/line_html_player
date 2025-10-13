@@ -25,6 +25,8 @@ interface ControlPanelProps {
     popperBoundaryElement?: HTMLElement | null;
     popperPortalId?: string;
     timelineRef?: React.RefObject<TimelineRef>;
+    externalServerTime?: Date;
+    shouldFetchServerTime?: boolean;
     onPlayPause: () => void;
     onMuteToggle: () => void;
     onSpeedChange: (speed: number) => void;
@@ -54,6 +56,8 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
     popperBoundaryElement,
     popperPortalId,
     timelineRef: externalTimelineRef,
+    externalServerTime,
+    shouldFetchServerTime,
     onPlayPause,
     onMuteToggle,
     onSpeedChange,
@@ -112,6 +116,8 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                     camera={camera}
                     proxy={proxy}
                     mode={mode}
+                    externalServerTime={externalServerTime}
+                    shouldFetchServerTime={shouldFetchServerTime}
                 />
             )}
         </div>

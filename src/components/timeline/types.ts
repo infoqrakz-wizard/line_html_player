@@ -6,6 +6,7 @@
  * Свойства компонента Timeline
  */
 import {Mode, Protocol} from '../../utils/types';
+import {TimelineResponse} from '../../utils/api';
 
 export interface TimelineProps {
     /** URL сервера */
@@ -28,6 +29,10 @@ export interface TimelineProps {
     protocol?: Protocol;
     /** Прокси-сервер */
     proxy?: string;
+    /** Внешнее время сервера */
+    externalServerTime?: Date;
+    /** Флаг для авто-запроса времени сервера */
+    shouldFetchServerTime?: boolean;
 }
 
 /**
@@ -83,11 +88,9 @@ export interface LoadFragmentsParams {
 
 /**
  * Ответ API с фрагментами временной шкалы
+ * Используем TimelineResponse из api.ts
  */
-export interface FragmentsResponse {
-    /** Массив с наличием фрагментов */
-    timeline: number[];
-}
+export type FragmentsResponse = TimelineResponse;
 
 /**
  * Диапазон времени для одного фрагмента записи

@@ -18,7 +18,7 @@ import {Mode, Protocol} from '../../utils/types';
 import {TimeProvider} from '../../context/time-context';
 import {TimelineAuthProvider} from '../../context/timeline-auth-context';
 import {useCamerasList} from '../../hooks/useCamerasList';
-import {CameraInfo} from '../../utils/api';
+import {CameraInfo, getCameraState, getServerTime, type CameraStateResponse} from '../../utils/api';
 
 import styles from './FourCamerasApp.module.scss';
 
@@ -32,7 +32,6 @@ interface CameraConfig extends CameraInfo {
 
 interface FourCamerasAppProps {}
 
-// Получаем конфигурацию сервера из HTML
 const getServerConfig = () => {
     const configElement = document.getElementById('server-config');
     if (!configElement) {
@@ -43,15 +42,23 @@ const getServerConfig = () => {
 
 type GridSize = 4 | 6 | 8 | 12;
 
-// Компонент для перетаскиваемой камеры
 interface SortableCameraProps {
     camera: CameraConfig;
     onDoubleClick: (cameraId: number) => void;
     isHovered: boolean;
     index: number;
+    cameraState?: CameraStateResponse;
+    serverTime?: Date;
 }
 
-const SortableCamera: React.FC<SortableCameraProps> = ({camera, onDoubleClick, isHovered, index}) => {
+const SortableCamera: React.FC<SortableCameraProps> = ({
+    camera,
+    onDoubleClick,
+    isHovered,
+    index,
+    cameraState,
+    serverTime
+}) => {
     const {attributes, listeners, setNodeRef, transition, isDragging} = useSortable({
         id: `${index}-${camera.id}`
     });
@@ -61,11 +68,9 @@ const SortableCamera: React.FC<SortableCameraProps> = ({camera, onDoubleClick, i
         opacity: isDragging ? 0.5 : 1
     };
 
-    // Обработчик для предотвращения перетаскивания при клике в controlArea
     const handlePointerDown = useCallback(
         (event: React.PointerEvent) => {
             const target = event.target as HTMLElement;
-            // Проверяем, произошло ли событие в области контролов плеера
             if (
                 target.closest('[class*="controlArea"]') ||
                 target.closest('[class*="controlPanel"]') ||
@@ -115,10 +120,14 @@ const SortableCamera: React.FC<SortableCameraProps> = ({camera, onDoubleClick, i
                             camera={camera.id}
                             protocol={camera.protocol}
                             showCameraSelector={false}
-                            muted={true} // Звук отключен для мини-плееров
-                            useSubStream={true} // Используем sub.mp4 для мини-плееров
-                            hideControlsOnMouseLeave={true} // Скрываем контролы сразу при уходе мыши
+                            muted={true}
+                            useSubStream={true}
+                            hideControlsOnMouseLeave={true}
                             onDoubleClick={() => onDoubleClick(camera.id)}
+                            cameraState={cameraState}
+                            serverTime={serverTime}
+                            shouldFetchCameraState={false}
+                            shouldFetchServerTime={false}
                         />
                     </TimelineAuthProvider>
                 </TimeProvider>
@@ -136,10 +145,11 @@ export const FourCamerasApp: React.FC<FourCamerasAppProps> = () => {
     const [gridSize, setGridSize] = useState<GridSize>(4);
     const [hoveredCameraId, setHoveredCameraId] = useState<string | null>(null);
 
-    // Получаем список камер с сервера
+    const [cameraStates, setCameraStates] = useState<Map<number, CameraStateResponse>>(new Map());
+    const [serverTime, setServerTime] = useState<Date | undefined>(undefined);
+
     const {cameras: camerasList, isLoading, error, refetch} = useCamerasList();
 
-    // Преобразуем список камер в нужный формат
     const cameras: CameraConfig[] = useMemo(() => {
         if (!camerasList.length) return [];
 
@@ -154,15 +164,58 @@ export const FourCamerasApp: React.FC<FourCamerasAppProps> = () => {
         }));
     }, [camerasList]);
 
-    // Инициализируем порядок камер на основе полученного списка
     const [cameraOrder, setCameraOrder] = useState<number[]>([]);
 
-    // Обновляем порядок камер когда загружается список
     useEffect(() => {
         if (cameras.length > 0) {
             setCameraOrder(cameras.map(camera => camera.id));
         }
     }, [cameras]);
+
+    const loadServerData = useCallback(async () => {
+        if (!cameras.length) return;
+
+        try {
+            const serverConfig = getServerConfig();
+            const credentials = `${serverConfig.login}:${serverConfig.password || ''}`;
+
+            const serverTimeData = await getServerTime(
+                serverConfig.streamUrl,
+                serverConfig.streamPort,
+                credentials,
+                serverConfig.protocol === 'https' ? Protocol.Https : Protocol.Http
+            );
+            setServerTime(serverTimeData);
+
+            const cameraStatesMap = new Map<number, CameraStateResponse>();
+
+            const cameraStatePromises = cameras.map(async camera => {
+                try {
+                    const state = await getCameraState(
+                        serverConfig.streamUrl,
+                        serverConfig.streamPort,
+                        credentials,
+                        camera.id,
+                        serverConfig.protocol === 'https' ? Protocol.Https : Protocol.Http
+                    );
+                    cameraStatesMap.set(camera.id, state);
+                } catch (error) {
+                    console.warn(`Failed to load state for camera ${camera.id}:`, error);
+                }
+            });
+
+            await Promise.all(cameraStatePromises);
+            setCameraStates(cameraStatesMap);
+        } catch (error) {
+            console.error('Failed to load server data:', error);
+        }
+    }, [cameras]);
+
+    useEffect(() => {
+        if (cameras.length > 0) {
+            void loadServerData();
+        }
+    }, [cameras, loadServerData]);
 
     const handleCameraClose = useCallback(() => {
         setExpandedCamera(null);
@@ -179,7 +232,7 @@ export const FourCamerasApp: React.FC<FourCamerasAppProps> = () => {
 
     const handleGridSizeChange = useCallback((newGridSize: GridSize) => {
         setGridSize(newGridSize);
-        setIsGridTooltipOpen(false); // Закрываем тултип после выбора
+        setIsGridTooltipOpen(false);
     }, []);
 
     const handleGridIconClick = useCallback(() => {
@@ -190,10 +243,8 @@ export const FourCamerasApp: React.FC<FourCamerasAppProps> = () => {
         setFilterText(e.target.value);
     }, []);
 
-    // Фильтрация камер
     const filteredCameras = cameras.filter(camera => camera.name?.toLowerCase().includes(filterText.toLowerCase()));
 
-    // Функция для получения URL превью камеры
     const getCameraPreviewUrl = useCallback(
         (
             cameraId: number,
@@ -219,10 +270,8 @@ export const FourCamerasApp: React.FC<FourCamerasAppProps> = () => {
         []
     );
 
-    // Ref для тултипа грида
     const gridTooltipRef = useRef<HTMLDivElement>(null);
 
-    // Обработка кликов вне тултипа грида
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (gridTooltipRef.current && !gridTooltipRef.current.contains(event.target as Node)) {
@@ -239,11 +288,10 @@ export const FourCamerasApp: React.FC<FourCamerasAppProps> = () => {
         };
     }, [isGridTooltipOpen]);
 
-    // Настройка сенсоров для drag and drop
     const sensors = useSensors(
         useSensor(PointerSensor, {
             activationConstraint: {
-                distance: 8 // Минимальное расстояние в пикселях перед началом перетаскивания
+                distance: 8
             }
         }),
         useSensor(KeyboardSensor, {
@@ -251,13 +299,10 @@ export const FourCamerasApp: React.FC<FourCamerasAppProps> = () => {
         })
     );
 
-    // Обработчик начала перетаскивания
     const handleDragStart = useCallback(() => {
-        // Добавляем класс на body для курсора
         document.body.classList.add('dragging-active');
     }, []);
 
-    // Обработчик hover при перетаскивании
     const handleDragOver = useCallback((event: DragOverEvent) => {
         const {over} = event;
 
@@ -269,24 +314,20 @@ export const FourCamerasApp: React.FC<FourCamerasAppProps> = () => {
         }
     }, []);
 
-    // Обработчик завершения перетаскивания
     const handleDragEnd = useCallback((event: DragEndEvent) => {
         const {active, over} = event;
         const activeId = active.id as string;
 
         setHoveredCameraId(null);
 
-        // Удаляем класс с body
         document.body.classList.remove('dragging-active');
 
         if (!over) return;
 
-        // Если перетаскиваем камеру из меню
         if (typeof activeId === 'string' && activeId.startsWith('camera-')) {
             const draggedCameraId = Number(activeId.replace('camera-', ''));
             const targetCameraId = Number((over.id as string).split('-')[1]);
 
-            // Заменяем камеру в сетке
             setCameraOrder(items => {
                 const targetIndex = items.indexOf(targetCameraId);
                 if (targetIndex !== -1) {
@@ -297,7 +338,6 @@ export const FourCamerasApp: React.FC<FourCamerasAppProps> = () => {
                 return items;
             });
         } else {
-            // Обычная перестановка камер в сетке
             if (over && active.id !== over.id) {
                 setCameraOrder(items => {
                     const [activeIndex, activeCameraId] = (active.id as string).split('-').map(Number);
@@ -312,7 +352,6 @@ export const FourCamerasApp: React.FC<FourCamerasAppProps> = () => {
         }
     }, []);
 
-    // Компонент для отображения состояния загрузки
     const LoadingScreen: React.FC = () => (
         <div className={styles.loadingScreen}>
             <div className={styles.loadingSpinner}></div>
@@ -320,7 +359,6 @@ export const FourCamerasApp: React.FC<FourCamerasAppProps> = () => {
         </div>
     );
 
-    // Компонент для отображения ошибки
     const ErrorScreen: React.FC<{error: string; onRetry: () => void}> = ({error, onRetry}) => (
         <div className={styles.errorScreen}>
             <div className={styles.errorIcon}>⚠️</div>
@@ -335,12 +373,10 @@ export const FourCamerasApp: React.FC<FourCamerasAppProps> = () => {
         </div>
     );
 
-    // Если загружается список камер
     if (isLoading) {
         return <LoadingScreen />;
     }
 
-    // Если произошла ошибка при загрузке
     if (error) {
         return (
             <ErrorScreen
@@ -350,7 +386,6 @@ export const FourCamerasApp: React.FC<FourCamerasAppProps> = () => {
         );
     }
 
-    // Если нет камер
     if (!cameras.length) {
         return (
             <div className={styles.errorScreen}>
@@ -367,7 +402,6 @@ export const FourCamerasApp: React.FC<FourCamerasAppProps> = () => {
         );
     }
 
-    // Если камера развернута, показываем только её
     if (expandedCamera !== null) {
         const camera = cameras.find(c => c.id === expandedCamera);
         if (!camera) {
@@ -407,6 +441,10 @@ export const FourCamerasApp: React.FC<FourCamerasAppProps> = () => {
                                     showCameraSelector={false}
                                     useSubStream={false}
                                     onDoubleClick={handleCameraClose}
+                                    cameraState={cameraStates.get(camera.id)}
+                                    serverTime={serverTime}
+                                    shouldFetchCameraState={false}
+                                    shouldFetchServerTime={false}
                                 />
                             </TimelineAuthProvider>
                         </TimeProvider>
@@ -416,7 +454,6 @@ export const FourCamerasApp: React.FC<FourCamerasAppProps> = () => {
         );
     }
 
-    // Обычный вид с четырьмя камерами
     return (
         <DndContext
             sensors={sensors}
@@ -604,7 +641,6 @@ export const FourCamerasApp: React.FC<FourCamerasAppProps> = () => {
                             if (cameraContainer) {
                                 const targetCameraId = Number(cameraContainer.getAttribute('data-camera-id'));
 
-                                // Заменяем камеру в сетке
                                 setCameraOrder(items => {
                                     const targetIndex = items.indexOf(targetCameraId);
                                     if (targetIndex !== -1) {
@@ -621,7 +657,6 @@ export const FourCamerasApp: React.FC<FourCamerasAppProps> = () => {
                     <SortableContext
                         items={cameraOrder.slice(0, gridSize).map((cameraId, index) => `${index}-${cameraId}`)}
                         strategy={rectSortingStrategy}
-                        // disabled={true}
                     >
                         {cameraOrder.slice(0, gridSize).map((cameraId, index) => {
                             const camera = cameras.find(c => c.id === cameraId);
@@ -634,6 +669,8 @@ export const FourCamerasApp: React.FC<FourCamerasAppProps> = () => {
                                     camera={camera}
                                     onDoubleClick={handleCameraDoubleClick}
                                     isHovered={hoveredCameraId === `${index}-${camera.id}`}
+                                    cameraState={cameraStates.get(camera.id)}
+                                    serverTime={serverTime}
                                 />
                             );
                         })}

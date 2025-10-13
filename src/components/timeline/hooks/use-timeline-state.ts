@@ -23,6 +23,10 @@ const areTimeRangesEqual = (range1: TimeRange | null, range2: TimeRange | null):
  * @param url URL для API запросов
  * @param port Порт для API запросов
  * @param credentials Учетные данные для API запросов
+ * @param protocol Протокол для API запросов
+ * @param proxy Прокси для API запросов
+ * @param externalServerTime Внешнее время сервера
+ * @param shouldFetchServerTime Флаг для авто-запроса времени сервера
  * @returns Состояние временной шкалы и методы для управления им
  */
 export const useTimelineState = (
@@ -31,15 +35,17 @@ export const useTimelineState = (
     port?: number,
     credentials?: string,
     protocol?: Protocol,
-    proxy?: string
+    proxy?: string,
+    externalServerTime?: Date,
+    shouldFetchServerTime: boolean = true
 ) => {
-    // Получаем время из глобального контекста
     const {serverTime, setServerTime, progress: ctxProgress, skipCenterTimeline} = useTime();
     const [isLoading, setIsLoading] = useState<boolean>(true);
 
     const [serverTimeError, setServerTimeError] = useState<boolean>(false);
 
-    // Индекс текущего интервала масштабирования
+    const [isInitialized, setIsInitialized] = useState<boolean>(false);
+
     const [intervalIndex, setIntervalIndex] = useState(8);
 
     // Видимый диапазон времени (инициализируется только после получения серверного времени)
@@ -73,9 +79,39 @@ export const useTimelineState = (
         }
     }, [serverTime, visibleTimeRange, intervalIndex, ctxProgress]);
 
-    // Получение времени сервера при инициализации
+    // Обработка внешнего времени сервера
     useEffect(() => {
-        if (!url || !port || !credentials || serverTime) return;
+        if (externalServerTime && !isInitialized) {
+            setServerTime(externalServerTime);
+
+            // Инициализируем видимый диапазон
+            const currentInterval = INTERVALS[intervalIndex];
+            const halfInterval = currentInterval / 2;
+            const currentDateTime = new Date(externalServerTime.getTime() + ctxProgress * 1000);
+
+            const start = new Date(currentDateTime.getTime() - halfInterval);
+            const end = new Date(currentDateTime.getTime() + halfInterval);
+
+            setVisibleTimeRangeState({start, end});
+            setIsLoading(false);
+            setIsInitialized(true);
+        }
+    }, [externalServerTime, isInitialized, intervalIndex, ctxProgress, setServerTime, setVisibleTimeRangeState]);
+
+    // Получение времени сервера при инициализации (только если не передано извне)
+    useEffect(() => {
+        // Если время передано извне, уже инициализированы, или не разрешено делать запросы, не делаем запрос
+        if (
+            externalServerTime ||
+            isInitialized ||
+            !shouldFetchServerTime ||
+            !url ||
+            !port ||
+            !credentials ||
+            serverTime
+        ) {
+            return;
+        }
 
         const fetchServerTime = () => {
             setIsLoading(true);
@@ -94,6 +130,7 @@ export const useTimelineState = (
 
                     setVisibleTimeRangeState({start, end});
                     setIsLoading(false);
+                    setIsInitialized(true);
                 })
                 .catch(error => {
                     console.error('Ошибка при получении времени сервера:', error);
@@ -103,10 +140,46 @@ export const useTimelineState = (
         };
 
         fetchServerTime();
-    }, [url, port, credentials, intervalIndex, protocol, proxy]);
+    }, [
+        url,
+        port,
+        credentials,
+        intervalIndex,
+        protocol,
+        proxy,
+        externalServerTime,
+        shouldFetchServerTime,
+        isInitialized,
+        serverTime,
+        ctxProgress,
+        setServerTime,
+        setVisibleTimeRangeState
+    ]);
+
+    // Отдельный useEffect для обновления времени при изменении intervalIndex
+    useEffect(() => {
+        // Обновляем время при изменении intervalIndex только если:
+        // 1. Уже инициализированы
+        // 2. Изначально данные НЕ переданы извне (то есть мы сами управляем временем)
+        // 3. Разрешено делать запросы
+        // 4. Есть все необходимые параметры для запроса
+        if (isInitialized && !externalServerTime && shouldFetchServerTime && url && port && credentials) {
+            const fetchServerTime = async () => {
+                try {
+                    const time = await getServerTime(url, port, credentials, protocol, proxy);
+                    setServerTime(time);
+                } catch (error) {
+                    console.error('Ошибка при обновлении времени сервера:', error);
+                }
+            };
+
+            void fetchServerTime();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [intervalIndex]); // Только intervalIndex в зависимостях
 
     const updateServerTime = async () => {
-        if (!url || !port || !credentials) return;
+        if (!url || !port || !credentials || !shouldFetchServerTime) return;
         const time = await getServerTime(url, port, credentials, protocol, proxy);
         setServerTime(time);
         return time;
@@ -115,9 +188,12 @@ export const useTimelineState = (
     /**
      * Установить видимый диапазон времени
      */
-    const setVisibleTimeRange = useCallback((range: TimeRange) => {
-        setVisibleTimeRangeState(range);
-    }, []);
+    const setVisibleTimeRange = useCallback(
+        (range: TimeRange) => {
+            setVisibleTimeRangeState(range);
+        },
+        [setVisibleTimeRangeState]
+    );
 
     /**
      * Центрировать временную шкалу на текущем времени

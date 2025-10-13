@@ -3,7 +3,7 @@ import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {formatDate, addSecondsToDate} from '../../utils/dates';
 import {getProtocol, formatUrlForDownload, clickA} from '../../utils/url-params';
 import {Mode, Protocol} from '../../utils/types';
-import {getCameraState, getCamerasList, type CameraInfo} from '../../utils/api';
+import {getCameraState, getCamerasList, type CameraInfo, type CameraStateResponse} from '../../utils/api';
 import {ControlPanel} from '../control-panel';
 import {CAMERA_SWIPE_THRESHOLD_PERCENT, PLAYER_HORIZONTAL_SWIPE_THRESHOLD} from '../timeline/utils/constants';
 
@@ -40,6 +40,12 @@ export interface PlayerProps {
     hideControlsOnMouseLeave?: boolean; // Флаг для скрытия контролов сразу при уходе мыши
     onDoubleClick?: () => void; // Обработчик двойного клика для кастомного поведения
     timelineHoverMode?: 'instant' | 'delayed'; // Режим отображения таймлайна при наведении
+
+    // Новые пропсы для внешних данных
+    cameraState?: CameraStateResponse; // Состояние камеры извне
+    serverTime?: Date; // Время сервера извне
+    shouldFetchCameraState?: boolean; // Флаг для авто-запроса состояния камеры
+    shouldFetchServerTime?: boolean; // Флаг для авто-запроса времени сервера
 }
 
 export const Player: React.FC<PlayerProps> = ({
@@ -57,7 +63,11 @@ export const Player: React.FC<PlayerProps> = ({
     useSubStream = false,
     hideControlsOnMouseLeave = false,
     onDoubleClick,
-    timelineHoverMode = 'instant'
+    timelineHoverMode = 'instant',
+    cameraState,
+    serverTime,
+    shouldFetchCameraState = true,
+    shouldFetchServerTime = true
 }) => {
     // Local auth state to allow updating credentials when 401 occurs
     const [authLogin, setAuthLogin] = useState<string>(login);
@@ -65,10 +75,13 @@ export const Player: React.FC<PlayerProps> = ({
     const [currentMode, setCurrentMode] = useState<Mode>(mode);
     const [isFirstLoad, setIsFirstLoad] = useState(true);
     const [isFullscreen, setIsFullscreen] = useState(false);
-    const {serverTime, setServerTime, progress: ctxProgress, setProgress} = useTime();
+    const {serverTime: contextServerTime, setServerTime, progress: ctxProgress, setProgress} = useTime();
     const [showSaveModal, setShowSaveModal] = useState<boolean>(false);
     const [isNoSound, setIsNoSound] = useState<boolean>(false);
     const [showH265Warning, setShowH265Warning] = useState<boolean>(false);
+
+    // Используем внешнее время сервера или из контекста
+    const effectiveServerTime = serverTime || contextServerTime;
 
     // Availability/auth check state
     const [isCheckingAvailability, setIsCheckingAvailability] = useState<boolean>(false);
@@ -138,14 +151,16 @@ export const Player: React.FC<PlayerProps> = ({
         streamPort,
         authVerified ? authorization : undefined,
         protocol,
-        effectiveProxy
+        effectiveProxy,
+        serverTime,
+        shouldFetchServerTime
     );
 
     // Формирование URL для потока в зависимости от режима и серверного времени
     let finalStreamUrl = '';
     if (authVerified && camera !== undefined) {
-        if (currentMode === 'record' && serverTime) {
-            finalStreamUrl = `${videoUrl}&time=${formatDate(serverTime)}&autoplay=1${!isMuted && !isNoSound ? '&audio=1' : ''}`;
+        if (currentMode === 'record' && effectiveServerTime) {
+            finalStreamUrl = `${videoUrl}&time=${formatDate(effectiveServerTime)}&autoplay=1${!isMuted && !isNoSound ? '&audio=1' : ''}`;
         } else {
             finalStreamUrl = videoUrl || '';
         }
@@ -155,7 +170,7 @@ export const Player: React.FC<PlayerProps> = ({
         fragmetsGapRef.current = 0;
         isTransitioningToNextFragmentRef.current = false;
         nextFragmentTimeRef.current = null;
-    }, [serverTime]);
+    }, [effectiveServerTime]);
 
     // Отслеживаем переключение режимов для определения, что это уже не первая загрузка
     useEffect(() => {
@@ -165,16 +180,7 @@ export const Player: React.FC<PlayerProps> = ({
     }, [currentMode, mode, isFirstLoad]);
 
     useEffect(() => {
-        const fetchCameraState = async () => {
-            const result = await getCameraState(
-                streamUrl,
-                streamPort,
-                authorization,
-                camera ?? 0,
-                protocol,
-                effectiveProxy
-            );
-
+        const processCameraState = (result: CameraStateResponse) => {
             const isH265 = result.result.state.video_streams.video.codec === 'h265';
             setIsNoSound(result.result.state.audio_streams.audio.signal === 'no');
 
@@ -187,10 +193,47 @@ export const Player: React.FC<PlayerProps> = ({
             }
         };
 
-        if (authVerified && streamUrl && streamPort && authorization && Number.isInteger(camera as number)) {
+        // Если передано состояние камеры извне, используем его
+        if (cameraState) {
+            processCameraState(cameraState);
+            return;
+        }
+
+        // Иначе делаем запрос сами, если флаг разрешает
+        if (
+            shouldFetchCameraState &&
+            authVerified &&
+            streamUrl &&
+            streamPort &&
+            authorization &&
+            Number.isInteger(camera as number)
+        ) {
+            const fetchCameraState = async () => {
+                const result = await getCameraState(
+                    streamUrl,
+                    streamPort,
+                    authorization,
+                    camera ?? 0,
+                    protocol,
+                    effectiveProxy
+                );
+                processCameraState(result);
+            };
             void fetchCameraState();
         }
-    }, [authVerified, streamUrl, streamPort, authorization, camera, protocol, effectiveProxy, isAndroid, isIOS]);
+    }, [
+        authVerified,
+        streamUrl,
+        streamPort,
+        authorization,
+        camera,
+        protocol,
+        effectiveProxy,
+        isAndroid,
+        isIOS,
+        cameraState,
+        shouldFetchCameraState
+    ]);
 
     const checkAvailability = useCallback(
         async (credentials: string) => {
@@ -285,14 +328,23 @@ export const Player: React.FC<PlayerProps> = ({
         if (time) {
             setServerTime(time, true);
         } else {
-            updateServerTime();
+            // Если не передано внешнее время сервера и флаг разрешает, обновляем время
+            if (shouldFetchServerTime && !serverTime) {
+                updateServerTime();
+            }
             // setServerTime(new Date(), false);
         }
     };
 
     const handleTimelineClick = async (clickedTime: Date) => {
-        // Получаем текущее время сервера или используем текущее время системы
-        const currentServerTime = await updateServerTime();
+        // Получаем текущее время сервера или используем переданное извне
+        let currentServerTime = effectiveServerTime;
+
+        // Если не передано внешнее время и флаг разрешает, делаем запрос
+        if (!serverTime && shouldFetchServerTime) {
+            const fetchedTime = await updateServerTime();
+            currentServerTime = fetchedTime || null;
+        }
 
         // Проверяем, является ли выбранное время в будущем
         // Добавляем небольшой буфер (5 секунд) для более точного определения
@@ -381,7 +433,9 @@ export const Player: React.FC<PlayerProps> = ({
 
     const handlePlayerTouchMove = useCallback(
         (e: React.TouchEvent) => {
-            if (!isPlayerSwipeActive || e.touches.length !== 1 || !showCameraSelector || availableCameras.length <= 1) return;
+            // prettier-ignore
+            const canSwipe = isPlayerSwipeActive && e.touches.length === 1 && showCameraSelector && availableCameras.length > 1;
+            if (!canSwipe) return;
 
             const touch = e.touches[0];
             const deltaX = touch.clientX - playerSwipeStartX;
@@ -519,14 +573,14 @@ export const Player: React.FC<PlayerProps> = ({
                     return;
                 }
 
-                if (currentMode === Mode.Record && serverTime) {
-                    let candidateAbsolute = addSecondsToDate(serverTime, ctxProgress + delta);
+                if (currentMode === Mode.Record && effectiveServerTime) {
+                    let candidateAbsolute = addSecondsToDate(effectiveServerTime, ctxProgress + delta);
 
                     if (isRight) {
                         const baseOffset = forwardAccumOffsetRef.current ?? ctxProgress;
                         const nextOffset = baseOffset + 5;
                         forwardAccumOffsetRef.current = nextOffset;
-                        candidateAbsolute = addSecondsToDate(serverTime, nextOffset);
+                        candidateAbsolute = addSecondsToDate(effectiveServerTime, nextOffset);
 
                         const approxNow = new Date();
                         if (candidateAbsolute.getTime() > approxNow.getTime()) {
@@ -556,7 +610,7 @@ export const Player: React.FC<PlayerProps> = ({
     }, [
         handleToggleFullscreen,
         currentMode,
-        serverTime,
+        effectiveServerTime,
         ctxProgress,
         updateServerTime,
         setProgress,
@@ -760,10 +814,10 @@ export const Player: React.FC<PlayerProps> = ({
         playbackSpeed,
         onPlayPause: (value?: boolean) => handlePlayPause(value),
         onProgress: p => {
-            if (currentMode === Mode.Record && serverTime) {
+            if (currentMode === Mode.Record && effectiveServerTime) {
                 // Вычисляем абсолютное время с учетом накопленного gap
                 const currentTotalProgress = p.currentTime + fragmetsGapRef.current;
-                const currentAbsoluteTime = new Date(serverTime.getTime() + currentTotalProgress * 1000);
+                const currentAbsoluteTime = new Date(effectiveServerTime.getTime() + currentTotalProgress * 1000);
 
                 // Проверяем, достигли ли мы конца текущего фрагмента
                 if (checkIfAtEndOfCurrentSegment(currentAbsoluteTime)) {
@@ -772,7 +826,7 @@ export const Player: React.FC<PlayerProps> = ({
 
                     if (nextSegmentTime && nextFragmentTimeRef.current !== nextSegmentTime) {
                         nextFragmentTimeRef.current = nextSegmentTime;
-                        const newProgress = (nextSegmentTime.getTime() - serverTime.getTime()) / 1000;
+                        const newProgress = (nextSegmentTime.getTime() - effectiveServerTime.getTime()) / 1000;
 
                         // Устанавливаем флаг перехода и обновляем gap
                         isTransitioningToNextFragmentRef.current = true;
@@ -889,7 +943,7 @@ export const Player: React.FC<PlayerProps> = ({
                     {/* Для iPhone всегда используем VideoTag с нативным воспроизведением m3u8 */}
                     {showSaveModal && (
                         <SaveStreamModal
-                            currentTime={addSecondsToDate(serverTime ?? new Date(), ctxProgress)}
+                            currentTime={addSecondsToDate(effectiveServerTime ?? new Date(), ctxProgress)}
                             isOpen={showSaveModal}
                             onClose={() => setShowSaveModal(false)}
                             onFinish={handleSaveStreamFinish}
@@ -985,6 +1039,8 @@ export const Player: React.FC<PlayerProps> = ({
                             popperBoundaryElement={containerRef.current}
                             popperPortalId={datepickerPortalIdRef.current}
                             timelineRef={timelineRef}
+                            externalServerTime={serverTime}
+                            shouldFetchServerTime={shouldFetchServerTime}
                             onPlayPause={() => handlePlayPause()}
                             onMuteToggle={() => handleMuteToggle()}
                             onToggleFullscreen={() => handleToggleFullscreen()}

@@ -27,7 +27,7 @@ interface GetFramesTimelineParams {
     proxy?: string;
 }
 
-interface TimelineResponse {
+export interface TimelineResponse {
     timeline: number[];
 }
 
@@ -173,7 +173,7 @@ export const getServerTime = async (
     }
 };
 
-interface CameraStateResponse {
+export interface CameraStateResponse {
     result: {
         state: {
             video_streams: {video: {codec: string}};

@@ -14,7 +14,22 @@ import {Mode} from '../../utils/types';
  * Компонент временной шкалы
  */
 export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
-    ({url, port, credentials, onTimeClick, progress = 0, camera, mode, protocol, proxy}, ref) => {
+    (
+        {
+            url,
+            port,
+            credentials,
+            onTimeClick,
+            progress = 0,
+            camera,
+            mode,
+            protocol,
+            proxy,
+            externalServerTime,
+            shouldFetchServerTime
+        },
+        ref
+    ) => {
         // Создаем ссылки на DOM-элементы
         const containerRef = useRef<HTMLDivElement>(null);
         const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -48,7 +63,16 @@ export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
             updateCursorPosition,
             resetCursorPosition,
             serverTimeError
-        } = useTimelineState(progress, url, port, credentials, protocol, proxy);
+        } = useTimelineState(
+            progress,
+            url,
+            port,
+            credentials,
+            protocol,
+            proxy,
+            externalServerTime,
+            shouldFetchServerTime
+        );
 
         // Используем хук для управления фрагментами
         const {fragments, fragmentsBufferRange, fragmentRanges, loadFragments, resetFragments} = useTimelineFragments({
