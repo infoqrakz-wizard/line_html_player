@@ -13,7 +13,7 @@ import {useOrientation} from '../timeline/hooks/use-orientation';
 import {TimelineRef} from '../timeline/types';
 
 import {HlsPlayer, VideoTag, SaveStreamModal, ModeIndicator} from './components';
-import {PlayerComponentProps} from './components/player-interface';
+import {PlayerComponentProps, PlaybackStatus} from './components/player-interface';
 import {getAuthToken} from '../../utils/getAuthToken';
 
 import type {PlayerRef} from './components/player-interface';
@@ -76,6 +76,7 @@ export const Player: React.FC<PlayerProps> = ({
     const [isPlaying, setIsPlaying] = useState<boolean>(true);
     const [isMuted, setIsMuted] = useState<boolean>(muted);
     const [playbackSpeed, setPlaybackSpeed] = useState<number>(1);
+    const [playbackStatus, setPlaybackStatus] = useState<PlaybackStatus>('loading');
 
     const [isMobile, setIsMobile] = useState<boolean>(false);
     const [showControls, setShowControls] = useState<boolean>(false);
@@ -271,6 +272,9 @@ export const Player: React.FC<PlayerProps> = ({
     };
 
     const handleTimelineClick = async (clickedTime: Date) => {
+        // Сразу устанавливаем статус loading, так как мы не можем сразу продолжить воспроизведение
+        setPlaybackStatus('loading');
+
         // Получаем текущее время сервера или используем текущее время системы
         const currentServerTime = await updateServerTime();
 
@@ -308,6 +312,10 @@ export const Player: React.FC<PlayerProps> = ({
 
     const handleSpeedChange = (speed: number) => {
         setPlaybackSpeed(speed);
+    };
+
+    const handlePlaybackStatusChange = (status: PlaybackStatus) => {
+        setPlaybackStatus(status);
     };
 
     const handleMouseEnter = () => {
@@ -706,6 +714,7 @@ export const Player: React.FC<PlayerProps> = ({
         // posterUrl,
         playbackSpeed,
         onPlayPause: (value?: boolean) => handlePlayPause(value),
+        onPlaybackStatusChange: handlePlaybackStatusChange,
         onProgress: p => {
             if (currentMode === Mode.Record && serverTime) {
                 // Вычисляем абсолютное время с учетом накопленного gap
@@ -781,7 +790,7 @@ export const Player: React.FC<PlayerProps> = ({
                 <div className={`${styles.topControls} ${isVerticalTimeline ? styles.mobileLandscapeTopControls : ''}`}>
                     <ModeIndicator
                         mode={currentMode}
-                        isPlaying={isPlaying}
+                        playbackStatus={playbackStatus}
                     />
                 </div>
                 <div className={`${styles.videoContainer} ${isVerticalTimeline ? styles.landscapeVideoContainer : ''}`}>

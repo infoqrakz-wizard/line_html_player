@@ -1,15 +1,19 @@
 import React from 'react';
 import styles from './mode-indicator.module.scss';
+import type {PlaybackStatus} from '../player-interface';
 
 interface ModeIndicatorProps {
     mode: 'live' | 'record';
-    isPlaying: boolean;
+    playbackStatus: PlaybackStatus;
 }
 
-export const ModeIndicator: React.FC<ModeIndicatorProps> = ({ mode, isPlaying }) => {
+export const ModeIndicator: React.FC<ModeIndicatorProps> = ({mode, playbackStatus}) => {
     const label = mode === 'live' ? 'LIVE' : 'PLAYBACK';
+
+    const isActuallyPlaying = playbackStatus === 'playing';
+
     const statusClassName = `${styles.statusDot} ${
-        isPlaying ? (mode === 'live' ? styles.blinkGreen : styles.blinkRed) : styles.paused
+        isActuallyPlaying ? (mode === 'live' ? styles.blinkGreen : styles.blinkRed) : styles.paused
     }`;
 
     return (

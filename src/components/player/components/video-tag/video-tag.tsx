@@ -12,6 +12,7 @@ export interface VideoTagProps {
     posterUrl?: string;
     onProgress?: (progress: {currentTime: number; duration: number}) => void;
     onPlayPause?: (playing: boolean) => void;
+    onPlaybackStatusChange?: (status: import('../player-interface').PlaybackStatus) => void;
     updateServerTime?: () => Promise<Date | undefined>;
     setProgress?: (seconds: number) => void;
     overlayText?: string;
@@ -27,6 +28,7 @@ export const VideoTag = forwardRef<PlayerRef, VideoTagProps>((props, ref) => {
         posterUrl,
         onProgress,
         onPlayPause,
+        onPlaybackStatusChange,
         overlayText,
         updateServerTime,
         setProgress
@@ -133,6 +135,54 @@ export const VideoTag = forwardRef<PlayerRef, VideoTagProps>((props, ref) => {
         mutedRef.current = muted;
         handleMuteToggle();
     }, [muted, mutedRef]);
+
+    // Отслеживаем фактический статус воспроизведения и сообщаем родителю
+    useEffect(() => {
+        const video = videoRef.current;
+        if (!video || !onPlaybackStatusChange) return;
+
+        const handlePlay = () => {
+            if (!isLoading && !isBuffering) {
+                onPlaybackStatusChange('playing');
+            }
+        };
+
+        const handlePause = () => {
+            onPlaybackStatusChange('paused');
+        };
+
+        const handleError = () => {
+            onPlaybackStatusChange('error');
+        };
+
+        video.addEventListener('play', handlePlay);
+        video.addEventListener('pause', handlePause);
+        video.addEventListener('error', handleError);
+
+        return () => {
+            video.removeEventListener('play', handlePlay);
+            video.removeEventListener('pause', handlePause);
+            video.removeEventListener('error', handleError);
+        };
+    }, [isLoading, isBuffering, onPlaybackStatusChange]);
+
+    // Отслеживаем изменения isLoading и isBuffering
+    useEffect(() => {
+        if (!onPlaybackStatusChange) return;
+
+        const video = videoRef.current;
+        if (!video) return;
+
+        if (isLoading) {
+            onPlaybackStatusChange('loading');
+        } else if (isBuffering) {
+            onPlaybackStatusChange('buffering');
+        } else if (!video.paused) {
+            onPlaybackStatusChange('playing');
+        } else {
+            onPlaybackStatusChange('paused');
+        }
+    }, [isLoading, isBuffering, onPlaybackStatusChange]);
 
     useEffect(() => {
         const video = videoRef.current;
