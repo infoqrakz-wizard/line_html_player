@@ -36,6 +36,8 @@ export interface PlayerProps {
     showCameraSelector?: boolean;
     proxy?: string;
     isUseProxy?: boolean;
+    enableZoomMagnifier?: boolean; // Включить лупу (по умолчанию true)
+    enableVideoZoom?: boolean; // Включить зум видео по скроллу (по умолчанию true)
 }
 
 export const Player: React.FC<PlayerProps> = ({
@@ -49,7 +51,9 @@ export const Player: React.FC<PlayerProps> = ({
     protocol: preferredProtocol,
     showCameraSelector = false,
     proxy,
-    isUseProxy
+    isUseProxy,
+    enableZoomMagnifier = true,
+    enableVideoZoom = true
 }) => {
     // Local auth state to allow updating credentials when 401 occurs
     const [authLogin, setAuthLogin] = useState<string>(login);
@@ -93,7 +97,12 @@ export const Player: React.FC<PlayerProps> = ({
     const [isZoomActive, setIsZoomActive] = useState<boolean>(false);
     const [zoomMouseX, setZoomMouseX] = useState<number>(0);
     const [zoomMouseY, setZoomMouseY] = useState<number>(0);
+    const [videoZoom, setVideoZoom] = useState<number>(1);
+    const [zoomOriginX, setZoomOriginX] = useState<number>(0.5);
+    const [zoomOriginY, setZoomOriginY] = useState<number>(0.5);
     const isCtrlPressedRef = useRef<boolean>(false);
+    const videoContainerRef = useRef<HTMLDivElement>(null);
+    const lastMousePositionRef = useRef<{x: number; y: number}>({x: 0, y: 0});
 
     const containerRef = useRef<HTMLDivElement>(null);
     const datepickerPortalIdRef = useRef<string>(`datepicker-portal-${Math.random().toString(36).slice(2)}`);
@@ -613,7 +622,21 @@ export const Player: React.FC<PlayerProps> = ({
             if (tag === 'input' || tag === 'textarea' || tag === 'select' || target?.isContentEditable) return;
 
             if (e.key === 'Control' || e.ctrlKey || e.metaKey) {
+                if (!enableZoomMagnifier) return;
+
                 isCtrlPressedRef.current = true;
+
+                // Если курсор уже находится над контейнером, сразу активируем лупу
+                if (containerRef.current) {
+                    const rect = containerRef.current.getBoundingClientRect();
+                    const {x, y} = lastMousePositionRef.current;
+
+                    if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
+                        setIsZoomActive(true);
+                        setZoomMouseX(x);
+                        setZoomMouseY(y);
+                    }
+                }
             }
         };
 
@@ -621,11 +644,17 @@ export const Player: React.FC<PlayerProps> = ({
             if (e.key === 'Control' || (!e.ctrlKey && !e.metaKey)) {
                 isCtrlPressedRef.current = false;
                 setIsZoomActive(false);
+                // Зум видео не сбрасываем при отпускании Ctrl, чтобы сохранить уровень зума после скролла
             }
         };
 
         const handleMouseMove = (e: MouseEvent) => {
-            if (isCtrlPressedRef.current && containerRef.current) {
+            // Всегда сохраняем последнюю позицию мыши для немедленной активации лупы при нажатии Ctrl
+            if (enableZoomMagnifier) {
+                lastMousePositionRef.current = {x: e.clientX, y: e.clientY};
+            }
+
+            if (enableZoomMagnifier && isCtrlPressedRef.current && containerRef.current) {
                 const rect = containerRef.current.getBoundingClientRect();
                 const x = e.clientX;
                 const y = e.clientY;
@@ -641,18 +670,64 @@ export const Player: React.FC<PlayerProps> = ({
             }
         };
 
+        const handleMouseEnter = (e: MouseEvent) => {
+            // Сохраняем позицию мыши при входе в контейнер
+            if (enableZoomMagnifier) {
+                lastMousePositionRef.current = {x: e.clientX, y: e.clientY};
+            }
+        };
+
         const handleMouseLeave = () => {
             if (isCtrlPressedRef.current) {
                 setIsZoomActive(false);
             }
         };
 
+        const handleWheel = (e: WheelEvent) => {
+            // Обрабатываем скролл для зума видео без Ctrl
+            if (!enableVideoZoom || !containerRef.current || !videoContainerRef.current) return;
+
+            const rect = containerRef.current.getBoundingClientRect();
+            const videoContainerRect = videoContainerRef.current.getBoundingClientRect();
+            const x = e.clientX;
+            const y = e.clientY;
+
+            // Проверяем, что курсор находится внутри контейнера
+            if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
+                e.preventDefault();
+                e.stopPropagation();
+
+                // Вычисляем относительную позицию курсора внутри видео контейнера для transform-origin
+                const relativeX = (x - videoContainerRect.left) / videoContainerRect.width;
+                const relativeY = (y - videoContainerRect.top) / videoContainerRect.height;
+
+                // Обновляем позицию мыши для лупы (если она активна)
+                if (enableZoomMagnifier && isCtrlPressedRef.current) {
+                    setZoomMouseX(x);
+                    setZoomMouseY(y);
+                }
+
+                // Обновляем точку зума для видео
+                setZoomOriginX(relativeX);
+                setZoomOriginY(relativeY);
+
+                // Изменяем зум видео: скролл вверх - увеличиваем, вниз - уменьшаем
+                setVideoZoom(prev => {
+                    const delta = e.deltaY > 0 ? -0.1 : 0.1;
+                    const newZoom = Math.max(1, Math.min(5, prev + delta));
+                    return Number(newZoom.toFixed(1));
+                });
+            }
+        };
+
         window.addEventListener('keydown', handleKeyDown);
         window.addEventListener('keyup', handleKeyUp);
         window.addEventListener('mousemove', handleMouseMove);
+        window.addEventListener('wheel', handleWheel, {passive: false});
 
         const container = containerRef.current;
         if (container) {
+            container.addEventListener('mouseenter', handleMouseEnter as EventListener);
             container.addEventListener('mouseleave', handleMouseLeave);
         }
 
@@ -660,11 +735,13 @@ export const Player: React.FC<PlayerProps> = ({
             window.removeEventListener('keydown', handleKeyDown);
             window.removeEventListener('keyup', handleKeyUp);
             window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('wheel', handleWheel);
             if (container) {
+                container.removeEventListener('mouseenter', handleMouseEnter as EventListener);
                 container.removeEventListener('mouseleave', handleMouseLeave);
             }
         };
-    }, []);
+    }, [enableZoomMagnifier, enableVideoZoom]);
 
     const handleSaveStreamFinish = (start: Date, end: Date) => {
         const fileName = `record_${formatDate(start, 'yyyy-MM-dd_HH-mm')}_${formatDate(end, 'yyyy-MM-dd_HH-mm')}`;
@@ -858,7 +935,15 @@ export const Player: React.FC<PlayerProps> = ({
                         playbackStatus={playbackStatus}
                     />
                 </div>
-                <div className={`${styles.videoContainer} ${isVerticalTimeline ? styles.landscapeVideoContainer : ''}`}>
+                <div
+                    ref={videoContainerRef}
+                    className={`${styles.videoContainer} ${isVerticalTimeline ? styles.landscapeVideoContainer : ''}`}
+                    style={{
+                        transform: enableVideoZoom ? `scale(${videoZoom})` : 'none',
+                        transformOrigin: enableVideoZoom ? `${zoomOriginX * 100}% ${zoomOriginY * 100}%` : 'center',
+                        transition: enableVideoZoom && videoZoom === 1 ? 'transform 0.3s ease-out' : 'none'
+                    }}
+                >
                     <div
                         style={{
                             width: '100%',
@@ -1017,16 +1102,19 @@ export const Player: React.FC<PlayerProps> = ({
                 </div>
                 <div id={datepickerPortalIdRef.current} />
             </div>
-            {isZoomActive && playerRef.current?.getVideoElement && playerRef.current.getVideoElement() && (
-                <ZoomMagnifier
-                    videoElement={playerRef.current.getVideoElement()}
-                    mouseX={zoomMouseX}
-                    mouseY={zoomMouseY}
-                    isActive={isZoomActive}
-                    zoomFactor={2}
-                    size={200}
-                />
-            )}
+            {enableZoomMagnifier &&
+                isZoomActive &&
+                playerRef.current?.getVideoElement &&
+                playerRef.current.getVideoElement() && (
+                    <ZoomMagnifier
+                        videoElement={playerRef.current.getVideoElement()}
+                        mouseX={zoomMouseX}
+                        mouseY={zoomMouseY}
+                        isActive={isZoomActive}
+                        zoomFactor={2}
+                        size={200}
+                    />
+                )}
         </>
     );
 };
