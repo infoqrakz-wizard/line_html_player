@@ -61,7 +61,8 @@ export const HlsPlayer = forwardRef<PlayerRef, HlsPlayerProps>((props, ref) => {
             } catch (e) {
                 // no-op
             }
-        }
+        },
+        getVideoElement: () => videoRef.current
     }));
 
     useEffect(() => {

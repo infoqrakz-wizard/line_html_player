@@ -13,4 +13,5 @@ export interface PlayerComponentProps {
 
 export interface PlayerRef {
     seekBy: (seconds: number) => void;
+    getVideoElement?: () => HTMLVideoElement | null;
 }

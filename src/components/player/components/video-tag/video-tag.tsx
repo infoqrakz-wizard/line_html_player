@@ -54,7 +54,8 @@ export const VideoTag = forwardRef<PlayerRef, VideoTagProps>((props, ref) => {
             } catch (e) {
                 // no-op
             }
-        }
+        },
+        getVideoElement: () => videoRef.current
     }));
 
     const handleTimeUpdate = () => {

@@ -12,7 +12,7 @@ import {useTimelineState} from '../timeline/hooks/use-timeline-state';
 import {useOrientation} from '../timeline/hooks/use-orientation';
 import {TimelineRef} from '../timeline/types';
 
-import {HlsPlayer, VideoTag, SaveStreamModal, ModeIndicator} from './components';
+import {HlsPlayer, VideoTag, SaveStreamModal, ModeIndicator, ZoomMagnifier} from './components';
 import {PlayerComponentProps, PlaybackStatus} from './components/player-interface';
 import {getAuthToken} from '../../utils/getAuthToken';
 
@@ -89,6 +89,11 @@ export const Player: React.FC<PlayerProps> = ({
     const [playerSwipeStartX, setPlayerSwipeStartX] = useState<number>(0);
     const [playerSwipeStartY, setPlayerSwipeStartY] = useState<number>(0);
     const [hasPlayerSwiped, setHasPlayerSwiped] = useState<boolean>(false);
+
+    const [isZoomActive, setIsZoomActive] = useState<boolean>(false);
+    const [zoomMouseX, setZoomMouseX] = useState<number>(0);
+    const [zoomMouseY, setZoomMouseY] = useState<number>(0);
+    const isCtrlPressedRef = useRef<boolean>(false);
 
     const containerRef = useRef<HTMLDivElement>(null);
     const datepickerPortalIdRef = useRef<string>(`datepicker-portal-${Math.random().toString(36).slice(2)}`);
@@ -601,6 +606,66 @@ export const Player: React.FC<PlayerProps> = ({
         return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
     }, [isPlaying, currentMode, updateServerTime, setProgress]);
 
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            const target = e.target as HTMLElement | null;
+            const tag = target?.tagName?.toLowerCase();
+            if (tag === 'input' || tag === 'textarea' || tag === 'select' || target?.isContentEditable) return;
+
+            if (e.key === 'Control' || e.ctrlKey || e.metaKey) {
+                isCtrlPressedRef.current = true;
+            }
+        };
+
+        const handleKeyUp = (e: KeyboardEvent) => {
+            if (e.key === 'Control' || (!e.ctrlKey && !e.metaKey)) {
+                isCtrlPressedRef.current = false;
+                setIsZoomActive(false);
+            }
+        };
+
+        const handleMouseMove = (e: MouseEvent) => {
+            if (isCtrlPressedRef.current && containerRef.current) {
+                const rect = containerRef.current.getBoundingClientRect();
+                const x = e.clientX;
+                const y = e.clientY;
+
+                // Проверяем, что курсор находится внутри контейнера
+                if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
+                    setIsZoomActive(true);
+                    setZoomMouseX(x);
+                    setZoomMouseY(y);
+                } else {
+                    setIsZoomActive(false);
+                }
+            }
+        };
+
+        const handleMouseLeave = () => {
+            if (isCtrlPressedRef.current) {
+                setIsZoomActive(false);
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        window.addEventListener('keyup', handleKeyUp);
+        window.addEventListener('mousemove', handleMouseMove);
+
+        const container = containerRef.current;
+        if (container) {
+            container.addEventListener('mouseleave', handleMouseLeave);
+        }
+
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+            window.removeEventListener('keyup', handleKeyUp);
+            window.removeEventListener('mousemove', handleMouseMove);
+            if (container) {
+                container.removeEventListener('mouseleave', handleMouseLeave);
+            }
+        };
+    }, []);
+
     const handleSaveStreamFinish = (start: Date, end: Date) => {
         const fileName = `record_${formatDate(start, 'yyyy-MM-dd_HH-mm')}_${formatDate(end, 'yyyy-MM-dd_HH-mm')}`;
         const durationSeconds = (end.getTime() - start.getTime()) / 1000;
@@ -952,6 +1017,16 @@ export const Player: React.FC<PlayerProps> = ({
                 </div>
                 <div id={datepickerPortalIdRef.current} />
             </div>
+            {isZoomActive && playerRef.current?.getVideoElement && playerRef.current.getVideoElement() && (
+                <ZoomMagnifier
+                    videoElement={playerRef.current.getVideoElement()}
+                    mouseX={zoomMouseX}
+                    mouseY={zoomMouseY}
+                    isActive={isZoomActive}
+                    zoomFactor={2}
+                    size={200}
+                />
+            )}
         </>
     );
 };
