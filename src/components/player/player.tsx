@@ -626,9 +626,9 @@ export const Player: React.FC<PlayerProps> = ({
 
                 isCtrlPressedRef.current = true;
 
-                // Если курсор уже находится над контейнером, сразу активируем лупу
-                if (containerRef.current) {
-                    const rect = containerRef.current.getBoundingClientRect();
+                // Если курсор уже находится над видео контейнером, сразу активируем лупу
+                if (videoContainerRef.current) {
+                    const rect = videoContainerRef.current.getBoundingClientRect();
                     const {x, y} = lastMousePositionRef.current;
 
                     if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
@@ -654,12 +654,12 @@ export const Player: React.FC<PlayerProps> = ({
                 lastMousePositionRef.current = {x: e.clientX, y: e.clientY};
             }
 
-            if (enableZoomMagnifier && isCtrlPressedRef.current && containerRef.current) {
-                const rect = containerRef.current.getBoundingClientRect();
+            if (enableZoomMagnifier && isCtrlPressedRef.current && videoContainerRef.current) {
+                const rect = videoContainerRef.current.getBoundingClientRect();
                 const x = e.clientX;
                 const y = e.clientY;
 
-                // Проверяем, что курсор находится внутри контейнера
+                // Проверяем, что курсор находится внутри видео контейнера
                 if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
                     setIsZoomActive(true);
                     setZoomMouseX(x);
@@ -670,16 +670,11 @@ export const Player: React.FC<PlayerProps> = ({
             }
         };
 
-        const handleMouseEnter = (e: MouseEvent) => {
-            // Сохраняем позицию мыши при входе в контейнер
-            if (enableZoomMagnifier) {
-                lastMousePositionRef.current = {x: e.clientX, y: e.clientY};
-            }
-        };
-
-        const handleMouseLeave = () => {
-            if (isCtrlPressedRef.current) {
-                setIsZoomActive(false);
+        const handleMouseEnter = (e: MouseEvent | Event) => {
+            // Сохраняем позицию мыши при входе в видео контейнер
+            if (enableZoomMagnifier && 'clientX' in e) {
+                const mouseEvent = e as MouseEvent;
+                lastMousePositionRef.current = {x: mouseEvent.clientX, y: mouseEvent.clientY};
             }
         };
 
@@ -737,10 +732,9 @@ export const Player: React.FC<PlayerProps> = ({
         window.addEventListener('mousemove', handleMouseMove);
         window.addEventListener('wheel', handleWheel, {passive: false});
 
-        const container = containerRef.current;
-        if (container) {
-            container.addEventListener('mouseenter', handleMouseEnter as EventListener);
-            container.addEventListener('mouseleave', handleMouseLeave);
+        const videoContainer = videoContainerRef.current;
+        if (videoContainer) {
+            videoContainer.addEventListener('mouseenter', handleMouseEnter as EventListener);
         }
 
         return () => {
@@ -748,9 +742,8 @@ export const Player: React.FC<PlayerProps> = ({
             window.removeEventListener('keyup', handleKeyUp);
             window.removeEventListener('mousemove', handleMouseMove);
             window.removeEventListener('wheel', handleWheel);
-            if (container) {
-                container.removeEventListener('mouseenter', handleMouseEnter as EventListener);
-                container.removeEventListener('mouseleave', handleMouseLeave);
+            if (videoContainer) {
+                videoContainer.removeEventListener('mouseenter', handleMouseEnter as EventListener);
             }
         };
     }, [enableZoomMagnifier, enableVideoZoom]);
@@ -1134,20 +1127,22 @@ export const Player: React.FC<PlayerProps> = ({
                     </div>
                 </div>
                 <div id={datepickerPortalIdRef.current} />
+                {enableZoomMagnifier &&
+                    isZoomActive &&
+                    playerRef.current?.getVideoElement &&
+                    playerRef.current.getVideoElement() && (
+                        <ZoomMagnifier
+                            videoElement={playerRef.current.getVideoElement()}
+                            mouseX={zoomMouseX}
+                            mouseY={zoomMouseY}
+                            isActive={isZoomActive}
+                            zoomFactor={2}
+                            size={200}
+                            isFullscreen={isFullscreen}
+                            playerContainerRef={containerRef}
+                        />
+                    )}
             </div>
-            {enableZoomMagnifier &&
-                isZoomActive &&
-                playerRef.current?.getVideoElement &&
-                playerRef.current.getVideoElement() && (
-                    <ZoomMagnifier
-                        videoElement={playerRef.current.getVideoElement()}
-                        mouseX={zoomMouseX}
-                        mouseY={zoomMouseY}
-                        isActive={isZoomActive}
-                        zoomFactor={2}
-                        size={200}
-                    />
-                )}
         </>
     );
 };

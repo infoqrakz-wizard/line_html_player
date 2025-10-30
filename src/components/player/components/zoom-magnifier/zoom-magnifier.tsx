@@ -8,6 +8,8 @@ export interface ZoomMagnifierProps {
     isActive: boolean;
     zoomFactor?: number;
     size?: number;
+    isFullscreen?: boolean;
+    playerContainerRef?: React.RefObject<HTMLElement>;
 }
 
 const DEFAULT_ZOOM_FACTOR = 2;
@@ -19,7 +21,9 @@ export const ZoomMagnifier: React.FC<ZoomMagnifierProps> = ({
     mouseY,
     isActive,
     zoomFactor = DEFAULT_ZOOM_FACTOR,
-    size = DEFAULT_SIZE
+    size = DEFAULT_SIZE,
+    isFullscreen = false,
+    playerContainerRef
 }) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -101,15 +105,26 @@ export const ZoomMagnifier: React.FC<ZoomMagnifierProps> = ({
         return null;
     }
 
+    // Вычисляем позицию в зависимости от того, в fullscreen мы или нет
+    let left = mouseX;
+    let top = mouseY;
+
+    if (!isFullscreen && playerContainerRef?.current) {
+        const playerRect = playerContainerRef.current.getBoundingClientRect();
+        left = mouseX - playerRect.left;
+        top = mouseY - playerRect.top;
+    }
+
     return (
         <div
             ref={containerRef}
             className={styles.zoomMagnifier}
             style={{
-                left: `${mouseX}px`,
-                top: `${mouseY}px`,
+                left: `${left}px`,
+                top: `${top}px`,
                 width: `${size}px`,
-                height: `${size}px`
+                height: `${size}px`,
+                position: isFullscreen ? 'fixed' : 'absolute'
             }}
         >
             <canvas
