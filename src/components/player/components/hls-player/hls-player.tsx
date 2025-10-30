@@ -2,8 +2,6 @@
 import React, {forwardRef, useEffect, useImperativeHandle, useRef, useState} from 'react';
 import Hls from 'hls.js';
 
-import {PlayOverlay} from '../play-overlay';
-import {Loader} from '../loader';
 import {VideoContainer} from '../video-container';
 
 export interface HlsPlayerProps {
@@ -551,13 +549,6 @@ export const HlsPlayer = forwardRef<PlayerRef, HlsPlayerProps>((props, ref) => {
 
     return (
         <VideoContainer isLandscape={isLandscape}>
-            {(isLoading || isBuffering) && <Loader message={isLoading ? 'Загрузка видео...' : 'Буферизация...'} />}
-            {!playingRef.current && !isLoading && !isBuffering && (
-                <PlayOverlay
-                    text={overlayText}
-                    onClick={() => onPlayPause?.(true)}
-                />
-            )}
             <video
                 data-type="hls"
                 ref={videoRef}

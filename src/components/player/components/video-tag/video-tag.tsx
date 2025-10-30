@@ -1,7 +1,5 @@
 /* eslint-disable jsx-a11y/media-has-caption */
 import React, {forwardRef, useEffect, useImperativeHandle, useRef, useState} from 'react';
-import {Loader} from '../loader';
-import {PlayOverlay} from '../play-overlay';
 import {VideoContainer} from '../video-container';
 import type {PlayerRef} from '../player-interface';
 
@@ -291,13 +289,6 @@ export const VideoTag = forwardRef<PlayerRef, VideoTagProps>((props, ref) => {
 
     return (
         <VideoContainer isLandscape={isLandscape}>
-            {(isLoading || isBuffering) && <Loader message={isLoading ? 'Загрузка видео...' : 'Буферизация...'} />}
-            {!playingRef.current && !isLoading && !isBuffering && (
-                <PlayOverlay
-                    onClick={() => onPlayPause?.(true)}
-                    text={overlayText}
-                />
-            )}
             <video
                 data-type="video"
                 onClick={() => onPlayPause?.(false)}

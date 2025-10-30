@@ -12,7 +12,7 @@ import {useTimelineState} from '../timeline/hooks/use-timeline-state';
 import {useOrientation} from '../timeline/hooks/use-orientation';
 import {TimelineRef} from '../timeline/types';
 
-import {HlsPlayer, VideoTag, SaveStreamModal, ModeIndicator, ZoomMagnifier} from './components';
+import {HlsPlayer, VideoTag, SaveStreamModal, ModeIndicator, ZoomMagnifier, PlayOverlay, Loader} from './components';
 import {PlayerComponentProps, PlaybackStatus} from './components/player-interface';
 import {getAuthToken} from '../../utils/getAuthToken';
 
@@ -687,6 +687,18 @@ export const Player: React.FC<PlayerProps> = ({
             // Обрабатываем скролл для зума видео без Ctrl
             if (!enableVideoZoom || !containerRef.current || !videoContainerRef.current) return;
 
+            const target = e.target as HTMLElement | null;
+
+            // Проверяем, не находится ли курсор над Timeline, ControlPanel или ControlArea
+            if (
+                target &&
+                (target.closest('[class*="timeline"]') ||
+                    target.closest('[class*="controlPanel"]') ||
+                    target.closest('[class*="controlArea"]'))
+            ) {
+                return;
+            }
+
             const rect = containerRef.current.getBoundingClientRect();
             const videoContainerRect = videoContainerRef.current.getBoundingClientRect();
             const x = e.clientX;
@@ -938,16 +950,12 @@ export const Player: React.FC<PlayerProps> = ({
                 <div
                     ref={videoContainerRef}
                     className={`${styles.videoContainer} ${isVerticalTimeline ? styles.landscapeVideoContainer : ''}`}
-                    style={{
-                        transform: enableVideoZoom ? `scale(${videoZoom})` : 'none',
-                        transformOrigin: enableVideoZoom ? `${zoomOriginX * 100}% ${zoomOriginY * 100}%` : 'center',
-                        transition: enableVideoZoom && videoZoom === 1 ? 'transform 0.3s ease-out' : 'none'
-                    }}
                 >
                     <div
                         style={{
                             width: '100%',
-                            height: '100%'
+                            height: '100%',
+                            position: 'relative'
                         }}
                         onDoubleClick={handleToggleFullscreen}
                         onTouchStart={handlePlayerTouchStart}
@@ -963,33 +971,58 @@ export const Player: React.FC<PlayerProps> = ({
                             }
                         }}
                     >
-                        {isSafari ? (
-                            <VideoTag
-                                isLandscape={isVerticalTimeline}
-                                ref={playerRef}
-                                {...props}
-                                updateServerTime={updateServerTime}
-                                setProgress={setProgress}
-                                overlayText={showH265Warning ? OVERLAY_TEXT_265 : undefined}
-                            />
-                        ) : currentMode === 'record' ? (
-                            <HlsPlayer
-                                isLandscape={isVerticalTimeline}
-                                ref={playerRef}
-                                {...props}
-                                overlayText={showH265Warning ? OVERLAY_TEXT_265 : undefined}
-                            />
-                        ) : (
-                            <VideoTag
-                                isLandscape={isVerticalTimeline}
-                                ref={playerRef}
-                                {...props}
-                                updateServerTime={updateServerTime}
-                                setProgress={setProgress}
-                                overlayText={showH265Warning ? OVERLAY_TEXT_265 : undefined}
-                            />
-                        )}
+                        {/* Wrapper для видео с зумом */}
+                        <div
+                            style={{
+                                width: '100%',
+                                height: '100%',
+                                transform: enableVideoZoom ? `scale(${videoZoom})` : 'none',
+                                transformOrigin: enableVideoZoom
+                                    ? `${zoomOriginX * 100}% ${zoomOriginY * 100}%`
+                                    : 'center',
+                                transition: enableVideoZoom && videoZoom === 1 ? 'transform 0.3s ease-out' : 'none',
+                                position: 'absolute',
+                                inset: 0
+                            }}
+                        >
+                            {isSafari ? (
+                                <VideoTag
+                                    isLandscape={isVerticalTimeline}
+                                    ref={playerRef}
+                                    {...props}
+                                    updateServerTime={updateServerTime}
+                                    setProgress={setProgress}
+                                    overlayText={showH265Warning ? OVERLAY_TEXT_265 : undefined}
+                                />
+                            ) : currentMode === 'record' ? (
+                                <HlsPlayer
+                                    isLandscape={isVerticalTimeline}
+                                    ref={playerRef}
+                                    {...props}
+                                    overlayText={showH265Warning ? OVERLAY_TEXT_265 : undefined}
+                                />
+                            ) : (
+                                <VideoTag
+                                    isLandscape={isVerticalTimeline}
+                                    ref={playerRef}
+                                    {...props}
+                                    updateServerTime={updateServerTime}
+                                    setProgress={setProgress}
+                                    overlayText={showH265Warning ? OVERLAY_TEXT_265 : undefined}
+                                />
+                            )}
+                        </div>
                     </div>
+                    {/* Оверлеи поверх видео без зума - вне transform-контейнера */}
+                    {(playbackStatus === 'loading' || playbackStatus === 'buffering') && (
+                        <Loader message={playbackStatus === 'loading' ? 'Загрузка видео...' : 'Буферизация...'} />
+                    )}
+                    {!isPlaying && playbackStatus !== 'loading' && playbackStatus !== 'buffering' && (
+                        <PlayOverlay
+                            onClick={() => handlePlayPause(true)}
+                            text={showH265Warning ? OVERLAY_TEXT_265 : undefined}
+                        />
+                    )}
                     {/* Для iPhone всегда используем VideoTag с нативным воспроизведением m3u8 */}
                     {showSaveModal && (
                         <SaveStreamModal
