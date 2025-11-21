@@ -35,7 +35,6 @@ export interface PlayerProps {
     protocol?: Protocol;
     showCameraSelector?: boolean;
     proxy?: string;
-    isUseProxy?: boolean;
     enableZoomMagnifier?: boolean; // Включить лупу (по умолчанию true)
     enableVideoZoom?: boolean; // Включить зум видео по скроллу (по умолчанию true)
 }
@@ -51,10 +50,11 @@ export const Player: React.FC<PlayerProps> = ({
     protocol: preferredProtocol,
     showCameraSelector = false,
     proxy,
-    isUseProxy,
     enableZoomMagnifier = true,
     enableVideoZoom = true
 }) => {
+    // отключение функционала proxy
+    const isUseProxy = false;
     // Local auth state to allow updating credentials when 401 occurs
     const [authLogin, setAuthLogin] = useState<string>(login);
     const [authPassword, setAuthPassword] = useState<string>(password ?? '');
