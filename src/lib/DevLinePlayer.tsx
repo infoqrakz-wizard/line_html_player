@@ -18,6 +18,7 @@ interface DevLinePlayerOptions {
     password?: string;
     protocol?: Protocol;
     proxy?: string;
+    isUseProxy?: boolean;
 }
 
 class DevLinePlayer {
@@ -35,7 +36,9 @@ class DevLinePlayer {
             password: '',
             mode: Mode.Live,
             muted: true,
-            protocol: Protocol.Http
+            protocol: Protocol.Http,
+            proxy: 'https://proxy.devline.ru',
+            isUseProxy: false
         }
     ) {
         if (typeof container === 'string') {
@@ -50,7 +53,8 @@ class DevLinePlayer {
 
         const normalizedOptions: DevLinePlayerOptions = {
             ...options,
-            proxy: options.proxy ?? 'https://proxy.devline.ru'
+            proxy: options.proxy ?? 'https://proxy.devline.ru',
+            isUseProxy: options.isUseProxy
         };
 
         if (!normalizedOptions.streamUrl) throw new Error('streamUrl is required');
