@@ -1,8 +1,44 @@
 /* eslint-disable jsx-a11y/media-has-caption */
 import React, {forwardRef, useEffect, useImperativeHandle, useRef, useState} from 'react';
-import Hls from 'hls.js';
+import Hls, {Fragment} from 'hls.js';
 
 import {VideoContainer} from '../video-container';
+
+const FALLBACK_BASE_URL = typeof window !== 'undefined' ? window.location.href : 'http://localhost';
+
+const safelyCreateUrl = (value: string): URL | null => {
+    try {
+        return new URL(value, FALLBACK_BASE_URL);
+    } catch {
+        return null;
+    }
+};
+
+const parseIsoDate = (value?: string | null): number | null => {
+    if (!value) return null;
+    const parsed = Date.parse(value);
+    if (Number.isNaN(parsed)) return null;
+    return parsed;
+};
+
+const extractTimestampFromParams = (urlValue?: string | null, paramName?: string): number | null => {
+    if (!urlValue || !paramName) return null;
+    const parsedUrl = safelyCreateUrl(urlValue);
+    if (!parsedUrl) return null;
+    return parseIsoDate(parsedUrl.searchParams.get(paramName));
+};
+
+const extractNextTimeMs = (urlValue?: string | null): number | null =>
+    extractTimestampFromParams(urlValue, 'next_time');
+
+const extractFragmentStartMs = (urlValue?: string | null, frag?: Fragment): number | null => {
+    const paramValue = extractTimestampFromParams(urlValue, 'time');
+    if (paramValue !== null) return paramValue;
+    if (typeof frag?.programDateTime === 'number') {
+        return frag.programDateTime;
+    }
+    return null;
+};
 
 export interface HlsPlayerProps {
     url: string;
@@ -28,7 +64,6 @@ export const HlsPlayer = forwardRef<PlayerRef, HlsPlayerProps>((props, ref) => {
         onPlaybackStatusChange,
         playbackSpeed,
         muted = true,
-        overlayText,
         isLandscape = false
     } = props;
     const videoRef = useRef<HTMLVideoElement>(null);
@@ -47,6 +82,167 @@ export const HlsPlayer = forwardRef<PlayerRef, HlsPlayerProps>((props, ref) => {
 
     const playingRef = useRef(playing);
     const mutedRef = useRef(muted);
+    const targetStartDateRef = useRef<number | null>(extractNextTimeMs(url));
+    const pendingSeekRef = useRef<number | null>(null);
+    const startAppliedRef = useRef(false);
+    const metadataListenerRef = useRef<(() => void) | null>(null);
+
+    const cleanupMetadataListener = () => {
+        const handler = metadataListenerRef.current;
+        const video = videoRef.current;
+        if (handler && video) {
+            video.removeEventListener('loadedmetadata', handler);
+            metadataListenerRef.current = null;
+            console.log('[HLS][seek-cleanup] removed loadedmetadata listener');
+        }
+    };
+
+    const ensureTargetDateFromUrl = (candidateUrl?: string | null) => {
+        if (targetStartDateRef.current) return;
+        const parsed = extractNextTimeMs(candidateUrl || undefined);
+
+        if (parsed !== null) {
+            targetStartDateRef.current = parsed;
+            console.log('[HLS][next_time]', {
+                url: candidateUrl,
+                targetStartDate: new Date(parsed).toISOString()
+            });
+        }
+    };
+
+    const updatePendingSeekFromFragment = (frag: Fragment, fragUrl?: string | null) => {
+        if (pendingSeekRef.current !== null || !targetStartDateRef.current) return;
+        const fragmentStartMs = extractFragmentStartMs(fragUrl || undefined, frag);
+        if (fragmentStartMs === null) return;
+
+        const offsetSeconds = (targetStartDateRef.current - fragmentStartMs) / 1000;
+        const effectiveOffset = Math.max(0, offsetSeconds);
+        const cappedOffset =
+            frag.duration && Number.isFinite(frag.duration)
+                ? Math.min(effectiveOffset, frag.duration)
+                : effectiveOffset;
+        const fragStartSeconds =
+            Number.isFinite(frag.start) && typeof frag.start === 'number'
+                ? frag.start
+                : videoRef.current?.currentTime || 0;
+
+        pendingSeekRef.current = Math.max(0, fragStartSeconds + cappedOffset);
+        console.log('[HLS][seek-calc]', {
+            targetStartDate: new Date(targetStartDateRef.current).toISOString(),
+            fragmentStartMs,
+            offsetSeconds,
+            cappedOffset,
+            fragStartSeconds,
+            pendingSeek: pendingSeekRef.current,
+            fragUrl
+        });
+    };
+
+    const buildUrlWithTimeParam = (baseUrl: string, isoTime: string): string | null => {
+        if (!baseUrl) return null;
+
+        const hashIndex = baseUrl.indexOf('#');
+        const hasHash = hashIndex >= 0;
+        const hash = hasHash ? baseUrl.slice(hashIndex) : '';
+        const urlWithoutHash = hasHash ? baseUrl.slice(0, hashIndex) : baseUrl;
+
+        const queryIndex = urlWithoutHash.indexOf('?');
+        const basePath = queryIndex >= 0 ? urlWithoutHash.slice(0, queryIndex) : urlWithoutHash;
+        const queryString = queryIndex >= 0 ? urlWithoutHash.slice(queryIndex + 1) : '';
+
+        const preservedParams: string[] = [];
+
+        if (queryString) {
+            const rawParams = queryString.split('&').filter(Boolean);
+            rawParams.forEach(param => {
+                const equalsIndex = param.indexOf('=');
+                const rawKey = equalsIndex === -1 ? param : param.slice(0, equalsIndex);
+                let decodedKey: string;
+                try {
+                    decodedKey = decodeURIComponent(rawKey);
+                } catch {
+                    decodedKey = rawKey;
+                }
+                if (decodedKey === 'time' || decodedKey === 'next_time') {
+                    return;
+                }
+                preservedParams.push(param);
+            });
+        }
+
+        preservedParams.push(`time=${isoTime}`);
+        const queryPart = `?${preservedParams.join('&')}`;
+
+        return `${basePath}${queryPart}${hash}`;
+    };
+
+    const reloadFromNextTime = (nextTimeMs: number, fragmentUrl?: string | null) => {
+        const hls = hlsRef.current;
+        if (!hls) return;
+
+        const currentTarget = targetStartDateRef.current;
+        if (currentTarget && Math.abs(currentTarget - nextTimeMs) < 1) {
+            console.log('[HLS][next_time][skip]', {nextTimeMs, fragmentUrl});
+            return;
+        }
+
+        const isoTime = new Date(nextTimeMs).toISOString();
+        const nextSource = buildUrlWithTimeParam(url, isoTime);
+        if (!nextSource) {
+            console.warn('[HLS][next_time][error] failed to build url', {url, isoTime, fragmentUrl});
+            return;
+        }
+
+        targetStartDateRef.current = nextTimeMs;
+        pendingSeekRef.current = null;
+        startAppliedRef.current = false;
+        cleanupMetadataListener();
+        setIsLoading(true);
+
+        console.log('[HLS][next_time][reload]', {nextTime: isoTime, nextSource});
+        hls.loadSource(nextSource);
+        hls.startLoad(0);
+    };
+
+    const applyPendingSeek = () => {
+        if (startAppliedRef.current || pendingSeekRef.current === null) return;
+        const video = videoRef.current;
+        if (!video) return;
+
+        const seekTo = pendingSeekRef.current;
+        const performSeek = () => {
+            console.log('[HLS][seek-apply]', {seekTo});
+            video.currentTime = seekTo;
+            startAppliedRef.current = true;
+            pendingSeekRef.current = null;
+            if (playingRef.current) {
+                video.play().catch(console.error);
+            }
+        };
+
+        if (video.readyState >= 1) {
+            performSeek();
+            return;
+        }
+
+        if (metadataListenerRef.current) return;
+
+        const handleLoadedMetadata = () => {
+            video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+            metadataListenerRef.current = null;
+            console.log('[HLS][seek-apply] loadedmetadata fired');
+            performSeek();
+        };
+
+        metadataListenerRef.current = handleLoadedMetadata;
+        video.addEventListener('loadedmetadata', handleLoadedMetadata);
+    };
+
+    useEffect(() => {
+        targetStartDateRef.current = extractNextTimeMs(url);
+        pendingSeekRef.current = null;
+        startAppliedRef.current = false;
+    }, [url]);
 
     useImperativeHandle(ref, () => ({
         seekBy: (seconds: number) => {
@@ -272,6 +468,24 @@ export const HlsPlayer = forwardRef<PlayerRef, HlsPlayerProps>((props, ref) => {
                 if (fragLoadingTimeout.current) {
                     clearTimeout(fragLoadingTimeout.current);
                 }
+
+                const fragmentUrl =
+                    data.frag?.url ||
+                    (data.frag?.baseurl && data.frag?.relurl
+                        ? `${data.frag.baseurl}${data.frag.relurl}`
+                        : data.frag?.relurl);
+
+                ensureTargetDateFromUrl(fragmentUrl);
+                updatePendingSeekFromFragment(data.frag, fragmentUrl);
+                const nextTimeFromFragment = extractTimestampFromParams(fragmentUrl || undefined, 'next_time');
+                if (nextTimeFromFragment !== null) {
+                    reloadFromNextTime(nextTimeFromFragment, fragmentUrl || undefined);
+                }
+                console.log('[HLS][frag-loading]', {
+                    sn: data.frag.sn,
+                    pendingSeek: pendingSeekRef.current,
+                    startApplied: startAppliedRef.current
+                });
             });
 
             hls.on(Hls.Events.FRAG_LOADED, (event, data) => {
@@ -285,6 +499,13 @@ export const HlsPlayer = forwardRef<PlayerRef, HlsPlayerProps>((props, ref) => {
                 if (fragLoadingTimeout.current) {
                     clearTimeout(fragLoadingTimeout.current);
                 }
+
+                applyPendingSeek();
+                console.log('[HLS][frag-loaded]', {
+                    sn: data.frag.sn,
+                    pendingSeek: pendingSeekRef.current,
+                    startApplied: startAppliedRef.current
+                });
             });
 
             hls.on(Hls.Events.ERROR, (event, data) => {
@@ -343,6 +564,11 @@ export const HlsPlayer = forwardRef<PlayerRef, HlsPlayerProps>((props, ref) => {
                 if (playingRef.current) {
                     video.play().catch(console.error);
                 }
+                console.log('[HLS][manifest-parsed]', {
+                    pendingSeek: pendingSeekRef.current,
+                    startApplied: startAppliedRef.current
+                });
+                applyPendingSeek();
             });
 
             hls.loadSource(url);
@@ -528,6 +754,7 @@ export const HlsPlayer = forwardRef<PlayerRef, HlsPlayerProps>((props, ref) => {
             return () => {
                 video.removeEventListener('error', handleVideoError);
                 clearInterval(bufferInterval);
+                cleanupMetadataListener();
                 if (bufferingTimeout.current) {
                     clearTimeout(bufferingTimeout.current);
                 }
