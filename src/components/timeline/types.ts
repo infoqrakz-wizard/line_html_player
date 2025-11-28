@@ -50,6 +50,8 @@ export interface TimelineRef {
         intervalIndex: number;
         fragmentRanges: FragmentTimeRange[];
     } | null;
+    /** Обновить позицию курсора по времени */
+    updateCursorPositionByTime: (time: Date) => void;
 }
 
 /**

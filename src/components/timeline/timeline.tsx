@@ -26,16 +26,6 @@ export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
         // Определяем, нужно ли показывать вертикальный таймлайн
         const isVerticalTimeline = isMobile && orientation === 'landscape';
 
-        // Отладочная информация
-        console.log(
-            'Timeline - isMobile:',
-            isMobile,
-            'orientation:',
-            orientation,
-            'isVerticalTimeline:',
-            isVerticalTimeline
-        );
-
         // Используем хук для управления состоянием временной шкалы
         const {
             serverTime,
@@ -47,6 +37,7 @@ export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
             centerOnCurrentTime,
             cursorPosition,
             updateCursorPosition,
+            updateCursorPositionByTime,
             resetCursorPosition,
             serverTimeError
         } = useTimelineState(progress, url, port, credentials, protocol, proxy);
@@ -134,6 +125,13 @@ export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
                             intervalIndex,
                             fragmentRanges
                         };
+                    },
+                    updateCursorPositionByTime: (time: Date) => {
+                        if (containerRef.current) {
+                            const rect = containerRef.current.getBoundingClientRect();
+                            const containerWidth = rect.width;
+                            updateCursorPositionByTime(time, containerWidth);
+                        }
                     }
                 };
             }
@@ -145,7 +143,8 @@ export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
             fragments,
             fragmentsBufferRange,
             intervalIndex,
-            fragmentRanges
+            fragmentRanges,
+            updateCursorPositionByTime
         ]);
 
         // Устанавливаем обработчик колесика мыши
@@ -183,11 +182,7 @@ export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
                     durationHours: durationHours.toFixed(2),
                     intervalIndex: fragmentsLoadKey.intervalIndex
                 });
-                loadFragmentsRef.current(
-                    startDate,
-                    endDate,
-                    fragmentsLoadKey.intervalIndex
-                );
+                loadFragmentsRef.current(startDate, endDate, fragmentsLoadKey.intervalIndex);
             }
         }, [fragmentsLoadKey]);
 

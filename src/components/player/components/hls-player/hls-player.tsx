@@ -51,6 +51,7 @@ export interface HlsPlayerProps {
     onPlaybackStatusChange?: (status: import('../player-interface').PlaybackStatus) => void;
     overlayText?: string;
     isLandscape?: boolean;
+    onFragmentTimeUpdate?: (time: Date) => void;
 }
 
 import type {PlayerRef} from '../player-interface';
@@ -64,7 +65,8 @@ export const HlsPlayer = forwardRef<PlayerRef, HlsPlayerProps>((props, ref) => {
         onPlaybackStatusChange,
         playbackSpeed,
         muted = true,
-        isLandscape = false
+        isLandscape = false,
+        onFragmentTimeUpdate
     } = props;
     const videoRef = useRef<HTMLVideoElement>(null);
     const hlsRef = useRef<Hls | null>(null);
@@ -86,6 +88,8 @@ export const HlsPlayer = forwardRef<PlayerRef, HlsPlayerProps>((props, ref) => {
     const pendingSeekRef = useRef<number | null>(null);
     const startAppliedRef = useRef(false);
     const metadataListenerRef = useRef<(() => void) | null>(null);
+    const firstFragmentTimeNotifiedRef = useRef<boolean>(false);
+    const currentUrlRef = useRef<string>(url);
 
     const cleanupMetadataListener = () => {
         const handler = metadataListenerRef.current;
@@ -242,6 +246,11 @@ export const HlsPlayer = forwardRef<PlayerRef, HlsPlayerProps>((props, ref) => {
         targetStartDateRef.current = extractNextTimeMs(url);
         pendingSeekRef.current = null;
         startAppliedRef.current = false;
+        // Сбрасываем флаг при изменении URL для нового таймблока
+        if (currentUrlRef.current !== url) {
+            firstFragmentTimeNotifiedRef.current = false;
+            currentUrlRef.current = url;
+        }
     }, [url]);
 
     useImperativeHandle(ref, () => ({
@@ -404,6 +413,9 @@ export const HlsPlayer = forwardRef<PlayerRef, HlsPlayerProps>((props, ref) => {
 
         setIsLoading(true);
         recoveryAttempts.current = 0;
+        // Сбрасываем флаг для нового таймблока
+        firstFragmentTimeNotifiedRef.current = false;
+        currentUrlRef.current = url;
 
         if (Hls.isSupported()) {
             const hls = new Hls({
@@ -481,6 +493,34 @@ export const HlsPlayer = forwardRef<PlayerRef, HlsPlayerProps>((props, ref) => {
                 if (nextTimeFromFragment !== null) {
                     reloadFromNextTime(nextTimeFromFragment, fragmentUrl || undefined);
                 }
+                // Перехватываем первый запрос к .ts файлу с параметром time для обновления индикатора времени
+                if (onFragmentTimeUpdate && !firstFragmentTimeNotifiedRef.current && fragmentUrl) {
+                    const parsedUrl = safelyCreateUrl(fragmentUrl);
+                    if (parsedUrl) {
+                        const pathname = parsedUrl.pathname.toLowerCase();
+                        if (pathname.endsWith('.ts') || pathname.includes('.ts?')) {
+                            // Извлекаем время из параметра time
+                            const timeParam = parsedUrl.searchParams.get('time');
+                            if (timeParam) {
+                                const fragmentTime = parseIsoDate(timeParam);
+                                if (fragmentTime !== null) {
+                                    // Вызываем callback только один раз для первого фрагмента
+                                    firstFragmentTimeNotifiedRef.current = true;
+                                    const timeDate = new Date(fragmentTime);
+                                    console.log(
+                                        '[HLS][time-indicator-update] Обновляем индикатор времени на актуальное время из первого .ts фрагмента:',
+                                        {
+                                            time: timeDate.toISOString(),
+                                            fragmentUrl: fragmentUrl?.substring(0, 200)
+                                        }
+                                    );
+                                    onFragmentTimeUpdate(timeDate);
+                                }
+                            }
+                        }
+                    }
+                }
+
                 console.log('[HLS][frag-loading]', {
                     sn: data.frag.sn,
                     pendingSeek: pendingSeekRef.current,

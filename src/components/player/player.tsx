@@ -1174,6 +1174,21 @@ export const Player: React.FC<PlayerProps> = ({
                                     ref={playerRef}
                                     {...props}
                                     overlayText={showH265Warning ? OVERLAY_TEXT_265 : undefined}
+                                    onFragmentTimeUpdate={(time: Date) => {
+                                        // Обновляем serverTime на актуальное время из первого .ts фрагмента
+                                        // Это переместит индикатор текущего времени на правильную позицию
+                                        const videoElement = playerRef.current?.getVideoElement?.();
+                                        const videoCurrentTime = videoElement?.currentTime || 0;
+
+                                        // skipCenterTimeline = true, чтобы не центрировать таймлайн
+                                        setServerTime(time, true);
+
+                                        // Сразу обновляем progress на текущее время воспроизведения,
+                                        // чтобы индикатор продолжал двигаться вместе с видео
+                                        if (videoCurrentTime > 0) {
+                                            setProgress(videoCurrentTime);
+                                        }
+                                    }}
                                 />
                             ) : (
                                 <VideoTag

@@ -179,6 +179,28 @@ export const useTimelineState = (
     );
 
     /**
+     * Обновить позицию курсора по времени
+     * @param time Время для позиционирования курсора
+     * @param containerWidth Ширина контейнера
+     */
+    const updateCursorPositionByTime = useCallback(
+        (time: Date, containerWidth: number) => {
+            if (!visibleTimeRange) return;
+
+            // Вычисляем позицию x для данного времени
+            const visibleDuration = visibleTimeRange.end.getTime() - visibleTimeRange.start.getTime();
+            const timeOffset = time.getTime() - visibleTimeRange.start.getTime();
+            const x = (timeOffset / visibleDuration) * containerWidth;
+
+            setCursorPosition({
+                x,
+                time
+            });
+        },
+        [visibleTimeRange]
+    );
+
+    /**
      * Сбросить позицию курсора
      */
     const resetCursorPosition = useCallback(() => {
@@ -195,6 +217,7 @@ export const useTimelineState = (
         centerOnCurrentTime,
         cursorPosition,
         updateCursorPosition,
+        updateCursorPositionByTime,
         resetCursorPosition,
         updateServerTime,
         serverTimeError
