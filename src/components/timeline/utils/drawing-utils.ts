@@ -42,16 +42,12 @@ export const drawFragments = (
     height: number,
     unitLengthMs: number,
     currentTime?: Date,
-    progress: number = 0
+    progress: number = 0 // eslint-disable-line @typescript-eslint/no-unused-vars
 ): void => {
     const screenDuration = visibleTimeRange.end.getTime() - visibleTimeRange.start.getTime();
 
     const fragmentHeight = 4;
     const fragmentY = 4;
-
-    // Переменные для отслеживания последнего фрагмента
-    let lastFragmentEndTime = 0;
-    let lastFragmentEndX = 0;
 
     // Сначала рисуем серую полосу на всю длину таймлайна
     ctx.fillStyle = 'rgba(128, 128, 128, 0.3)';
@@ -60,22 +56,7 @@ export const drawFragments = (
     // Если нет фрагментов, выходим после отрисовки серой полосы
     if (fragments.length === 0) return;
 
-    // Сначала находим последний фрагмент среди всех фрагментов в буфере
-    fragments.forEach((hasFrame, index) => {
-        if (hasFrame) {
-            const fragmentStartTime = fragmentsBufferRange.start.getTime() + index * unitLengthMs;
-            const fragmentEndTime = fragmentStartTime + unitLengthMs;
-
-            // Обновляем информацию о последнем фрагменте (независимо от видимости)
-            if (fragmentEndTime > lastFragmentEndTime) {
-                lastFragmentEndTime = fragmentEndTime;
-                // Вычисляем X-координату последнего фрагмента
-                lastFragmentEndX = ((fragmentEndTime - visibleTimeRange.start.getTime()) / screenDuration) * width;
-            }
-        }
-    });
-
-    // Теперь рисуем зеленые фрагменты поверх серой полосы
+    // Рисуем зеленые фрагменты поверх серой полосы только там, где есть данные
     ctx.fillStyle = '#4CAF50';
 
     fragments.forEach((hasFrame, index) => {
@@ -94,38 +75,6 @@ export const drawFragments = (
             }
         }
     });
-
-    // Если передано текущее время и прогресс, дорисовываем зеленую полосу до индикатора текущего времени
-    if (currentTime && lastFragmentEndTime > 0) {
-        const currentTimeMs = currentTime.getTime() + progress * 1000;
-        const currentX = ((currentTimeMs - visibleTimeRange.start.getTime()) / screenDuration) * width;
-
-        // Если текущее время находится после последнего фрагмента
-        if (currentTimeMs > lastFragmentEndTime) {
-            // Определяем начальную позицию для зеленой полосы
-            let visibleXStart;
-
-            if (lastFragmentEndX < 0) {
-                // Если последний фрагмент находится левее видимой области, начинаем с левого края экрана
-                visibleXStart = 0;
-            } else if (lastFragmentEndX > width) {
-                // Если последний фрагмент находится правее видимой области, начинаем с левого края экрана
-                visibleXStart = 0;
-            } else {
-                // Если последний фрагмент виден, начинаем от него
-                visibleXStart = lastFragmentEndX;
-            }
-
-            // Определяем конечную позицию для зеленой полосы
-            const visibleXEnd = Math.min(width, Math.max(0, currentX));
-            const visibleWidth = visibleXEnd - visibleXStart;
-
-            // Дорисовываем зеленую полосу только если есть видимая область
-            if (visibleWidth > 0) {
-                ctx.fillRect(visibleXStart, fragmentY, visibleWidth, fragmentHeight);
-            }
-        }
-    }
 };
 
 /**

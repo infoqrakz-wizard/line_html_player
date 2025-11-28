@@ -359,26 +359,7 @@ export const drawVerticalFragments = (
     // Вычисляем текущее время с учетом прогресса
     const currentTimeMs = currentTime.getTime() + progress * 1000;
 
-    // Переменные для отслеживания последнего фрагмента
-    let lastFragmentEndTime = 0;
-    let lastFragmentEndY = 0;
-
-    // Сначала находим последний фрагмент среди всех фрагментов в буфере
-    for (let i = 0; i < fragments.length; i++) {
-        if (fragments[i] === 1) {
-            const fragmentStartTime = fragmentsBufferRange.start.getTime() + i * unitLengthMs;
-            const fragmentEndTime = fragmentStartTime + unitLengthMs;
-
-            // Обновляем информацию о последнем фрагменте (независимо от видимости)
-            if (fragmentEndTime > lastFragmentEndTime) {
-                lastFragmentEndTime = fragmentEndTime;
-                // Вычисляем Y-координату последнего фрагмента
-                lastFragmentEndY = (fragmentEndTime - visibleTimeRange.start.getTime()) * (height / screenDuration);
-            }
-        }
-    }
-
-    // Отрисовываем фрагменты
+    // Отрисовываем фрагменты только там, где есть данные
     for (let i = 0; i < fragments.length; i++) {
         if (fragments[i] === 1) {
             const fragmentStartTime = fragmentsBufferRange.start.getTime() + i * unitLengthMs;
@@ -409,38 +390,6 @@ export const drawVerticalFragments = (
                 // Отрисовываем фрагмент
                 ctx.fillStyle = fragmentColor;
                 ctx.fillRect(fragmentX, fragmentStartY, fragmentWidth, fragmentEndY - fragmentStartY);
-            }
-        }
-    }
-
-    // Если передано текущее время и прогресс, дорисовываем зеленую полосу до индикатора текущего времени
-    if (currentTime && lastFragmentEndTime > 0) {
-        const currentY = ((currentTimeMs - visibleTimeRange.start.getTime()) / screenDuration) * height;
-
-        // Если текущее время находится после последнего фрагмента
-        if (currentTimeMs > lastFragmentEndTime) {
-            // Определяем начальную позицию для зеленой полосы
-            let visibleYStart;
-
-            if (lastFragmentEndY < 0) {
-                // Если последний фрагмент находится выше видимой области, начинаем с верха экрана
-                visibleYStart = 0;
-            } else if (lastFragmentEndY > height) {
-                // Если последний фрагмент находится ниже видимой области, начинаем с верха экрана
-                visibleYStart = 0;
-            } else {
-                // Если последний фрагмент виден, начинаем от него
-                visibleYStart = lastFragmentEndY;
-            }
-
-            // Определяем конечную позицию для зеленой полосы
-            const visibleYEnd = Math.min(height, Math.max(0, currentY));
-            const visibleHeight = visibleYEnd - visibleYStart;
-
-            // Дорисовываем зеленую полосу только если есть видимая область
-            if (visibleHeight > 0) {
-                ctx.fillStyle = 'rgba(100, 200, 100, 0.8)'; // Зеленый цвет как у фрагментов
-                ctx.fillRect(fragmentX, visibleYStart, fragmentWidth, visibleHeight);
             }
         }
     }
