@@ -419,6 +419,7 @@ export const Player: React.FC<PlayerProps> = ({
 
     const handleSelectFilterOption = (option: MotionFilterOption) => {
         if (option === 'motion') {
+            // Для фильтра движения показываем редактор маски
             const baseGrid = appliedMotionFilter?.mask
                 ? gridFromMaskPayload(appliedMotionFilter.mask)
                 : createFilledMaskGrid(1);
@@ -426,16 +427,16 @@ export const Player: React.FC<PlayerProps> = ({
             setMaskGrid(baseGrid);
             setIsMaskEditorVisible(true);
             setIsFilterPanelOpen(false);
-            return;
+        } else {
+            // Для фильтров по типам объектов (human, transport) сразу применяем фильтр без маски
+            const objectType = option as MotionObjectType;
+            setAppliedMotionFilter({
+                types: [objectType]
+            });
+            setActiveFilterType(option);
+            setIsFilterPanelOpen(false);
+            setIsMaskEditorVisible(false);
         }
-
-        const mappedType: MotionObjectType[] = [option as MotionObjectType];
-        setAppliedMotionFilter({
-            types: mappedType
-        });
-        setActiveFilterType(option);
-        setIsMaskEditorVisible(false);
-        setIsFilterPanelOpen(false);
     };
 
     const handleClearMotionFilter = () => {
@@ -462,13 +463,6 @@ export const Player: React.FC<PlayerProps> = ({
         setActiveFilterType('motion');
         setIsMaskEditorVisible(false);
         maskEditorInitialGridRef.current = maskGrid.map(row => [...row]);
-    };
-
-    const handleMaskReset = () => {
-        setAppliedMotionFilter(null);
-        setActiveFilterType(null);
-        maskEditorInitialGridRef.current = null;
-        setMaskGrid(createFilledMaskGrid(1));
     };
 
     const handleMouseLeave = () => {
@@ -1049,7 +1043,8 @@ export const Player: React.FC<PlayerProps> = ({
     const isVerticalTimeline = isMobileDevice && orientation === 'landscape';
 
     const shouldHideUiForMask = isMaskEditorVisible;
-    const shouldHidePlaybackLabel = !!appliedMotionFilter?.mask;
+    // Скрываем PLAYBACK когда активен фильтр (с маской или с типами объектов)
+    const shouldHidePlaybackLabel = !!(appliedMotionFilter?.mask || appliedMotionFilter?.types);
 
     return (
         <>
@@ -1095,7 +1090,7 @@ export const Player: React.FC<PlayerProps> = ({
                     >
                         <button
                             className={styles.resetFilterButton}
-                            onClick={handleMaskReset}
+                            onClick={handleClearMotionFilter}
                             aria-label="Сброс фильтра"
                         >
                             Сброс

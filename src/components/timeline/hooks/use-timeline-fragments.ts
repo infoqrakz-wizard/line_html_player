@@ -213,11 +213,6 @@ export const useTimelineFragments = (
      * Останавливает выполнение запросов из очереди
      */
     const stopProcessingQueue = useCallback(() => {
-        // Отменяем активный запрос
-        if (activeRequestXhrRef.current) {
-            activeRequestXhrRef.current.abort();
-            activeRequestXhrRef.current = null;
-        }
         // Останавливаем обработку очереди
         isProcessingMotionQueueRef.current = false;
         // Очищаем debounce таймер
@@ -391,13 +386,24 @@ export const useTimelineFragments = (
      * Обрабатывает очередь запросов motion timeline последовательно
      */
     const processMotionTimelineQueue = useCallback(async (): Promise<void> => {
-        if (isProcessingMotionQueueRef.current || motionTimelineQueueRef.current.length === 0) {
+        // Проверяем, не обрабатывается ли уже очередь
+        if (isProcessingMotionQueueRef.current) {
+            console.log('processMotionTimelineQueue: очередь уже обрабатывается, пропускаем');
+            return;
+        }
+
+        if (motionTimelineQueueRef.current.length === 0) {
             return;
         }
 
         isProcessingMotionQueueRef.current = true;
 
         while (motionTimelineQueueRef.current.length > 0) {
+            // Проверяем, не была ли обработка остановлена
+            if (!isProcessingMotionQueueRef.current) {
+                console.log('processMotionTimelineQueue: обработка остановлена, прерываем цикл');
+                break;
+            }
             const request = motionTimelineQueueRef.current.shift();
             if (!request) break;
 
@@ -559,17 +565,7 @@ export const useTimelineFragments = (
                     timelineLength: response.timeline.length
                 });
 
-                // Обновляем fragments сразу после получения результата
-                if (currentMotionBufferRef.current) {
-                    const {
-                        start: bufferStart,
-                        end: bufferEnd,
-                        zoomIndex: bufferZoomIndex
-                    } = currentMotionBufferRef.current;
-                    const mergedTimeline = mergeMotionTimelineResults(bufferStart, bufferEnd, bufferZoomIndex);
-                    setFragments(mergedTimeline);
-                    setFragmentsBufferRange({start: bufferStart, end: bufferEnd});
-                }
+                // НЕ обновляем fragments сразу - накапливаем результаты и применим все вместе после завершения
             } catch (error) {
                 // Игнорируем ошибку отмены запроса
                 if (error instanceof Error && error.message === 'Request aborted') {
@@ -582,6 +578,19 @@ export const useTimelineFragments = (
                     break;
                 }
             }
+        }
+
+        // После завершения всех запросов (или остановки) применяем все результаты одним разом
+        if (currentMotionBufferRef.current) {
+            const {start: bufferStart, end: bufferEnd, zoomIndex: bufferZoomIndex} = currentMotionBufferRef.current;
+            const mergedTimeline = mergeMotionTimelineResults(bufferStart, bufferEnd, bufferZoomIndex);
+            setFragments(mergedTimeline);
+            setFragmentsBufferRange({start: bufferStart, end: bufferEnd});
+            console.log('processMotionTimelineQueue: применены все результаты', {
+                bufferStart: bufferStart.toISOString(),
+                bufferEnd: bufferEnd.toISOString(),
+                mergedTimelineLength: mergedTimeline.length
+            });
         }
 
         // Пересчитываем диапазон очереди после обработки
@@ -940,7 +949,15 @@ export const useTimelineFragments = (
     const handleTimelineChange = useCallback(
         (visibleStart: Date, visibleEnd: Date) => {
             // 1) Останавливаем выполнение запросов из очереди
-            stopProcessingQueue();
+            // Отменяем только активный запрос (если он есть)
+            // Запросы идут последовательно, поэтому должен быть только один активный запрос
+            if (activeRequestXhrRef.current) {
+                console.log('handleTimelineChange: отменяем активный запрос');
+                activeRequestXhrRef.current.abort();
+                activeRequestXhrRef.current = null;
+            }
+            // Останавливаем обработку очереди
+            isProcessingMotionQueueRef.current = false;
 
             // 2) Чистим из очереди интервалы, которые уже за пределами отображаемого timeline
             cleanQueueOutOfRange(visibleStart, visibleEnd);
@@ -957,7 +974,7 @@ export const useTimelineFragments = (
                 processMotionTimelineQueue();
             }, DEBOUNCE_DELAY);
         },
-        [stopProcessingQueue, cleanQueueOutOfRange, processMotionTimelineQueue]
+        [cleanQueueOutOfRange, processMotionTimelineQueue]
     );
 
     /**
