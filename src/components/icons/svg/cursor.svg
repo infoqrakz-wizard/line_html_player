@@ -2,8 +2,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" id="Capa_1" x="0px" y="0px" viewBox="0 0 512 512" style="enable-background:new 0 0 512 512;" xml:space="preserve" width="512" height="512">
 <g id="Cursor_4_">
 	
-		<circle style="fill:none;stroke:#000000;stroke-width:40;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:10;" cx="256" cy="80" r="60"/>
-	<path style="fill:none;stroke:#000000;stroke-width:40;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:10;" d="&#10;&#9;&#9;M220.201,469.865l-120-230C97.513,234.488,96,228.421,96,222c0-22.091,17.909-40,40-40c5.003,0,9.792,0.919,14.207,2.597&#10;&#9;&#9;l91.586,34.807C246.208,221.081,250.997,222,256,222c5.004,0,9.792-0.919,14.207-2.597l91.586-34.807&#10;&#9;&#9;C366.208,182.919,370.996,182,376,182c22.091,0,40,17.909,40,40c0,6.421-1.513,12.488-4.201,17.865l-120,230&#10;&#9;&#9;C285.237,482.988,271.671,492,256,492S226.763,482.988,220.201,469.865z"/>
+		<circle style="fill:none;stroke:#FFFFFF;stroke-width:40;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:10;" cx="256" cy="80" r="60"/>
+	<path style="fill:none;stroke:#FFFFFF;stroke-width:40;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:10;" d="&#10;&#9;&#9;M220.201,469.865l-120-230C97.513,234.488,96,228.421,96,222c0-22.091,17.909-40,40-40c5.003,0,9.792,0.919,14.207,2.597&#10;&#9;&#9;l91.586,34.807C246.208,221.081,250.997,222,256,222c5.004,0,9.792-0.919,14.207-2.597l91.586-34.807&#10;&#9;&#9;C366.208,182.919,370.996,182,376,182c22.091,0,40,17.909,40,40c0,6.421-1.513,12.488-4.201,17.865l-120,230&#10;&#9;&#9;C285.237,482.988,271.671,492,256,492S226.763,482.988,220.201,469.865z"/>
 </g>
 
 

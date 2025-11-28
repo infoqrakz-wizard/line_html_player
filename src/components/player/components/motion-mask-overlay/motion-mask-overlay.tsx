@@ -1,63 +1,60 @@
-import React, {useState} from 'react';
+import React, {useState, useRef} from 'react';
 
 import styles from './motion-mask-overlay.module.scss';
-import {Icons} from '../../../icons';
-
-type MaskTool = 'brush' | 'eraser';
-
-const BRUSH_SIZES = [1, 2, 3];
 
 interface MotionMaskOverlayProps {
     isVisible: boolean;
     maskGrid: number[][];
-    activeTool: MaskTool;
-    brushSize: number;
-    onToolChange: (tool: MaskTool) => void;
-    onBrushSizeChange: (size: number) => void;
-    onPaintCell: (rowIndex: number, colIndex: number) => void;
-    onClearMask: () => void;
+    onToggleCell: (rowIndex: number, colIndex: number) => void;
     onApply: () => void;
-    onCancel: () => void;
 }
 
-export const MotionMaskOverlay: React.FC<MotionMaskOverlayProps> = ({
-    isVisible,
-    maskGrid,
-    activeTool,
-    brushSize,
-    onToolChange,
-    onBrushSizeChange,
-    onPaintCell,
-    onClearMask,
-    onApply,
-    onCancel
-}) => {
+export const MotionMaskOverlay: React.FC<MotionMaskOverlayProps> = ({isVisible, maskGrid, onToggleCell, onApply}) => {
     const [isDrawing, setIsDrawing] = useState(false);
-    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    // Запоминаем целевое состояние ячеек (0 или 1) для текущей сессии рисования
+    const targetStateRef = useRef<0 | 1 | null>(null);
+    // Отслеживаем ячейки, которые уже были обработаны в текущей сессии
+    const processedCellsRef = useRef<Set<string>>(new Set());
 
     if (!isVisible) return null;
 
     const beginDrawing = (rowIndex: number, colIndex: number) => {
         setIsDrawing(true);
-        onPaintCell(rowIndex, colIndex);
+        // Очищаем список обработанных ячеек для новой сессии
+        processedCellsRef.current.clear();
+
+        // Определяем текущее состояние ячейки и запоминаем противоположное (целевое)
+        const currentState = maskGrid[rowIndex][colIndex];
+        const targetState: 0 | 1 = currentState === 1 ? 0 : 1;
+        targetStateRef.current = targetState;
+
+        // Добавляем текущую ячейку в список обработанных и переключаем ее
+        const cellKey = `${rowIndex}-${colIndex}`;
+        processedCellsRef.current.add(cellKey);
+        onToggleCell(rowIndex, colIndex);
     };
 
     const stopDrawing = () => {
         if (!isDrawing) return;
         setIsDrawing(false);
+        // Очищаем состояние при окончании рисования
+        targetStateRef.current = null;
+        processedCellsRef.current.clear();
     };
 
     const handleCellEnter = (rowIndex: number, colIndex: number) => {
-        if (!isDrawing) return;
-        onPaintCell(rowIndex, colIndex);
-    };
+        if (!isDrawing || targetStateRef.current === null) return;
 
-    const handleToolChange = (tool: MaskTool) => {
-        onToolChange(tool);
-    };
+        const cellKey = `${rowIndex}-${colIndex}`;
+        // Пропускаем ячейку, если она уже была обработана в этой сессии
+        if (processedCellsRef.current.has(cellKey)) return;
 
-    const handleBrushSizeClick = (size: number) => {
-        onBrushSizeChange(size);
+        const currentState = maskGrid[rowIndex][colIndex];
+        // Переключаем ячейку только если она не в целевом состоянии
+        if (currentState !== targetStateRef.current) {
+            processedCellsRef.current.add(cellKey);
+            onToggleCell(rowIndex, colIndex);
+        }
     };
 
     const rowsCount = maskGrid.length;
@@ -94,114 +91,13 @@ export const MotionMaskOverlay: React.FC<MotionMaskOverlayProps> = ({
                     )}
                 </div>
                 <button
-                    className={styles.closeOverlayButton}
-                    onClick={onCancel}
-                    aria-label="Закрыть маску"
+                    className={styles.actionButton}
+                    onClick={onApply}
+                    aria-label="Применить фильтр"
                 >
-                    ×
-                </button>
-                <button
-                    className={styles.settingsFab}
-                    onClick={() => setIsSettingsOpen(true)}
-                    aria-label="Настройки маски"
-                >
-                    <Icons.Settings />
+                    ОК
                 </button>
             </div>
-
-            {isSettingsOpen && (
-                <div
-                    className={styles.modalBackdrop}
-                    role="dialog"
-                    aria-modal="true"
-                >
-                    <div className={styles.modal}>
-                        <div className={styles.modalHeader}>
-                            <div>
-                                <h3>Зона поиска движения</h3>
-                            </div>
-                            <button
-                                className={styles.modalCloseButton}
-                                onClick={() => setIsSettingsOpen(false)}
-                                aria-label="Закрыть настройки"
-                            >
-                                ×
-                            </button>
-                        </div>
-
-                        <div className={styles.controlGroup}>
-                            <span className={styles.controlLabel}>Инструмент</span>
-                            <div className={styles.iconToggles}>
-                                <button
-                                    className={`${styles.iconButton} ${
-                                        activeTool === 'brush' ? styles.iconButtonActive : ''
-                                    }`}
-                                    onClick={() => handleToolChange('brush')}
-                                    aria-pressed={activeTool === 'brush'}
-                                    aria-label="Кисть"
-                                >
-                                    <div>🖌️ Кисть</div>
-                                </button>
-                                <button
-                                    className={`${styles.iconButton} ${
-                                        activeTool === 'eraser' ? styles.iconButtonActive : ''
-                                    }`}
-                                    onClick={() => handleToolChange('eraser')}
-                                    aria-pressed={activeTool === 'eraser'}
-                                    aria-label="Ластик"
-                                >
-                                    <div>🧹 Ластик</div>
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className={styles.controlGroup}>
-                            <span className={styles.controlLabel}>Размер кисти</span>
-                            <div className={styles.sizeChips}>
-                                {BRUSH_SIZES.map(size => (
-                                    <button
-                                        key={size}
-                                        className={`${styles.sizeChip} ${
-                                            brushSize === size ? styles.sizeChipActive : ''
-                                        }`}
-                                        onClick={() => handleBrushSizeClick(size)}
-                                        aria-pressed={brushSize === size}
-                                    >
-                                        {size}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        <button
-                            className={styles.clearButton}
-                            onClick={onClearMask}
-                        >
-                            Очистить сетку
-                        </button>
-
-                        <div className={styles.modalFooter}>
-                            <span className={styles.resolution}>
-                                {columnsCount} × {rowsCount}
-                            </span>
-                            <div className={styles.actionButtons}>
-                                <button
-                                    className={styles.secondaryButton}
-                                    onClick={() => setIsSettingsOpen(false)}
-                                >
-                                    Закрыть
-                                </button>
-                                <button
-                                    className={styles.primaryButton}
-                                    onClick={onApply}
-                                >
-                                    Применить
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 };

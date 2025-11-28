@@ -196,6 +196,8 @@ export interface TimelineInteractionsParams {
     loadFragments: (start: Date, end: Date, zoomIndex?: number) => void;
     /** Сбросить фрагменты */
     resetFragments: () => void;
+    /** Обработать изменения timeline (вызывается после окончания взаимодействия) */
+    handleTimelineChange?: (visibleStart: Date, visibleEnd: Date) => void;
     /** Текущее время */
     currentTime: Date;
     /** Обработчик клика по временной шкале */

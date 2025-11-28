@@ -345,8 +345,6 @@ export const Player: React.FC<PlayerProps> = ({
     const [isFilterPanelOpen, setIsFilterPanelOpen] = useState<boolean>(false);
     const [activeFilterType, setActiveFilterType] = useState<MotionFilterOption | null>(null);
     const [maskGrid, setMaskGrid] = useState<MaskGrid>(() => createFilledMaskGrid(1));
-    const [maskTool, setMaskTool] = useState<'brush' | 'eraser'>('brush');
-    const [brushSize, setBrushSize] = useState<number>(3);
     const [isMaskEditorVisible, setIsMaskEditorVisible] = useState<boolean>(false);
     const [appliedMotionFilter, setAppliedMotionFilter] = useState<TimelineMotionFilter | null>(null);
     const maskEditorInitialGridRef = useRef<MaskGrid | null>(null);
@@ -426,7 +424,6 @@ export const Player: React.FC<PlayerProps> = ({
                 : createFilledMaskGrid(1);
             maskEditorInitialGridRef.current = baseGrid.map(row => [...row]);
             setMaskGrid(baseGrid);
-            setMaskTool('brush');
             setIsMaskEditorVisible(true);
             setIsFilterPanelOpen(false);
             return;
@@ -450,42 +447,13 @@ export const Player: React.FC<PlayerProps> = ({
         setMaskGrid(createFilledMaskGrid(1));
     };
 
-    const handleMaskPaint = (rowIndex: number, colIndex: number) => {
+    const handleMaskToggleCell = (rowIndex: number, colIndex: number) => {
         setMaskGrid(prev => {
-            const rows = prev.length;
-            const cols = prev[0]?.length ?? 0;
-            const radius = Math.max(0, brushSize - 1);
-            const nextValue: 0 | 1 = maskTool === 'brush' ? 1 : 0;
-            let didChange = false;
             const nextGrid = prev.map(row => row.slice());
-
-            for (let dy = -radius; dy <= radius; dy += 1) {
-                for (let dx = -radius; dx <= radius; dx += 1) {
-                    const distance = Math.sqrt(dx * dx + dy * dy);
-                    if (distance > radius) continue;
-                    const targetRow = rowIndex + dy;
-                    const targetCol = colIndex + dx;
-                    if (targetRow < 0 || targetRow >= rows || targetCol < 0 || targetCol >= cols) continue;
-                    if (nextGrid[targetRow][targetCol] === nextValue) continue;
-                    nextGrid[targetRow][targetCol] = nextValue;
-                    didChange = true;
-                }
-            }
-
-            return didChange ? nextGrid : prev;
+            const currentValue = nextGrid[rowIndex][colIndex];
+            nextGrid[rowIndex][colIndex] = currentValue === 1 ? 0 : 1;
+            return nextGrid;
         });
-    };
-
-    const handleBrushSizeChange = (size: number) => {
-        setBrushSize(size);
-    };
-
-    const handleMaskClear = () => {
-        setMaskGrid(createFilledMaskGrid(0));
-    };
-
-    const handleMaskToolChange = (tool: 'brush' | 'eraser') => {
-        setMaskTool(tool);
     };
 
     const handleMaskApply = () => {
@@ -496,14 +464,11 @@ export const Player: React.FC<PlayerProps> = ({
         maskEditorInitialGridRef.current = maskGrid.map(row => [...row]);
     };
 
-    const handleMaskEditorCancel = () => {
-        setIsMaskEditorVisible(false);
-        if (maskEditorInitialGridRef.current) {
-            const restored = maskEditorInitialGridRef.current.map(row => [...row]);
-            setMaskGrid(restored);
-        } else if (!appliedMotionFilter?.mask) {
-            setMaskGrid(createFilledMaskGrid(1));
-        }
+    const handleMaskReset = () => {
+        setAppliedMotionFilter(null);
+        setActiveFilterType(null);
+        maskEditorInitialGridRef.current = null;
+        setMaskGrid(createFilledMaskGrid(1));
     };
 
     const handleMouseLeave = () => {
@@ -1084,6 +1049,7 @@ export const Player: React.FC<PlayerProps> = ({
     const isVerticalTimeline = isMobileDevice && orientation === 'landscape';
 
     const shouldHideUiForMask = isMaskEditorVisible;
+    const shouldHidePlaybackLabel = !!appliedMotionFilter?.mask;
 
     return (
         <>
@@ -1109,7 +1075,7 @@ export const Player: React.FC<PlayerProps> = ({
                     </div>
                 )}
 
-                {!shouldHideUiForMask && (
+                {!shouldHideUiForMask && !shouldHidePlaybackLabel && (
                     <div
                         className={`${styles.topControls} ${
                             isVerticalTimeline ? styles.mobileLandscapeTopControls : ''
@@ -1119,6 +1085,21 @@ export const Player: React.FC<PlayerProps> = ({
                             mode={currentMode}
                             playbackStatus={playbackStatus}
                         />
+                    </div>
+                )}
+                {!shouldHideUiForMask && shouldHidePlaybackLabel && (
+                    <div
+                        className={`${styles.topControls} ${
+                            isVerticalTimeline ? styles.mobileLandscapeTopControls : ''
+                        }`}
+                    >
+                        <button
+                            className={styles.resetFilterButton}
+                            onClick={handleMaskReset}
+                            aria-label="Сброс фильтра"
+                        >
+                            Сброс
+                        </button>
                     </div>
                 )}
                 <div
@@ -1206,14 +1187,8 @@ export const Player: React.FC<PlayerProps> = ({
                     <MotionMaskOverlay
                         isVisible={isMaskEditorVisible}
                         maskGrid={maskGrid}
-                        activeTool={maskTool}
-                        brushSize={brushSize}
-                        onToolChange={handleMaskToolChange}
-                        onBrushSizeChange={handleBrushSizeChange}
-                        onPaintCell={handleMaskPaint}
-                        onClearMask={handleMaskClear}
+                        onToggleCell={handleMaskToggleCell}
                         onApply={handleMaskApply}
-                        onCancel={handleMaskEditorCancel}
                     />
                     {(playbackStatus === 'loading' || playbackStatus === 'buffering') && (
                         <Loader message={playbackStatus === 'loading' ? 'Загрузка видео...' : 'Буферизация...'} />

@@ -223,9 +223,9 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
 
     const filterOptions: Array<{type: MotionFilterOption; label: string; icon: React.ReactNode}> = useMemo(
         () => [
-            {type: 'motion', label: 'Движение', icon: <Icons.Movement />},
+            {type: 'motion', label: 'Движение', icon: <Icons.Arrow />},
             {type: 'transport', label: 'Машины', icon: <Icons.Car />},
-            {type: 'human', label: 'Люди', icon: <Icons.Person />}
+            {type: 'human', label: 'Люди', icon: <Icons.Cursor />}
         ],
         []
     );
@@ -236,10 +236,6 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
 
     const handleFilterSelect = (option: MotionFilterOption) => {
         onSelectFilterOption?.(option);
-    };
-
-    const handleClearFilter = () => {
-        onClearFilter?.();
     };
 
     return (
@@ -302,12 +298,6 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
                                         <span>{option.label}</span>
                                     </button>
                                 ))}
-                                <button
-                                    className={styles.clearFilterButton}
-                                    onClick={handleClearFilter}
-                                >
-                                    Сбросить
-                                </button>
                             </div>
                         )}
                     </div>

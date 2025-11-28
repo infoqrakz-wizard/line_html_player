@@ -29,6 +29,7 @@ export const useTimelineInteractions = ({
     fragmentsBufferRange,
     loadFragments,
     resetFragments,
+    handleTimelineChange,
     currentTime, // eslint-disable-line @typescript-eslint/no-unused-vars
     onTimeClick,
     progress, // eslint-disable-line @typescript-eslint/no-unused-vars
@@ -67,7 +68,11 @@ export const useTimelineInteractions = ({
      */
     const handleMouseUp = useCallback(() => {
         setIsDragging(false);
-    }, []);
+        // Вызываем handleTimelineChange после окончания перетаскивания
+        if (handleTimelineChange && visibleTimeRange) {
+            handleTimelineChange(visibleTimeRange.start, visibleTimeRange.end);
+        }
+    }, [handleTimelineChange, visibleTimeRange]);
 
     /**
      * Обработчик движения мыши
@@ -193,6 +198,11 @@ export const useTimelineInteractions = ({
                         loadFragments(newStart, newEnd, newIndex);
 
                         setVisibleTimeRange({start: newStart, end: newEnd});
+
+                        // Вызываем handleTimelineChange после изменения зума
+                        if (handleTimelineChange) {
+                            handleTimelineChange(newStart, newEnd);
+                        }
                     }
                 }
             }
@@ -206,7 +216,8 @@ export const useTimelineInteractions = ({
             loadFragments,
             resetFragments,
             setIntervalIndex,
-            setVisibleTimeRange
+            setVisibleTimeRange,
+            handleTimelineChange
         ]
     );
 
@@ -396,6 +407,11 @@ export const useTimelineInteractions = ({
 
                             setVisibleTimeRange({start: newStart, end: newEnd});
 
+                            // Вызываем handleTimelineChange после изменения зума
+                            if (handleTimelineChange) {
+                                handleTimelineChange(newStart, newEnd);
+                            }
+
                             verticalSwipeDistanceRef.current = 0;
                         }
                     }
@@ -447,6 +463,11 @@ export const useTimelineInteractions = ({
 
                             setVisibleTimeRange({start: newStart, end: newEnd});
 
+                            // Вызываем handleTimelineChange после изменения зума
+                            if (handleTimelineChange) {
+                                handleTimelineChange(newStart, newEnd);
+                            }
+
                             verticalSwipeDistanceRef.current = 0;
                         }
                     }
@@ -495,6 +516,12 @@ export const useTimelineInteractions = ({
 
     const handleTouchEnd = useCallback(
         (e: React.TouchEvent) => {
+            setIsDragging(false);
+            // Вызываем handleTimelineChange после окончания перетаскивания
+            if (handleTimelineChange && visibleTimeRange && hasDragged) {
+                handleTimelineChange(visibleTimeRange.start, visibleTimeRange.end);
+            }
+
             if (
                 !hasDragged &&
                 swipeTypeRef.current !== 'vertical' &&
@@ -543,7 +570,8 @@ export const useTimelineInteractions = ({
             fragments,
             fragmentsBufferRange,
             intervalIndex,
-            isVertical
+            isVertical,
+            handleTimelineChange
         ]
     );
 

@@ -45,16 +45,19 @@ export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
         // Используем хук для управления фрагментами
         const motionFilterSignature = useMemo(() => createMotionFilterSignature(motionFilter), [motionFilter]);
 
-        const {fragments, fragmentsBufferRange, fragmentRanges, loadFragments, resetFragments} = useTimelineFragments({
-            url,
-            port,
-            credentials,
-            camera,
-            protocol,
-            proxy,
-            motionFilter: motionFilter ?? null,
-            motionFilterSignature
-        });
+        const {fragments, fragmentsBufferRange, fragmentRanges, loadFragments, resetFragments, handleTimelineChange} =
+            useTimelineFragments({
+                url,
+                port,
+                credentials,
+                camera,
+                protocol,
+                proxy,
+                motionFilter: motionFilter ?? null,
+                motionFilterSignature,
+                visibleTimeRange,
+                serverTime
+            });
 
         // Используем хук для обработки взаимодействий пользователя
         const {
@@ -77,6 +80,7 @@ export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
             fragmentsBufferRange,
             loadFragments,
             resetFragments,
+            handleTimelineChange,
             currentTime: serverTime || new Date(),
             onTimeClick,
             progress,
