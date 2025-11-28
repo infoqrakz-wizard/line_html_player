@@ -9,12 +9,13 @@ import {useTimelineFragments} from './hooks/use-timeline-fragments';
 import {useTimelineInteractions} from './hooks/use-timeline-interactions';
 import {useOrientation} from './hooks/use-orientation';
 import {Mode} from '../../utils/types';
+import {createMotionFilterSignature} from '../../types/motion-filter';
 
 /**
  * Компонент временной шкалы
  */
 export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
-    ({url, port, credentials, onTimeClick, progress = 0, camera, mode, protocol, proxy}, ref) => {
+    ({url, port, credentials, onTimeClick, progress = 0, camera, mode, protocol, proxy, motionFilter}, ref) => {
         // Создаем ссылки на DOM-элементы
         const containerRef = useRef<HTMLDivElement>(null);
         const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -51,13 +52,17 @@ export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
         } = useTimelineState(progress, url, port, credentials, protocol, proxy);
 
         // Используем хук для управления фрагментами
+        const motionFilterSignature = useMemo(() => createMotionFilterSignature(motionFilter), [motionFilter]);
+
         const {fragments, fragmentsBufferRange, fragmentRanges, loadFragments, resetFragments} = useTimelineFragments({
             url,
             port,
             credentials,
             camera,
             protocol,
-            proxy
+            proxy,
+            motionFilter: motionFilter ?? null,
+            motionFilterSignature
         });
 
         // Используем хук для обработки взаимодействий пользователя
@@ -132,7 +137,16 @@ export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
                     }
                 };
             }
-        }, [ref, setVisibleTimeRange, centerOnCurrentTime, serverTime, fragments, fragmentsBufferRange, intervalIndex]);
+        }, [
+            ref,
+            setVisibleTimeRange,
+            centerOnCurrentTime,
+            serverTime,
+            fragments,
+            fragmentsBufferRange,
+            intervalIndex,
+            fragmentRanges
+        ]);
 
         // Устанавливаем обработчик колесика мыши
         useEffect(() => {
@@ -149,22 +163,46 @@ export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
             };
         }, [visibleTimeRange, isLoading, intervalIndex]);
 
+        // Используем ref для хранения актуальных функций, чтобы избежать перезапуска эффектов
+        const loadFragmentsRef = useRef(loadFragments);
+        const resetFragmentsRef = useRef(resetFragments);
+        useEffect(() => {
+            loadFragmentsRef.current = loadFragments;
+            resetFragmentsRef.current = resetFragments;
+        }, [loadFragments, resetFragments]);
+
         // Загрузка фрагментов при изменении видимого диапазона времени
         useEffect(() => {
             if (fragmentsLoadKey) {
-                console.log(
-                    'Загружаем фрагменты для диапазона:',
-                    new Date(fragmentsLoadKey.startTime),
-                    'до',
-                    new Date(fragmentsLoadKey.endTime)
-                );
-                loadFragments(
-                    new Date(fragmentsLoadKey.startTime),
-                    new Date(fragmentsLoadKey.endTime),
+                const startDate = new Date(fragmentsLoadKey.startTime);
+                const endDate = new Date(fragmentsLoadKey.endTime);
+                const durationHours = (fragmentsLoadKey.endTime - fragmentsLoadKey.startTime) / (1000 * 60 * 60);
+                console.log('Timeline: Загружаем фрагменты для диапазона:', {
+                    start: startDate.toISOString(),
+                    end: endDate.toISOString(),
+                    durationHours: durationHours.toFixed(2),
+                    intervalIndex: fragmentsLoadKey.intervalIndex
+                });
+                loadFragmentsRef.current(
+                    startDate,
+                    endDate,
                     fragmentsLoadKey.intervalIndex
                 );
             }
-        }, [fragmentsLoadKey, loadFragments]);
+        }, [fragmentsLoadKey]);
+
+        const previousFilterSignatureRef = useRef<string | null>(null);
+        useEffect(() => {
+            if (!visibleTimeRange) return;
+            if (previousFilterSignatureRef.current === motionFilterSignature) return;
+
+            if (previousFilterSignatureRef.current !== null) {
+                resetFragmentsRef.current();
+            }
+
+            previousFilterSignatureRef.current = motionFilterSignature;
+            loadFragmentsRef.current(visibleTimeRange.start, visibleTimeRange.end, intervalIndex);
+        }, [motionFilterSignature, visibleTimeRange, intervalIndex]);
 
         // При смене режима Live → Record сбрасываем и перезагружаем фрагменты один раз
         const previousModeRef = useRef<Mode | undefined>(mode);
@@ -172,12 +210,12 @@ export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
             const previousMode = previousModeRef.current;
             if (previousMode !== mode) {
                 if (mode === Mode.Record && visibleTimeRange) {
-                    resetFragments();
-                    loadFragments(visibleTimeRange.start, visibleTimeRange.end, intervalIndex);
+                    resetFragmentsRef.current();
+                    loadFragmentsRef.current(visibleTimeRange.start, visibleTimeRange.end, intervalIndex);
                 }
                 previousModeRef.current = mode;
             }
-        }, [mode, visibleTimeRange, intervalIndex, loadFragments, resetFragments]);
+        }, [mode, visibleTimeRange, intervalIndex]);
 
         if (serverTimeError) {
             return null;

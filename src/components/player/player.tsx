@@ -20,8 +20,75 @@ import type {PlayerRef} from './components/player-interface';
 import Select from '../select/select';
 import styles from './player.module.scss';
 import {buildRequestUrl} from '../../utils/url-builder';
+import {MotionMaskOverlay} from './components/motion-mask-overlay/motion-mask-overlay';
+import {MotionFilterOption, MotionMaskPayload, MotionObjectType, TimelineMotionFilter} from '../../types/motion-filter';
 
 const OVERLAY_TEXT_265 = 'Ваш браузер не поддерживает кодек H.265 (HEVC).';
+const MOTION_MASK_WIDTH = 8;
+const MOTION_MASK_HEIGHT = 8;
+
+type MaskGrid = number[][];
+
+const createFilledMaskGrid = (fillValue: 0 | 1 = 1): MaskGrid =>
+    Array.from({length: MOTION_MASK_HEIGHT}, () => Array.from({length: MOTION_MASK_WIDTH}, () => fillValue));
+
+const gridFromMaskPayload = (payload: MotionMaskPayload): MaskGrid => {
+    const totalCells = payload.width * payload.height;
+    const values: number[] = [];
+
+    for (let i = 0; i < payload.data.length; i += 2) {
+        const count = payload.data[i];
+        const value = payload.data[i + 1] ?? 0;
+        for (let j = 0; j < count; j += 1) {
+            if (values.length >= totalCells) break;
+            values.push(value);
+        }
+    }
+
+    while (values.length < totalCells) {
+        values.push(0);
+    }
+
+    const grid: MaskGrid = [];
+    for (let row = 0; row < payload.height; row += 1) {
+        const start = row * payload.width;
+        grid.push(values.slice(start, start + payload.width));
+    }
+    return grid;
+};
+
+const buildMaskPayload = (grid: MaskGrid): MotionMaskPayload => {
+    const flatValues = grid.reduce<number[]>((acc, row) => acc.concat(row), []);
+    if (flatValues.length === 0) {
+        return {
+            width: MOTION_MASK_WIDTH,
+            height: MOTION_MASK_HEIGHT,
+            data: []
+        };
+    }
+
+    const data: number[] = [];
+    let currentValue = flatValues[0];
+    let count = 0;
+
+    flatValues.forEach(value => {
+        if (value === currentValue) {
+            count += 1;
+            return;
+        }
+        data.push(count, currentValue);
+        currentValue = value;
+        count = 1;
+    });
+
+    data.push(count, currentValue);
+
+    return {
+        width: MOTION_MASK_WIDTH,
+        height: MOTION_MASK_HEIGHT,
+        data
+    };
+};
 
 export interface PlayerProps {
     // Основные пропсы из DevLinePlayerProps
@@ -275,6 +342,15 @@ export const Player: React.FC<PlayerProps> = ({
         }
     }, [streamUrl, streamPort, login, password, checkAvailability]);
 
+    const [isFilterPanelOpen, setIsFilterPanelOpen] = useState<boolean>(false);
+    const [activeFilterType, setActiveFilterType] = useState<MotionFilterOption | null>(null);
+    const [maskGrid, setMaskGrid] = useState<MaskGrid>(() => createFilledMaskGrid(1));
+    const [maskTool, setMaskTool] = useState<'brush' | 'eraser'>('brush');
+    const [brushSize, setBrushSize] = useState<number>(3);
+    const [isMaskEditorVisible, setIsMaskEditorVisible] = useState<boolean>(false);
+    const [appliedMotionFilter, setAppliedMotionFilter] = useState<TimelineMotionFilter | null>(null);
+    const maskEditorInitialGridRef = useRef<MaskGrid | null>(null);
+
     const handleChangeMode = (newMode: Mode, time?: Date) => {
         setCurrentMode(newMode);
         if (time) {
@@ -337,6 +413,97 @@ export const Player: React.FC<PlayerProps> = ({
             clearTimeout(hideTimeoutRef.current);
         }
         setShowControls(true);
+    };
+
+    const handleToggleFilterPanel = () => {
+        setIsFilterPanelOpen(prev => !prev);
+    };
+
+    const handleSelectFilterOption = (option: MotionFilterOption) => {
+        if (option === 'motion') {
+            const baseGrid = appliedMotionFilter?.mask
+                ? gridFromMaskPayload(appliedMotionFilter.mask)
+                : createFilledMaskGrid(1);
+            maskEditorInitialGridRef.current = baseGrid.map(row => [...row]);
+            setMaskGrid(baseGrid);
+            setMaskTool('brush');
+            setIsMaskEditorVisible(true);
+            setIsFilterPanelOpen(false);
+            return;
+        }
+
+        const mappedType: MotionObjectType[] = [option as MotionObjectType];
+        setAppliedMotionFilter({
+            types: mappedType
+        });
+        setActiveFilterType(option);
+        setIsMaskEditorVisible(false);
+        setIsFilterPanelOpen(false);
+    };
+
+    const handleClearMotionFilter = () => {
+        setAppliedMotionFilter(null);
+        setActiveFilterType(null);
+        setIsMaskEditorVisible(false);
+        setIsFilterPanelOpen(false);
+        maskEditorInitialGridRef.current = null;
+        setMaskGrid(createFilledMaskGrid(1));
+    };
+
+    const handleMaskPaint = (rowIndex: number, colIndex: number) => {
+        setMaskGrid(prev => {
+            const rows = prev.length;
+            const cols = prev[0]?.length ?? 0;
+            const radius = Math.max(0, brushSize - 1);
+            const nextValue: 0 | 1 = maskTool === 'brush' ? 1 : 0;
+            let didChange = false;
+            const nextGrid = prev.map(row => row.slice());
+
+            for (let dy = -radius; dy <= radius; dy += 1) {
+                for (let dx = -radius; dx <= radius; dx += 1) {
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    if (distance > radius) continue;
+                    const targetRow = rowIndex + dy;
+                    const targetCol = colIndex + dx;
+                    if (targetRow < 0 || targetRow >= rows || targetCol < 0 || targetCol >= cols) continue;
+                    if (nextGrid[targetRow][targetCol] === nextValue) continue;
+                    nextGrid[targetRow][targetCol] = nextValue;
+                    didChange = true;
+                }
+            }
+
+            return didChange ? nextGrid : prev;
+        });
+    };
+
+    const handleBrushSizeChange = (size: number) => {
+        setBrushSize(size);
+    };
+
+    const handleMaskClear = () => {
+        setMaskGrid(createFilledMaskGrid(0));
+    };
+
+    const handleMaskToolChange = (tool: 'brush' | 'eraser') => {
+        setMaskTool(tool);
+    };
+
+    const handleMaskApply = () => {
+        const payload = buildMaskPayload(maskGrid);
+        setAppliedMotionFilter({mask: payload});
+        setActiveFilterType('motion');
+        setIsMaskEditorVisible(false);
+        maskEditorInitialGridRef.current = maskGrid.map(row => [...row]);
+    };
+
+    const handleMaskEditorCancel = () => {
+        setIsMaskEditorVisible(false);
+        if (maskEditorInitialGridRef.current) {
+            const restored = maskEditorInitialGridRef.current.map(row => [...row]);
+            setMaskGrid(restored);
+        } else if (!appliedMotionFilter?.mask) {
+            setMaskGrid(createFilledMaskGrid(1));
+        }
     };
 
     const handleMouseLeave = () => {
@@ -616,6 +783,12 @@ export const Player: React.FC<PlayerProps> = ({
     }, [isPlaying, currentMode, updateServerTime, setProgress]);
 
     useEffect(() => {
+        if (isMaskEditorVisible) {
+            isCtrlPressedRef.current = false;
+            setIsZoomActive(false);
+            return;
+        }
+
         const handleKeyDown = (e: KeyboardEvent) => {
             const target = e.target as HTMLElement | null;
             const tag = target?.tagName?.toLowerCase();
@@ -746,7 +919,7 @@ export const Player: React.FC<PlayerProps> = ({
                 videoContainer.removeEventListener('mouseenter', handleMouseEnter as EventListener);
             }
         };
-    }, [enableZoomMagnifier, enableVideoZoom]);
+    }, [enableZoomMagnifier, enableVideoZoom, isMaskEditorVisible]);
 
     const handleSaveStreamFinish = (start: Date, end: Date) => {
         const fileName = `record_${formatDate(start, 'yyyy-MM-dd_HH-mm')}_${formatDate(end, 'yyyy-MM-dd_HH-mm')}`;
@@ -910,6 +1083,8 @@ export const Player: React.FC<PlayerProps> = ({
     // Определяем, нужно ли показывать вертикальный таймлайн
     const isVerticalTimeline = isMobileDevice && orientation === 'landscape';
 
+    const shouldHideUiForMask = isMaskEditorVisible;
+
     return (
         <>
             <div
@@ -918,7 +1093,7 @@ export const Player: React.FC<PlayerProps> = ({
                 role="region"
                 aria-label="Плеер видео"
             >
-                {showCameraSelector && (
+                {showCameraSelector && !shouldHideUiForMask && (
                     <div
                         className={`${styles.cameraSelector} ${isVerticalTimeline ? styles.mobileLandscapeCameraSelector : ''}`}
                     >
@@ -934,12 +1109,18 @@ export const Player: React.FC<PlayerProps> = ({
                     </div>
                 )}
 
-                <div className={`${styles.topControls} ${isVerticalTimeline ? styles.mobileLandscapeTopControls : ''}`}>
-                    <ModeIndicator
-                        mode={currentMode}
-                        playbackStatus={playbackStatus}
-                    />
-                </div>
+                {!shouldHideUiForMask && (
+                    <div
+                        className={`${styles.topControls} ${
+                            isVerticalTimeline ? styles.mobileLandscapeTopControls : ''
+                        }`}
+                    >
+                        <ModeIndicator
+                            mode={currentMode}
+                            playbackStatus={playbackStatus}
+                        />
+                    </div>
+                )}
                 <div
                     ref={videoContainerRef}
                     className={`${styles.videoContainer} ${isVerticalTimeline ? styles.landscapeVideoContainer : ''}`}
@@ -1007,6 +1188,18 @@ export const Player: React.FC<PlayerProps> = ({
                         </div>
                     </div>
                     {/* Оверлеи поверх видео без зума - вне transform-контейнера */}
+                    <MotionMaskOverlay
+                        isVisible={isMaskEditorVisible}
+                        maskGrid={maskGrid}
+                        activeTool={maskTool}
+                        brushSize={brushSize}
+                        onToolChange={handleMaskToolChange}
+                        onBrushSizeChange={handleBrushSizeChange}
+                        onPaintCell={handleMaskPaint}
+                        onClearMask={handleMaskClear}
+                        onApply={handleMaskApply}
+                        onCancel={handleMaskEditorCancel}
+                    />
                     {(playbackStatus === 'loading' || playbackStatus === 'buffering') && (
                         <Loader message={playbackStatus === 'loading' ? 'Загрузка видео...' : 'Буферизация...'} />
                     )}
@@ -1089,43 +1282,53 @@ export const Player: React.FC<PlayerProps> = ({
                         </div>
                     )}
                 </div>
-                <div
-                    className={styles.controlArea}
-                    ref={controlAreaRef}
-                    onMouseEnter={handleMouseEnter}
-                    onMouseLeave={handleMouseLeave}
-                >
-                    <div className={`${styles.controlPanelContainer} ${showControls || isMobile ? styles.show : ''}`}>
-                        <ControlPanel
-                            mode={currentMode}
-                            isPlaying={isPlaying}
-                            isMuted={isMuted}
-                            isFullscreen={isFullscreen}
-                            isNoSound={isNoSound}
-                            playbackSpeed={playbackSpeed}
-                            url={streamUrl}
-                            port={streamPort}
-                            protocol={protocol}
-                            credentials={authVerified ? authorization : ''}
-                            progress={ctxProgress}
-                            camera={camera ?? 0}
-                            proxy={effectiveProxy}
-                            popperBoundaryElement={containerRef.current}
-                            popperPortalId={datepickerPortalIdRef.current}
-                            timelineRef={timelineRef}
-                            onPlayPause={() => handlePlayPause()}
-                            onMuteToggle={() => handleMuteToggle()}
-                            onToggleFullscreen={() => handleToggleFullscreen()}
-                            onSpeedChange={handleSpeedChange}
-                            onSaveStream={handleSaveStream}
-                            onTimeClick={handleTimelineClick}
-                            onChangeStartDate={handleTimeChange}
-                            onChangeMode={handleChangeMode}
-                            disableSpeedChange={currentMode === Mode.Live}
-                            disableCenterTimeline={currentMode === Mode.Live}
-                        />
+                {!shouldHideUiForMask && (
+                    <div
+                        className={styles.controlArea}
+                        ref={controlAreaRef}
+                        onMouseEnter={handleMouseEnter}
+                        onMouseLeave={handleMouseLeave}
+                    >
+                        <div
+                            className={`${styles.controlPanelContainer} ${showControls || isMobile ? styles.show : ''}`}
+                        >
+                            <ControlPanel
+                                mode={currentMode}
+                                isPlaying={isPlaying}
+                                isMuted={isMuted}
+                                isFullscreen={isFullscreen}
+                                isNoSound={isNoSound}
+                                playbackSpeed={playbackSpeed}
+                                url={streamUrl}
+                                port={streamPort}
+                                protocol={protocol}
+                                credentials={authVerified ? authorization : ''}
+                                progress={ctxProgress}
+                                camera={camera ?? 0}
+                                proxy={effectiveProxy}
+                                popperBoundaryElement={containerRef.current}
+                                popperPortalId={datepickerPortalIdRef.current}
+                                timelineRef={timelineRef}
+                                onPlayPause={() => handlePlayPause()}
+                                onMuteToggle={() => handleMuteToggle()}
+                                onToggleFullscreen={() => handleToggleFullscreen()}
+                                onSpeedChange={handleSpeedChange}
+                                onSaveStream={handleSaveStream}
+                                onTimeClick={handleTimelineClick}
+                                onChangeStartDate={handleTimeChange}
+                                onChangeMode={handleChangeMode}
+                                disableSpeedChange={currentMode === Mode.Live}
+                                disableCenterTimeline={currentMode === Mode.Live}
+                                motionFilter={appliedMotionFilter}
+                                isFilterPanelOpen={isFilterPanelOpen}
+                                activeFilterType={activeFilterType}
+                                onToggleFilterPanel={handleToggleFilterPanel}
+                                onSelectFilterOption={handleSelectFilterOption}
+                                onClearFilter={handleClearMotionFilter}
+                            />
+                        </div>
                     </div>
-                </div>
+                )}
                 <div id={datepickerPortalIdRef.current} />
                 {enableZoomMagnifier &&
                     isZoomActive &&

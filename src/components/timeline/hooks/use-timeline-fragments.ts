@@ -2,19 +2,22 @@
  * Хук для управления фрагментами временной шкалы
  */
 import {useState, useRef, useCallback, useMemo} from 'react';
-import {getFramesTimeline} from '../../../utils/api';
+import {getFramesTimeline, getMotionsTimeline} from '../../../utils/api';
 import {TimeRange, LoadQueueItem, TimelineFragmentsParams, FragmentTimeRange} from '../types';
 import {BUFFER_SCREENS, UNIT_LENGTHS} from '../utils/constants';
 import {useTimelineAuth} from '../../../context/timeline-auth-context';
 import {Protocol} from '../../../utils/types';
+import {TimelineMotionFilter} from '../../../types/motion-filter';
 
 /**
  * Хук для управления фрагментами временной шкалы
  * @param params Параметры для загрузки фрагментов
  * @returns Состояние фрагментов и методы для управления ими
  */
-export const useTimelineFragments = (params: TimelineFragmentsParams & {protocol?: Protocol}) => {
-    const {url, port, credentials, camera, protocol, proxy} = params;
+export const useTimelineFragments = (
+    params: TimelineFragmentsParams & {protocol?: Protocol; motionFilter?: TimelineMotionFilter | null}
+) => {
+    const {url, port, credentials, camera, protocol, proxy, motionFilter, motionFilterSignature} = params;
     const {setTimelineAccess} = useTimelineAuth();
 
     // Массив с наличием фрагментов
@@ -30,6 +33,8 @@ export const useTimelineFragments = (params: TimelineFragmentsParams & {protocol
     const [isLoadingFragments, setIsLoadingFragments] = useState(false);
     // Очередь загрузки фрагментов
     const loadQueue = useRef<LoadQueueItem | null>(null);
+    const lastAppliedFilterSignatureRef = useRef<string | null>(null);
+    const activeRequestRef = useRef<(LoadQueueItem & {filterSignature: string | null}) | null>(null);
 
     // Вычисляем диапазоны времени для каждого фрагмента
     const fragmentRanges = useMemo((): FragmentTimeRange[] => {
@@ -82,13 +87,15 @@ export const useTimelineFragments = (params: TimelineFragmentsParams & {protocol
         }
 
         return ranges;
-    }, [fragments, fragmentsBufferRange, loadQueue.current?.zoomIndex]);
+    }, [fragments, fragmentsBufferRange]);
 
     /**
      * Функция для запуска загрузки из очереди
      */
     const processLoadQueue = useCallback(async (): Promise<void> => {
-        if (isLoadingFragments || !loadQueue.current) return;
+        if (isLoadingFragments || !loadQueue.current) {
+            return;
+        }
 
         const {start, end, zoomIndex} = loadQueue.current;
         loadQueue.current = null;
@@ -99,23 +106,49 @@ export const useTimelineFragments = (params: TimelineFragmentsParams & {protocol
             const bufferStart = new Date(start.getTime() - screenDuration * BUFFER_SCREENS);
             const bufferEnd = new Date(end.getTime() + screenDuration * BUFFER_SCREENS);
 
-            const response = await getFramesTimeline({
+            console.log('use-timeline-fragments: request params', {
+                start: start.toISOString(),
+                end: end.toISOString(),
+                screenDurationHours: screenDuration / (1000 * 60 * 60),
+                bufferStart: bufferStart.toISOString(),
+                bufferEnd: bufferEnd.toISOString(),
+                bufferDurationHours: (bufferEnd.getTime() - bufferStart.getTime()) / (1000 * 60 * 60),
+                zoomIndex,
+                BUFFER_SCREENS
+            });
+
+            const requestBase = {
                 startTime: bufferStart,
-                url: url,
-                port: port,
-                credentials: credentials,
+                url,
+                port,
+                credentials,
                 endTime: bufferEnd,
                 unitLength: UNIT_LENGTHS[zoomIndex],
                 stream: 'video',
                 channel: camera,
                 protocol,
                 proxy
-            });
+            };
+
+            activeRequestRef.current = {
+                start,
+                end,
+                zoomIndex,
+                filterSignature: motionFilterSignature ?? null
+            };
+
+            const response = motionFilter
+                ? await getMotionsTimeline({
+                      ...requestBase,
+                      filter: motionFilter
+                  })
+                : await getFramesTimeline(requestBase);
 
             // Проверяем, не появился ли новый запрос в очереди
             if (!loadQueue.current) {
                 setFragments(response.timeline);
                 setFragmentsBufferRange({start: bufferStart, end: bufferEnd});
+                lastAppliedFilterSignatureRef.current = motionFilterSignature ?? null;
             }
         } catch (error) {
             console.error('Failed to load fragments:', error);
@@ -126,18 +159,36 @@ export const useTimelineFragments = (params: TimelineFragmentsParams & {protocol
             }
         } finally {
             setIsLoadingFragments(false);
+            activeRequestRef.current = null;
             // Если в очереди появился новый запрос, обрабатываем его
             if (loadQueue.current) {
                 processLoadQueue();
             }
         }
-    }, [isLoadingFragments, url, port, credentials, camera, proxy, protocol]);
+    }, [
+        isLoadingFragments,
+        url,
+        port,
+        credentials,
+        camera,
+        proxy,
+        protocol,
+        motionFilter,
+        motionFilterSignature,
+        setTimelineAccess
+    ]);
 
     /**
      * Функция для добавления запроса в очередь
      */
     const loadFragments = useCallback(
         (start: Date, end: Date, zoomIndex: number = 0) => {
+            console.log('loadFragments called with:', {
+                start: start.toISOString(),
+                end: end.toISOString(),
+                durationHours: (end.getTime() - start.getTime()) / (1000 * 60 * 60),
+                zoomIndex
+            });
             // Проверяем, не загружается ли уже этот диапазон
             if (
                 loadQueue.current &&
@@ -162,9 +213,22 @@ export const useTimelineFragments = (params: TimelineFragmentsParams & {protocol
                 currentBufferStart <= bufferStart.getTime() &&
                 currentBufferEnd >= bufferEnd.getTime() &&
                 currentBufferStart !== 0 && // Проверяем, что это не начальное состояние
-                !isLoadingFragments
+                !isLoadingFragments &&
+                lastAppliedFilterSignatureRef.current === (motionFilterSignature ?? null)
             ) {
                 console.log('loadFragments: диапазон уже загружен, пропускаем');
+                return;
+            }
+
+            const activeRequest = activeRequestRef.current;
+            if (
+                activeRequest &&
+                activeRequest.start.getTime() === start.getTime() &&
+                activeRequest.end.getTime() === end.getTime() &&
+                activeRequest.zoomIndex === zoomIndex &&
+                activeRequest.filterSignature === (motionFilterSignature ?? null)
+            ) {
+                console.log('loadFragments: запрос уже выполняется, пропускаем');
                 return;
             }
 
@@ -172,7 +236,7 @@ export const useTimelineFragments = (params: TimelineFragmentsParams & {protocol
             loadQueue.current = {start, end, zoomIndex};
             processLoadQueue();
         },
-        [processLoadQueue, fragmentsBufferRange, isLoadingFragments]
+        [processLoadQueue, fragmentsBufferRange, motionFilterSignature, isLoadingFragments]
     );
 
     /**
@@ -184,6 +248,7 @@ export const useTimelineFragments = (params: TimelineFragmentsParams & {protocol
             start: new Date(0), // Устанавливаем невалидный диапазон, чтобы гарантировать перезагрузку
             end: new Date(0)
         });
+        lastAppliedFilterSignatureRef.current = null;
     }, []);
 
     return {

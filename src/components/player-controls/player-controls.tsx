@@ -10,6 +10,7 @@ import {getFramesTimeline} from '../../utils/api';
 import {useTimelineAuth} from '../../context/timeline-auth-context';
 
 import {Icons} from '../icons';
+import {MotionFilterOption} from '../../types/motion-filter';
 
 import styles from './player-controls.module.scss';
 import {SpeedSelector} from '../speed-selector';
@@ -46,6 +47,11 @@ interface PlayerControlsProps {
     disableSpeedChange?: boolean;
     disableCenterTimeline?: boolean;
     onChangeMode?: (mode: Mode) => void;
+    isFilterPanelOpen?: boolean;
+    activeFilterType?: MotionFilterOption | null;
+    onToggleFilterPanel?: () => void;
+    onSelectFilterOption?: (option: MotionFilterOption) => void;
+    onClearFilter?: () => void;
 }
 
 export const PlayerControls: React.FC<PlayerControlsProps> = ({
@@ -71,7 +77,12 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
     onSaveStream,
     onToggleFullscreen,
     onChangeMode,
-    disableSpeedChange = false
+    disableSpeedChange = false,
+    isFilterPanelOpen = false,
+    activeFilterType = null,
+    onToggleFilterPanel,
+    onSelectFilterOption,
+    onClearFilter
 }) => {
     const {hasTimelineAccess, setTimelineAccess} = useTimelineAuth();
     const [startDate, setStartDate] = useState(new Date());
@@ -210,6 +221,27 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
         ];
     }, [popperBoundaryElement]);
 
+    const filterOptions: Array<{type: MotionFilterOption; label: string; icon: React.ReactNode}> = useMemo(
+        () => [
+            {type: 'motion', label: 'Движение', icon: <Icons.Movement />},
+            {type: 'transport', label: 'Машины', icon: <Icons.Car />},
+            {type: 'human', label: 'Люди', icon: <Icons.Person />}
+        ],
+        []
+    );
+
+    const handleFilterToggle = () => {
+        onToggleFilterPanel?.();
+    };
+
+    const handleFilterSelect = (option: MotionFilterOption) => {
+        onSelectFilterOption?.(option);
+    };
+
+    const handleClearFilter = () => {
+        onClearFilter?.();
+    };
+
     return (
         <div className={`${styles.controls} ${isMobileLandscape ? styles.mobileLandscape : ''}`}>
             <div className={styles.leftControls}>
@@ -241,6 +273,45 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
                 className={styles.rightControls}
                 ref={rightControlsRef}
             >
+                {hasTimelineAccess && (
+                    <div className={styles.filterControls}>
+                        <button
+                            className={`${styles.controlButton} ${activeFilterType ? styles.filterActive : ''}`}
+                            onClick={handleFilterToggle}
+                            aria-label="Фильтр движений"
+                            aria-expanded={isFilterPanelOpen}
+                            aria-pressed={activeFilterType !== null}
+                        >
+                            <Icons.Filter />
+                        </button>
+                        {isFilterPanelOpen && (
+                            <div
+                                className={styles.filterPanel}
+                                role="menu"
+                            >
+                                {filterOptions.map(option => (
+                                    <button
+                                        key={option.type}
+                                        className={`${styles.filterOption} ${
+                                            activeFilterType === option.type ? styles.filterOptionActive : ''
+                                        }`}
+                                        onClick={() => handleFilterSelect(option.type)}
+                                        aria-pressed={activeFilterType === option.type}
+                                    >
+                                        <span className={styles.filterIcon}>{option.icon}</span>
+                                        <span>{option.label}</span>
+                                    </button>
+                                ))}
+                                <button
+                                    className={styles.clearFilterButton}
+                                    onClick={handleClearFilter}
+                                >
+                                    Сбросить
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                )}
                 {hasTimelineAccess && (
                     <DatePicker
                         ref={datePickerRef}

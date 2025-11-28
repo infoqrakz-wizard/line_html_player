@@ -7,6 +7,7 @@ import {useOrientation} from '../timeline/hooks/use-orientation';
 import styles from './control-panel.module.scss';
 import {Mode, Protocol} from '../../utils/types';
 import {useTimelineAuth} from '../../context/timeline-auth-context';
+import {MotionFilterOption, TimelineMotionFilter} from '../../types/motion-filter';
 
 interface ControlPanelProps {
     mode: Mode;
@@ -35,6 +36,12 @@ interface ControlPanelProps {
     disableSpeedChange?: boolean;
     disableCenterTimeline?: boolean;
     onChangeMode?: (mode: Mode) => void;
+    motionFilter?: TimelineMotionFilter | null;
+    isFilterPanelOpen?: boolean;
+    activeFilterType?: MotionFilterOption | null;
+    onToggleFilterPanel?: () => void;
+    onSelectFilterOption?: (option: MotionFilterOption) => void;
+    onClearFilter?: () => void;
 }
 
 export const ControlPanel: React.FC<ControlPanelProps> = ({
@@ -63,7 +70,13 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
     onToggleFullscreen,
     disableSpeedChange = false,
     disableCenterTimeline = false,
-    onChangeMode
+    onChangeMode,
+    motionFilter,
+    isFilterPanelOpen,
+    activeFilterType,
+    onToggleFilterPanel,
+    onSelectFilterOption,
+    onClearFilter
 }) => {
     const {hasTimelineAccess} = useTimelineAuth();
     const {isMobile, orientation} = useOrientation();
@@ -99,6 +112,11 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                 disableSpeedChange={disableSpeedChange}
                 disableCenterTimeline={disableCenterTimeline}
                 onChangeMode={onChangeMode}
+                isFilterPanelOpen={isFilterPanelOpen}
+                activeFilterType={activeFilterType}
+                onToggleFilterPanel={onToggleFilterPanel}
+                onSelectFilterOption={onSelectFilterOption}
+                onClearFilter={onClearFilter}
             />
             {hasTimelineAccess && (
                 <Timeline
@@ -112,6 +130,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                     camera={camera}
                     proxy={proxy}
                     mode={mode}
+                    motionFilter={motionFilter}
                 />
             )}
         </div>

@@ -3,6 +3,7 @@ import {differenceInSeconds, format} from 'date-fns';
 import {Protocol} from './types';
 import {getAuthToken} from './getAuthToken';
 import {buildRequestUrl} from './url-builder';
+import {TimelineMotionFilter} from '../types/motion-filter';
 
 export interface CameraInfo {
     id: number;
@@ -100,6 +101,79 @@ export const getFramesTimeline = (params: GetFramesTimelineParams): Promise<Time
         };
 
         xhr.send(JSON.stringify({method: 'archive.get_frames_timeline', params: requestParams, version: 13}));
+    });
+};
+
+interface GetMotionsTimelineParams extends GetFramesTimelineParams {
+    filter?: TimelineMotionFilter;
+}
+
+export const getMotionsTimeline = (params: GetMotionsTimelineParams): Promise<TimelineResponse> => {
+    const {url, port, credentials, startTime, endTime, unitLength, channel, stream, proxy, filter} = params;
+    const preferredProtocol = params.protocol ?? getProtocol();
+
+    const requestParams = {
+        start_time: [
+            startTime.getFullYear(),
+            startTime.getMonth() + 1,
+            startTime.getDate(),
+            startTime.getHours(),
+            startTime.getMinutes(),
+            startTime.getSeconds()
+        ],
+        end_time: [
+            endTime.getFullYear(),
+            endTime.getMonth() + 1,
+            endTime.getDate(),
+            endTime.getHours(),
+            endTime.getMinutes(),
+            endTime.getSeconds()
+        ],
+        unit_len: unitLength,
+        ...(channel !== undefined && {channel}),
+        ...(stream !== undefined && {stream}),
+        ...(filter ? {filter} : {})
+    };
+
+    return new Promise((resolve, reject) => {
+        const rpcUrl = buildRequestUrl({
+            host: url,
+            port,
+            protocol: preferredProtocol,
+            proxy,
+            path: proxy ? '/rpc' : `/rpc?authorization=Basic ${getAuthToken(credentials)}&content-type=application/json`
+        });
+
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', rpcUrl, true);
+
+        if (proxy) {
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            xhr.setRequestHeader('Authorization', `Basic ${getAuthToken(credentials)}`);
+        }
+
+        xhr.onload = function () {
+            if (xhr.status >= 200 && xhr.status < 300) {
+                try {
+                    const data = JSON.parse(xhr.responseText);
+                    if (data.error && data.error.type === 'auth' && data.error.message === 'forbidden') {
+                        reject(new Error('FORBIDDEN'));
+                        return;
+                    }
+                    resolve(data.result);
+                } catch (parseError) {
+                    reject(new Error('Failed to parse motion timeline data'));
+                }
+            } else {
+                reject(new Error('Failed to fetch motion timeline data'));
+            }
+        };
+
+        xhr.onerror = function () {
+            reject(new Error('Failed to fetch motion timeline data'));
+        };
+
+        xhr.send(JSON.stringify({method: 'archive.get_motions_timeline', params: requestParams, version: 13}));
     });
 };
 

@@ -6,6 +6,7 @@
  * Свойства компонента Timeline
  */
 import {Mode, Protocol} from '../../utils/types';
+import {TimelineMotionFilter} from '../../types/motion-filter';
 
 export interface TimelineProps {
     /** URL сервера */
@@ -28,6 +29,8 @@ export interface TimelineProps {
     protocol?: Protocol;
     /** Прокси-сервер */
     proxy?: string;
+    /** Фильтр движений */
+    motionFilter?: TimelineMotionFilter | null;
 }
 
 /**
@@ -249,6 +252,10 @@ export interface TimelineFragmentsParams {
     protocol?: Protocol;
     /** Прокси-сервер */
     proxy?: string;
+    /** Фильтр движений */
+    motionFilter?: TimelineMotionFilter | null;
+    /** Сигнатура фильтра */
+    motionFilterSignature?: string | null;
 }
 
 /**

@@ -19,7 +19,7 @@ module.exports = () => {
             },
             open: ['/debug.html'],
             hot: true,
-            port: 3000,
+            port: 3005,
             compress: true,
             allowedHosts: 'all',
             client: {
