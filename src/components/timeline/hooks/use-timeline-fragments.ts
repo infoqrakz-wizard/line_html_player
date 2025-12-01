@@ -508,9 +508,16 @@ export const useTimelineFragments = (
                         reject(new Error('Request aborted'));
                     };
 
+                    // Определяем метод API и параметры фильтра в зависимости от типа фильтра
+                    const hasTypes = motionFilter?.types && motionFilter.types.length > 0;
+                    const apiMethod = hasTypes ? 'archive.get_objects_timeline' : 'archive.get_motions_timeline';
+
+                    // Для объектов передаем только types в filter, для движения - весь фильтр
+                    const filterParam = hasTypes ? {types: motionFilter.types} : motionFilter;
+
                     xhr.send(
                         JSON.stringify({
-                            method: 'archive.get_motions_timeline',
+                            method: apiMethod,
                             params: {
                                 start_time: [
                                     request.start.getFullYear(),
@@ -531,7 +538,7 @@ export const useTimelineFragments = (
                                 unit_len: UNIT_LENGTHS[request.zoomIndex],
                                 channel: camera,
                                 stream: 'video',
-                                filter: motionFilter!
+                                filter: filterParam
                             },
                             version: 13
                         })

@@ -13,6 +13,25 @@
   border: 1px dashed rgba(255, 255, 255, 0.2);
   border-radius: 12px;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.title {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: white;
+  font-size: 16px;
+  font-weight: 500;
+  text-align: center;
+  z-index: 10;
+  pointer-events: none;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 8px 16px;
+  border-radius: 8px;
+  backdrop-filter: blur(4px);
 }
 
 .maskGrid {

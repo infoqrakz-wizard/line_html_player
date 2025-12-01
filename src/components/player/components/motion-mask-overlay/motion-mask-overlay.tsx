@@ -67,6 +67,7 @@ export const MotionMaskOverlay: React.FC<MotionMaskOverlayProps> = ({isVisible, 
                 onPointerUp={stopDrawing}
                 onPointerLeave={stopDrawing}
             >
+                <div className={styles.title}>Выберите зоны для поиска событий</div>
                 <div
                     className={styles.maskGrid}
                     style={{

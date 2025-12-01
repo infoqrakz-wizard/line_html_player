@@ -29,7 +29,7 @@ const MOTION_MASK_HEIGHT = 8;
 
 type MaskGrid = number[][];
 
-const createFilledMaskGrid = (fillValue: 0 | 1 = 1): MaskGrid =>
+const createFilledMaskGrid = (fillValue: 0 | 1 = 0): MaskGrid =>
     Array.from({length: MOTION_MASK_HEIGHT}, () => Array.from({length: MOTION_MASK_WIDTH}, () => fillValue));
 
 const gridFromMaskPayload = (payload: MotionMaskPayload): MaskGrid => {
@@ -344,10 +344,11 @@ export const Player: React.FC<PlayerProps> = ({
 
     const [isFilterPanelOpen, setIsFilterPanelOpen] = useState<boolean>(false);
     const [activeFilterType, setActiveFilterType] = useState<MotionFilterOption | null>(null);
-    const [maskGrid, setMaskGrid] = useState<MaskGrid>(() => createFilledMaskGrid(1));
+    const [maskGrid, setMaskGrid] = useState<MaskGrid>(() => createFilledMaskGrid(0));
     const [isMaskEditorVisible, setIsMaskEditorVisible] = useState<boolean>(false);
     const [appliedMotionFilter, setAppliedMotionFilter] = useState<TimelineMotionFilter | null>(null);
     const maskEditorInitialGridRef = useRef<MaskGrid | null>(null);
+    const editingFilterTypeRef = useRef<MotionFilterOption | null>(null);
 
     const handleChangeMode = (newMode: Mode, time?: Date) => {
         setCurrentMode(newMode);
@@ -418,25 +419,29 @@ export const Player: React.FC<PlayerProps> = ({
     };
 
     const handleSelectFilterOption = (option: MotionFilterOption) => {
+        // Для всех фильтров показываем редактор маски
+        editingFilterTypeRef.current = option;
+
+        // Определяем базовую сетку из существующего фильтра
+        let baseGrid: MaskGrid;
         if (option === 'motion') {
-            // Для фильтра движения показываем редактор маски
-            const baseGrid = appliedMotionFilter?.mask
+            baseGrid = appliedMotionFilter?.mask
                 ? gridFromMaskPayload(appliedMotionFilter.mask)
-                : createFilledMaskGrid(1);
-            maskEditorInitialGridRef.current = baseGrid.map(row => [...row]);
-            setMaskGrid(baseGrid);
-            setIsMaskEditorVisible(true);
-            setIsFilterPanelOpen(false);
+                : createFilledMaskGrid(0);
         } else {
-            // Для фильтров по типам объектов (human, transport) сразу применяем фильтр без маски
+            // Для фильтров human/transport проверяем, есть ли уже маска в примененном фильтре
             const objectType = option as MotionObjectType;
-            setAppliedMotionFilter({
-                types: [objectType]
-            });
-            setActiveFilterType(option);
-            setIsFilterPanelOpen(false);
-            setIsMaskEditorVisible(false);
+            if (appliedMotionFilter?.types?.includes(objectType) && appliedMotionFilter?.mask) {
+                baseGrid = gridFromMaskPayload(appliedMotionFilter.mask);
+            } else {
+                baseGrid = createFilledMaskGrid(0);
+            }
         }
+
+        maskEditorInitialGridRef.current = baseGrid.map(row => [...row]);
+        setMaskGrid(baseGrid);
+        setIsMaskEditorVisible(true);
+        setIsFilterPanelOpen(false);
     };
 
     const handleClearMotionFilter = () => {
@@ -445,7 +450,8 @@ export const Player: React.FC<PlayerProps> = ({
         setIsMaskEditorVisible(false);
         setIsFilterPanelOpen(false);
         maskEditorInitialGridRef.current = null;
-        setMaskGrid(createFilledMaskGrid(1));
+        setMaskGrid(createFilledMaskGrid(0));
+        editingFilterTypeRef.current = null;
     };
 
     const handleMaskToggleCell = (rowIndex: number, colIndex: number) => {
@@ -459,10 +465,25 @@ export const Player: React.FC<PlayerProps> = ({
 
     const handleMaskApply = () => {
         const payload = buildMaskPayload(maskGrid);
-        setAppliedMotionFilter({mask: payload});
-        setActiveFilterType('motion');
+        const filterType = editingFilterTypeRef.current;
+
+        if (filterType === 'motion') {
+            // Для фильтра движения сохраняем только маску
+            setAppliedMotionFilter({mask: payload});
+            setActiveFilterType('motion');
+        } else if (filterType === 'human' || filterType === 'transport') {
+            // Для фильтров human/transport сохраняем и маску, и тип
+            const objectType = filterType as MotionObjectType;
+            setAppliedMotionFilter({
+                mask: payload,
+                types: [objectType]
+            });
+            setActiveFilterType(filterType);
+        }
+
         setIsMaskEditorVisible(false);
         maskEditorInitialGridRef.current = maskGrid.map(row => [...row]);
+        editingFilterTypeRef.current = null;
     };
 
     const handleMouseLeave = () => {
