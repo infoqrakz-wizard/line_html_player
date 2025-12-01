@@ -515,6 +515,8 @@ export const useTimelineFragments = (
                     // Для объектов передаем только types в filter, для движения - весь фильтр
                     const filterParam = hasTypes ? {types: motionFilter.types} : motionFilter;
 
+                    const version = hasTypes ? 71 : 13;
+
                     xhr.send(
                         JSON.stringify({
                             method: apiMethod,
@@ -540,7 +542,7 @@ export const useTimelineFragments = (
                                 stream: 'video',
                                 filter: filterParam
                             },
-                            version: 13
+                            version
                         })
                     );
                 });

@@ -173,7 +173,7 @@ export const getMotionsTimeline = (params: GetMotionsTimelineParams): Promise<Ti
             reject(new Error('Failed to fetch motion timeline data'));
         };
 
-        xhr.send(JSON.stringify({method: 'archive.get_motions_timeline', params: requestParams, version: 13}));
+        xhr.send(JSON.stringify({method: 'archive.get_motions_timeline', params: requestParams, version: 71}));
     });
 };
 
