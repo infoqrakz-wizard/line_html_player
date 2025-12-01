@@ -1,5 +1,5 @@
 import {getProtocol} from './url-params';
-import {differenceInSeconds, format} from 'date-fns';
+import {differenceInSeconds, format, startOfDay, endOfDay, addDays, isSameDay} from 'date-fns';
 import {Protocol} from './types';
 import {getAuthToken} from './getAuthToken';
 import {buildRequestUrl} from './url-builder';
@@ -32,10 +32,18 @@ interface TimelineResponse {
     timeline: number[];
 }
 
-export const getFramesTimeline = (params: GetFramesTimelineParams): Promise<TimelineResponse> => {
-    const {url, port, credentials, startTime, endTime, unitLength, channel, stream, proxy} = params;
-    const preferredProtocol = params.protocol ?? getProtocol();
-
+const makeSingleDayRequest = (
+    url: string,
+    port: number,
+    credentials: string,
+    startTime: Date,
+    endTime: Date,
+    unitLength: number,
+    channel: number | undefined,
+    stream: string | undefined,
+    preferredProtocol: Protocol,
+    proxy: string | undefined
+): Promise<TimelineResponse> => {
     const requestParams = {
         start_time: [
             startTime.getFullYear(),
@@ -57,6 +65,8 @@ export const getFramesTimeline = (params: GetFramesTimelineParams): Promise<Time
         ...(channel !== undefined && {channel}),
         ...(stream !== undefined && {stream})
     };
+
+    console.log('single day request params', requestParams.start_time, requestParams.end_time);
 
     return new Promise((resolve, reject) => {
         const rpcUrl = buildRequestUrl({
@@ -102,6 +112,106 @@ export const getFramesTimeline = (params: GetFramesTimelineParams): Promise<Time
 
         xhr.send(JSON.stringify({method: 'archive.get_frames_timeline', params: requestParams, version: 13}));
     });
+};
+
+export const getFramesTimeline = async (params: GetFramesTimelineParams): Promise<TimelineResponse> => {
+    const {url, port, credentials, startTime, endTime, unitLength, channel, stream, proxy} = params;
+    const preferredProtocol = params.protocol ?? getProtocol();
+
+    // Если запрос в пределах одного дня, делаем один запрос
+    if (isSameDay(startTime, endTime)) {
+        return makeSingleDayRequest(
+            url,
+            port,
+            credentials,
+            startTime,
+            endTime,
+            unitLength,
+            channel,
+            stream,
+            preferredProtocol,
+            proxy
+        );
+    }
+
+    // Разбиваем запрос по суткам
+    const requests: Array<Promise<TimelineResponse>> = [];
+    let currentDate = startOfDay(startTime);
+    const endDate = startOfDay(endTime);
+
+    // Первый день: от startTime до конца дня (23:59:59)
+    const firstDayEnd = endOfDay(startTime);
+    requests.push(
+        makeSingleDayRequest(
+            url,
+            port,
+            credentials,
+            startTime,
+            firstDayEnd,
+            unitLength,
+            channel,
+            stream,
+            preferredProtocol,
+            proxy
+        )
+    );
+
+    // Промежуточные дни: от начала до конца дня
+    currentDate = addDays(currentDate, 1);
+    while (currentDate < endDate) {
+        const dayStart = startOfDay(currentDate);
+        const dayEnd = endOfDay(currentDate);
+        requests.push(
+            makeSingleDayRequest(
+                url,
+                port,
+                credentials,
+                dayStart,
+                dayEnd,
+                unitLength,
+                channel,
+                stream,
+                preferredProtocol,
+                proxy
+            )
+        );
+        currentDate = addDays(currentDate, 1);
+    }
+
+    // Последний день: от начала дня до endTime
+    const lastDayStart = startOfDay(endTime);
+    requests.push(
+        makeSingleDayRequest(
+            url,
+            port,
+            credentials,
+            lastDayStart,
+            endTime,
+            unitLength,
+            channel,
+            stream,
+            preferredProtocol,
+            proxy
+        )
+    );
+
+    // Выполняем все запросы параллельно и объединяем результаты
+    try {
+        const results = await Promise.all(requests);
+        const combinedTimeline: number[] = [];
+
+        for (const result of results) {
+            combinedTimeline.push(...result.timeline);
+        }
+
+        return {timeline: combinedTimeline};
+    } catch (error) {
+        // Если один из запросов вернул FORBIDDEN, пробрасываем его
+        if (error instanceof Error && error.message === 'FORBIDDEN') {
+            throw error;
+        }
+        throw new Error('Failed to fetch timeline data');
+    }
 };
 
 interface GetMotionsTimelineParams extends GetFramesTimelineParams {

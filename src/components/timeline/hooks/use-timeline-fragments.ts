@@ -68,8 +68,10 @@ export const useTimelineFragments = (
     const activeRequestXhrRef = useRef<XMLHttpRequest | null>(null);
     // Ref для текущего диапазона буфера motion timeline (для обновления fragments)
     const currentMotionBufferRef = useRef<{start: Date; end: Date; zoomIndex: number} | null>(null);
+    // Ref для debounce таймера loadFragments (для motion filter)
+    const loadFragmentsDebounceTimerRef = useRef<NodeJS.Timeout | null>(null);
     // Задержка для debounce (мс) - после окончания взаимодействия
-    const DEBOUNCE_DELAY = 500;
+    const DEBOUNCE_DELAY = 1000;
 
     // Вычисляем диапазоны времени для каждого фрагмента
     const fragmentRanges = useMemo((): FragmentTimeRange[] => {
@@ -640,22 +642,10 @@ export const useTimelineFragments = (
         const {start, end, zoomIndex} = loadQueue.current;
         loadQueue.current = null;
         setIsLoadingFragments(true);
-
         try {
             const screenDuration = end.getTime() - start.getTime();
             const bufferStart = new Date(start.getTime() - screenDuration * BUFFER_SCREENS);
             const bufferEnd = new Date(end.getTime() + screenDuration * BUFFER_SCREENS);
-
-            console.log('use-timeline-fragments: request params', {
-                start: start.toISOString(),
-                end: end.toISOString(),
-                screenDurationHours: screenDuration / (1000 * 60 * 60),
-                bufferStart: bufferStart.toISOString(),
-                bufferEnd: bufferEnd.toISOString(),
-                bufferDurationHours: (bufferEnd.getTime() - bufferStart.getTime()) / (1000 * 60 * 60),
-                zoomIndex,
-                BUFFER_SCREENS
-            });
 
             const requestBase = {
                 startTime: bufferStart,
@@ -723,14 +713,6 @@ export const useTimelineFragments = (
                         };
                     }
                     return block;
-                });
-                console.log('use-timeline-fragments: разбиваем на блоки для motion timeline', {
-                    totalBlocks: blocks.length,
-                    visibleStart: visibleTimeRange.start.toISOString(),
-                    visibleEnd: visibleTimeRange.end.toISOString(),
-                    motionBufferStart: motionBufferStart.toISOString(),
-                    motionBufferEnd: motionBufferEnd.toISOString(),
-                    now: new Date(now).toISOString()
                 });
 
                 // НЕ удаляем старые результаты - сохраняем все запрошенные интервалы для отображения пользователю
@@ -845,20 +827,22 @@ export const useTimelineFragments = (
      */
     const loadFragments = useCallback(
         (start: Date, end: Date, zoomIndex: number = 0) => {
-            console.log('loadFragments called with:', {
-                start: start.toISOString(),
-                end: end.toISOString(),
-                durationHours: (end.getTime() - start.getTime()) / (1000 * 60 * 60),
-                zoomIndex
-            });
+            // Очищаем loadQueue, если запрос уже обработан (isLoadingFragments = true)
+            // Это важно, чтобы избежать ситуации, когда старый запрос блокирует новые запросы
+            if (loadQueue.current && isLoadingFragments) {
+                loadQueue.current = null;
+            }
+
             // Проверяем, не загружается ли уже этот диапазон
+            // Важно: проверяем только если запрос еще не обработан (isLoadingFragments = false)
+            // Если запрос уже обрабатывается, то loadQueue.current будет null
             if (
                 loadQueue.current &&
+                !isLoadingFragments &&
                 loadQueue.current.start.getTime() === start.getTime() &&
                 loadQueue.current.end.getTime() === end.getTime() &&
                 loadQueue.current.zoomIndex === zoomIndex
             ) {
-                console.log('loadFragments: запрос уже в очереди, пропускаем');
                 return;
             }
 
@@ -870,16 +854,33 @@ export const useTimelineFragments = (
             const currentBufferStart = fragmentsBufferRange.start.getTime();
             const currentBufferEnd = fragmentsBufferRange.end.getTime();
 
-            // Если запрашиваемый диапазон уже покрыт текущим буфером и масштаб не изменился
-            if (
-                currentBufferStart <= bufferStart.getTime() &&
-                currentBufferEnd >= bufferEnd.getTime() &&
-                currentBufferStart !== 0 && // Проверяем, что это не начальное состояние
-                !isLoadingFragments &&
-                lastAppliedFilterSignatureRef.current === (motionFilterSignature ?? null)
-            ) {
-                console.log('loadFragments: диапазон уже загружен, пропускаем');
-                return;
+            // Для motion filter используем более мягкую проверку
+            // Проверяем только базовое покрытие буфером, но всегда добавляем запросы при изменении видимого диапазона
+            if (motionFilter) {
+                // Для motion filter проверяем только базовые условия
+                // Всегда добавляем запросы в очередь, если видимый диапазон изменился
+                // Это гарантирует обновление данных при перемещении таймлайна
+                const isSameRange =
+                    currentBufferStart === bufferStart.getTime() &&
+                    currentBufferEnd === bufferEnd.getTime() &&
+                    currentBufferStart !== 0 &&
+                    lastAppliedFilterSignatureRef.current === (motionFilterSignature ?? null);
+
+                if (isSameRange && !isLoadingFragments) {
+                    return;
+                }
+            } else {
+                // Для обычных запросов (без motion filter) используем старую логику
+                // Если запрашиваемый диапазон уже покрыт текущим буфером и масштаб не изменился
+                if (
+                    currentBufferStart <= bufferStart.getTime() &&
+                    currentBufferEnd >= bufferEnd.getTime() &&
+                    currentBufferStart !== 0 && // Проверяем, что это не начальное состояние
+                    !isLoadingFragments &&
+                    lastAppliedFilterSignatureRef.current === (motionFilterSignature ?? null)
+                ) {
+                    return;
+                }
             }
 
             const activeRequest = activeRequestRef.current;
@@ -890,15 +891,48 @@ export const useTimelineFragments = (
                 activeRequest.zoomIndex === zoomIndex &&
                 activeRequest.filterSignature === (motionFilterSignature ?? null)
             ) {
-                console.log('loadFragments: запрос уже выполняется, пропускаем');
                 return;
             }
 
-            console.log('loadFragments: добавляем новый запрос в очередь');
             loadQueue.current = {start, end, zoomIndex};
-            processLoadQueue();
+
+            // Для motion filter используем debounce, чтобы не отправлять запросы при каждом движении
+            if (motionFilter) {
+                // При первом включении фильтра запускаем сразу, иначе через debounce
+                const isFirstLoad = !loadedRangeRef.current;
+                if (isFirstLoad) {
+                    // Первый запрос - запускаем сразу
+                    // Очищаем предыдущий таймер, если он есть
+                    if (loadFragmentsDebounceTimerRef.current) {
+                        clearTimeout(loadFragmentsDebounceTimerRef.current);
+                        loadFragmentsDebounceTimerRef.current = null;
+                    }
+                    processLoadQueue();
+                } else {
+                    // Последующие запросы - через debounce
+                    // Если таймер уже установлен, просто обновляем данные в очереди
+                    // и не очищаем таймер, чтобы он выполнился с новыми данными
+                    if (!loadFragmentsDebounceTimerRef.current) {
+                        // Таймер не установлен - создаем новый
+                        loadFragmentsDebounceTimerRef.current = setTimeout(() => {
+                            loadFragmentsDebounceTimerRef.current = null;
+                            processLoadQueue();
+                        }, DEBOUNCE_DELAY);
+                    }
+                    // Таймер уже установлен - просто обновляем данные в очереди
+                    // Таймер выполнится с новыми данными
+                }
+            } else {
+                // Для обычных запросов (без motion filter) вызываем сразу
+                // Очищаем предыдущий таймер, если он есть
+                if (loadFragmentsDebounceTimerRef.current) {
+                    clearTimeout(loadFragmentsDebounceTimerRef.current);
+                    loadFragmentsDebounceTimerRef.current = null;
+                }
+                processLoadQueue();
+            }
         },
-        [processLoadQueue, fragmentsBufferRange, motionFilterSignature, isLoadingFragments]
+        [processLoadQueue, fragmentsBufferRange, motionFilterSignature, isLoadingFragments, motionFilter]
     );
 
     /**
@@ -917,10 +951,14 @@ export const useTimelineFragments = (
         loadedRangeRef.current = null; // Очищаем загруженный диапазон
         queuedRangeRef.current = null; // Очищаем диапазон очереди
         currentMotionBufferRef.current = null; // Очищаем текущий буфер
-        // Очищаем debounce таймер
+        // Очищаем debounce таймеры
         if (debounceTimerRef.current) {
             clearTimeout(debounceTimerRef.current);
             debounceTimerRef.current = null;
+        }
+        if (loadFragmentsDebounceTimerRef.current) {
+            clearTimeout(loadFragmentsDebounceTimerRef.current);
+            loadFragmentsDebounceTimerRef.current = null;
         }
         // Останавливаем активные запросы
         stopProcessingQueue();
@@ -956,25 +994,68 @@ export const useTimelineFragments = (
      * Обрабатывает изменения timeline/zoom - вызывается после окончания взаимодействия
      */
     const handleTimelineChange = useCallback(
-        (visibleStart: Date, visibleEnd: Date) => {
+        (visibleStart: Date, visibleEnd: Date, zoomIndex?: number) => {
             // 1) Останавливаем выполнение запросов из очереди
             // Отменяем только активный запрос (если он есть)
             // Запросы идут последовательно, поэтому должен быть только один активный запрос
             if (activeRequestXhrRef.current) {
-                console.log('handleTimelineChange: отменяем активный запрос');
                 activeRequestXhrRef.current.abort();
                 activeRequestXhrRef.current = null;
             }
             // Останавливаем обработку очереди
             isProcessingMotionQueueRef.current = false;
+            // Очищаем активный запрос, чтобы не блокировать новые запросы
+            activeRequestRef.current = null;
 
             // 2) Чистим из очереди интервалы, которые уже за пределами отображаемого timeline
             cleanQueueOutOfRange(visibleStart, visibleEnd);
 
-            // 3) Добавляем новые запросы в очередь (будет вызвано через loadFragments)
-            // Это делается автоматически при следующем вызове loadFragments
+            // 2.5) Очищаем loadQueue, если старый запрос больше не актуален
+            // Это важно, чтобы избежать ситуации, когда старый запрос блокирует новые запросы
+            if (loadQueue.current) {
+                const queueStart = loadQueue.current.start.getTime();
+                const queueEnd = loadQueue.current.end.getTime();
+                const screenDuration = visibleEnd.getTime() - visibleStart.getTime();
+                const bufferStart = visibleStart.getTime() - screenDuration * BUFFER_SCREENS;
+                const bufferEnd = visibleEnd.getTime() + screenDuration * BUFFER_SCREENS;
 
-            // 4) Запускаем выполнение запросов из очереди через 0.5 секунды
+                // Если старый запрос не пересекается с новым видимым диапазоном (с буфером), очищаем его
+                if (
+                    queueEnd < bufferStart ||
+                    queueStart > bufferEnd ||
+                    loadQueue.current.zoomIndex !== (zoomIndex ?? loadQueue.current.zoomIndex)
+                ) {
+                    loadQueue.current = null;
+                }
+            }
+
+            // 3) Очищаем таймер loadFragments ДО вызова loadFragments, чтобы избежать конфликтов
+            // Это важно, чтобы старый таймер не выполнился после того, как мы добавим новый запрос
+            const hadTimer = !!loadFragmentsDebounceTimerRef.current;
+            if (loadFragmentsDebounceTimerRef.current) {
+                clearTimeout(loadFragmentsDebounceTimerRef.current);
+                loadFragmentsDebounceTimerRef.current = null;
+            }
+
+            // 4) Добавляем новые запросы в очередь через loadFragments
+            // Для motion filter это критично, чтобы добавить запросы для нового видимого диапазона
+            if (motionFilter) {
+                // Получаем zoomIndex из параметра или из очереди
+                const currentZoomIndex = zoomIndex ?? loadQueue.current?.zoomIndex ?? 0;
+                // Вызываем loadFragments для добавления новых запросов в очередь
+                // Это обойдет проверку на покрытие буфером, так как мы явно хотим обновить данные
+                loadFragments(visibleStart, visibleEnd, currentZoomIndex);
+
+                // Если таймер был очищен, но loadFragments пропустил запрос (уже в очереди),
+                // нужно принудительно создать новый таймер
+                // eslint-disable-next-line max-len
+                if (hadTimer && loadQueue.current && !loadFragmentsDebounceTimerRef.current && !isLoadingFragments) {
+                    loadFragmentsDebounceTimerRef.current = setTimeout(() => {
+                        loadFragmentsDebounceTimerRef.current = null;
+                        processLoadQueue();
+                    }, DEBOUNCE_DELAY);
+                }
+            }
             if (debounceTimerRef.current) {
                 clearTimeout(debounceTimerRef.current);
             }
@@ -983,17 +1064,28 @@ export const useTimelineFragments = (
                 processMotionTimelineQueue();
             }, DEBOUNCE_DELAY);
         },
-        [cleanQueueOutOfRange, processMotionTimelineQueue]
+        [
+            cleanQueueOutOfRange,
+            processMotionTimelineQueue,
+            motionFilter,
+            loadFragments,
+            processLoadQueue,
+            isLoadingFragments
+        ]
     );
 
     /**
-     * Очистка debounce таймера при размонтировании
+     * Очистка debounce таймеров при размонтировании
      */
     useEffect(() => {
         return () => {
             if (debounceTimerRef.current) {
                 clearTimeout(debounceTimerRef.current);
                 debounceTimerRef.current = null;
+            }
+            if (loadFragmentsDebounceTimerRef.current) {
+                clearTimeout(loadFragmentsDebounceTimerRef.current);
+                loadFragmentsDebounceTimerRef.current = null;
             }
         };
     }, []);

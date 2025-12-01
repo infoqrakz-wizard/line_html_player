@@ -70,9 +70,9 @@ export const useTimelineInteractions = ({
         setIsDragging(false);
         // Вызываем handleTimelineChange после окончания перетаскивания
         if (handleTimelineChange && visibleTimeRange) {
-            handleTimelineChange(visibleTimeRange.start, visibleTimeRange.end);
+            handleTimelineChange(visibleTimeRange.start, visibleTimeRange.end, intervalIndex);
         }
-    }, [handleTimelineChange, visibleTimeRange]);
+    }, [handleTimelineChange, visibleTimeRange, intervalIndex]);
 
     /**
      * Обработчик движения мыши
@@ -100,17 +100,8 @@ export const useTimelineInteractions = ({
             const newStart = new Date(visibleTimeRange.start.getTime() - timeDelta);
             const newEnd = new Date(visibleTimeRange.end.getTime() - timeDelta);
 
-            // Проверяем, нужно ли загрузить новые фрагменты
-            const screenDuration = newEnd.getTime() - newStart.getTime();
-
-            // Проверяем расстояние от видимых границ до границ буфера
-            const distanceToStartBuffer = newStart.getTime() - fragmentsBufferRange.start.getTime();
-            const distanceToEndBuffer = fragmentsBufferRange.end.getTime() - newEnd.getTime();
-
-            // Загружаем новые фрагменты если до границы буфера остается один экран или меньше
-            if (distanceToStartBuffer < screenDuration || distanceToEndBuffer < screenDuration) {
-                loadFragments(newStart, newEnd, intervalIndex);
-            }
+            // Не загружаем фрагменты во время перетаскивания - загрузка произойдет после окончания перетаскивания
+            // через handleTimelineChange или через debounce
 
             setStartX(e.clientX);
             setVisibleTimeRange({start: newStart, end: newEnd});
@@ -146,14 +137,8 @@ export const useTimelineInteractions = ({
                 const newStart = new Date(visibleTimeRange.start.getTime() + scrollAmount);
                 const newEnd = new Date(visibleTimeRange.end.getTime() + scrollAmount);
 
-                // Проверяем необходимость загрузки новых фрагментов
-                const screenDuration = newEnd.getTime() - newStart.getTime();
-                const distanceToStartBuffer = newStart.getTime() - fragmentsBufferRange.start.getTime();
-                const distanceToEndBuffer = fragmentsBufferRange.end.getTime() - newEnd.getTime();
-
-                if (distanceToStartBuffer < screenDuration || distanceToEndBuffer < screenDuration) {
-                    loadFragments(newStart, newEnd, intervalIndex);
-                }
+                // Используем debounce для загрузки фрагментов при прокрутке
+                loadFragments(newStart, newEnd, intervalIndex);
 
                 setVisibleTimeRange({start: newStart, end: newEnd});
             } else {
@@ -192,16 +177,16 @@ export const useTimelineInteractions = ({
                         const newStart = new Date(timeUnderCursor.getTime() - cursorRatio * newRange);
                         const newEnd = new Date(newStart.getTime() + newRange);
 
-                        // Сбрасываем и перезагружаем фрагменты при изменении масштаба
+                        // Сбрасываем и перезагружаем фрагменты при изменении масштаба (немедленно)
                         resetFragments();
                         setIntervalIndex(newIndex);
-                        loadFragments(newStart, newEnd, newIndex);
+                        loadFragments(newStart, newEnd, newIndex, true);
 
                         setVisibleTimeRange({start: newStart, end: newEnd});
 
                         // Вызываем handleTimelineChange после изменения зума
                         if (handleTimelineChange) {
-                            handleTimelineChange(newStart, newEnd);
+                            handleTimelineChange(newStart, newEnd, newIndex);
                         }
                     }
                 }
@@ -354,14 +339,7 @@ export const useTimelineInteractions = ({
                     const newStart = new Date(visibleTimeRange.start.getTime() - timeDelta);
                     const newEnd = new Date(visibleTimeRange.end.getTime() - timeDelta);
 
-                    const screenDuration = newEnd.getTime() - newStart.getTime();
-
-                    const distanceToStartBuffer = newStart.getTime() - fragmentsBufferRange.start.getTime();
-                    const distanceToEndBuffer = fragmentsBufferRange.end.getTime() - newEnd.getTime();
-
-                    if (distanceToStartBuffer < screenDuration || distanceToEndBuffer < screenDuration) {
-                        loadFragments(newStart, newEnd, intervalIndex);
-                    }
+                    // Не загружаем фрагменты во время перетаскивания - загрузка произойдет после окончания перетаскивания
 
                     setStartY(currentY);
                     setVisibleTimeRange({start: newStart, end: newEnd});
@@ -403,13 +381,13 @@ export const useTimelineInteractions = ({
 
                             resetFragments();
                             setIntervalIndex(newIndex);
-                            loadFragments(newStart, newEnd, newIndex);
+                            loadFragments(newStart, newEnd, newIndex, true);
 
                             setVisibleTimeRange({start: newStart, end: newEnd});
 
                             // Вызываем handleTimelineChange после изменения зума
                             if (handleTimelineChange) {
-                                handleTimelineChange(newStart, newEnd);
+                                handleTimelineChange(newStart, newEnd, newIndex);
                             }
 
                             verticalSwipeDistanceRef.current = 0;
@@ -459,13 +437,13 @@ export const useTimelineInteractions = ({
 
                             resetFragments();
                             setIntervalIndex(newIndex);
-                            loadFragments(newStart, newEnd, newIndex);
+                            loadFragments(newStart, newEnd, newIndex, true);
 
                             setVisibleTimeRange({start: newStart, end: newEnd});
 
                             // Вызываем handleTimelineChange после изменения зума
                             if (handleTimelineChange) {
-                                handleTimelineChange(newStart, newEnd);
+                                handleTimelineChange(newStart, newEnd, newIndex);
                             }
 
                             verticalSwipeDistanceRef.current = 0;
@@ -483,14 +461,7 @@ export const useTimelineInteractions = ({
                     const newStart = new Date(visibleTimeRange.start.getTime() - timeDelta);
                     const newEnd = new Date(visibleTimeRange.end.getTime() - timeDelta);
 
-                    const screenDuration = newEnd.getTime() - newStart.getTime();
-
-                    const distanceToStartBuffer = newStart.getTime() - fragmentsBufferRange.start.getTime();
-                    const distanceToEndBuffer = fragmentsBufferRange.end.getTime() - newEnd.getTime();
-
-                    if (distanceToStartBuffer < screenDuration || distanceToEndBuffer < screenDuration) {
-                        loadFragments(newStart, newEnd, intervalIndex);
-                    }
+                    // Не загружаем фрагменты во время перетаскивания - загрузка произойдет после окончания перетаскивания
 
                     setStartX(currentX);
                     setVisibleTimeRange({start: newStart, end: newEnd});
@@ -510,7 +481,8 @@ export const useTimelineInteractions = ({
             setVisibleTimeRange,
             intervalIndex,
             resetFragments,
-            setIntervalIndex
+            setIntervalIndex,
+            handleTimelineChange
         ]
     );
 
@@ -519,7 +491,7 @@ export const useTimelineInteractions = ({
             setIsDragging(false);
             // Вызываем handleTimelineChange после окончания перетаскивания
             if (handleTimelineChange && visibleTimeRange && hasDragged) {
-                handleTimelineChange(visibleTimeRange.start, visibleTimeRange.end);
+                handleTimelineChange(visibleTimeRange.start, visibleTimeRange.end, intervalIndex);
             }
 
             if (
