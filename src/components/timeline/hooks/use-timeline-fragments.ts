@@ -219,7 +219,10 @@ export const useTimelineFragments = (
 
                     const duration = dayRangeEnd.getTime() - dayRangeStart.getTime();
                     const units = Math.ceil(duration / (targetUnitLength * 1000));
-                    result.push(...new Array(units).fill(0));
+                    // Используем более безопасный способ добавления элементов для больших массивов
+                    for (let i = 0; i < units; i++) {
+                        result.push(0);
+                    }
 
                     if (bufferRangeStart === null) {
                         bufferRangeStart = dayRangeStart;
@@ -1311,17 +1314,83 @@ export const useTimelineFragments = (
                 loadPromises.push(loadDayData(previousDay));
             }
 
-            // После завершения начальной загрузки устанавливаем флаг
+            // После завершения начальной загрузки устанавливаем флаг и обновляем отображение
             Promise.all(loadPromises).then(() => {
                 console.log('use-timeline-fragments: начальная загрузка завершена');
                 isInitialLoadCompletedRef.current = true;
+
+                // Обновляем отображение фрагментов для текущего видимого диапазона, если он есть
+                // Используем setTimeout, чтобы избежать обновления во время рендера
+                if (visibleTimeRange) {
+                    setTimeout(() => {
+                        const screenDuration = visibleTimeRange.end.getTime() - visibleTimeRange.start.getTime();
+                        const bufferStart = new Date(
+                            visibleTimeRange.start.getTime() - screenDuration * BUFFER_SCREENS
+                        );
+                        const bufferEnd = new Date(visibleTimeRange.end.getTime() + screenDuration * BUFFER_SCREENS);
+
+                        // Получаем текущий zoomIndex из loadQueue или используем 0 по умолчанию
+                        const currentZoomIndex = loadQueue.current?.zoomIndex ?? 0;
+
+                        // Обновляем fragments с загруженными данными
+                        const mergedData = mergeDaysDataForRange(bufferStart, bufferEnd, currentZoomIndex);
+                        setFragments([...mergedData.timeline]);
+                        setFragmentsBufferRange(mergedData.bufferRange);
+                    }, 0);
+                }
             });
         } else {
-            // Если дни уже загружены, сразу устанавливаем флаг
+            // Если дни уже загружены, сразу устанавливаем флаг и обновляем отображение
             isInitialLoadCompletedRef.current = true;
+
+            // Обновляем отображение фрагментов для текущего видимого диапазона, если он есть
+            // Используем setTimeout, чтобы избежать обновления во время рендера
+            if (visibleTimeRange) {
+                setTimeout(() => {
+                    const screenDuration = visibleTimeRange.end.getTime() - visibleTimeRange.start.getTime();
+                    const bufferStart = new Date(visibleTimeRange.start.getTime() - screenDuration * BUFFER_SCREENS);
+                    const bufferEnd = new Date(visibleTimeRange.end.getTime() + screenDuration * BUFFER_SCREENS);
+
+                    // Получаем текущий zoomIndex из loadQueue или используем 0 по умолчанию
+                    const currentZoomIndex = loadQueue.current?.zoomIndex ?? 0;
+
+                    // Обновляем fragments с загруженными данными
+                    const mergedData = mergeDaysDataForRange(bufferStart, bufferEnd, currentZoomIndex);
+                    setFragments(mergedData.timeline);
+                    setFragmentsBufferRange(mergedData.bufferRange);
+                }, 0);
+            }
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [motionFilter, serverTime]);
+
+    /**
+     * Обновляет отображение фрагментов, когда visibleTimeRange становится доступным после загрузки данных
+     */
+    useEffect(() => {
+        // Обновляем только для обычных фреймов (без фильтров) и только если начальная загрузка завершена
+        if (motionFilter || !visibleTimeRange || !isInitialLoadCompletedRef.current) {
+            return;
+        }
+
+        // Проверяем, есть ли загруженные данные для видимого диапазона
+        // Используем setTimeout, чтобы избежать обновления во время рендера
+        setTimeout(() => {
+            const screenDuration = visibleTimeRange.end.getTime() - visibleTimeRange.start.getTime();
+            const bufferStart = new Date(visibleTimeRange.start.getTime() - screenDuration * BUFFER_SCREENS);
+            const bufferEnd = new Date(visibleTimeRange.end.getTime() + screenDuration * BUFFER_SCREENS);
+
+            // Получаем текущий zoomIndex из loadQueue или используем 0 по умолчанию
+            const currentZoomIndex = loadQueue.current?.zoomIndex ?? 0;
+
+            // Обновляем fragments с загруженными данными
+            const mergedData = mergeDaysDataForRange(bufferStart, bufferEnd, currentZoomIndex);
+            setFragments(mergedData.timeline);
+            setFragmentsBufferRange(mergedData.bufferRange);
+            console.log('use-timeline-fragments: обновлено отображение при появлении visibleTimeRange');
+        }, 0);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [visibleTimeRange, motionFilter]);
 
     /**
      * Очищает только запросы из очереди, которые выходят в будущее (но сохраняет результаты)
