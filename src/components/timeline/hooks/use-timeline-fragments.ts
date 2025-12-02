@@ -514,8 +514,13 @@ export const useTimelineFragments = (
                     const hasTypes = motionFilter?.types && motionFilter.types.length > 0;
                     const apiMethod = hasTypes ? 'archive.get_objects_timeline' : 'archive.get_motions_timeline';
 
-                    // Для объектов передаем только types в filter, для движения - весь фильтр
-                    const filterParam = hasTypes ? {types: motionFilter.types} : motionFilter;
+                    // Формируем параметры фильтра: для объектов передаем types и mask, для движения - весь фильтр
+                    const filterParam = hasTypes
+                        ? {
+                              types: motionFilter.types,
+                              ...(motionFilter.mask && {mask: motionFilter.mask})
+                          }
+                        : motionFilter;
 
                     const version = hasTypes ? 71 : 13;
 
