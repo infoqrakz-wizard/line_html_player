@@ -52,6 +52,10 @@ export interface TimelineRef {
     } | null;
     /** Обновить позицию курсора по времени */
     updateCursorPositionByTime: (time: Date) => void;
+    /** Очистить кэш скачанных фреймов */
+    clearFramesCache: () => void;
+    /** Перезагрузить фрагменты для текущего видимого диапазона */
+    reloadFragments: () => void;
 }
 
 /**
@@ -129,7 +133,7 @@ export interface TimelineCanvasProps {
     /** Буферизованный диапазон фрагментов */
     fragmentsBufferRange: TimeRange;
     /** Функция для загрузки фрагментов */
-    loadFragments: (start: Date, end: Date, zoomIndex?: number) => void;
+    loadFragments: (start: Date, end: Date, zoomIndex?: number, immediate?: boolean) => void;
     /** Текущее время */
     currentTime: Date;
     /** Прогресс воспроизведения в секундах */
@@ -193,11 +197,11 @@ export interface TimelineInteractionsParams {
     /** Буферизованный диапазон фрагментов */
     fragmentsBufferRange: TimeRange;
     /** Загрузить фрагменты */
-    loadFragments: (start: Date, end: Date, zoomIndex?: number) => void;
+    loadFragments: (start: Date, end: Date, zoomIndex?: number, immediate?: boolean) => void;
     /** Сбросить фрагменты */
     resetFragments: () => void;
     /** Обработать изменения timeline (вызывается после окончания взаимодействия) */
-    handleTimelineChange?: (visibleStart: Date, visibleEnd: Date) => void;
+    handleTimelineChange?: (visibleStart: Date, visibleEnd: Date, intervalIndex?: number) => void;
     /** Текущее время */
     currentTime: Date;
     /** Обработчик клика по временной шкале */
@@ -227,7 +231,7 @@ export interface TimelineDrawingParams {
     /** Буферизованный диапазон фрагментов */
     fragmentsBufferRange: TimeRange;
     /** Функция для загрузки фрагментов */
-    loadFragments: (start: Date, end: Date, zoomIndex?: number) => void;
+    loadFragments: (start: Date, end: Date, zoomIndex?: number, immediate?: boolean) => void;
     /** Текущее время */
     currentTime: Date;
     /** Прогресс воспроизведения в секундах */

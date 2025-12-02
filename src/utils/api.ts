@@ -496,3 +496,12 @@ export const getCamerasList = (
         }
     });
 };
+
+/**
+ * Проверяет, находится ли запрос более чем на 2 дня в будущем
+ */
+export const isRequestTooFarInFuture = (requestTime: Date): boolean => {
+    const now = new Date();
+    const twoDaysFromNow = addDays(now, 2);
+    return requestTime.getTime() > twoDaysFromNow.getTime();
+};

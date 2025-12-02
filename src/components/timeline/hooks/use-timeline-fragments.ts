@@ -2,7 +2,7 @@
  * Хук для управления фрагментами временной шкалы
  */
 import {useState, useRef, useCallback, useMemo, useEffect} from 'react';
-import {getFramesTimeline} from '../../../utils/api';
+import {getFramesTimeline, isRequestTooFarInFuture} from '../../../utils/api';
 import {TimeRange, LoadQueueItem, TimelineFragmentsParams, FragmentTimeRange} from '../types';
 import {BUFFER_SCREENS, UNIT_LENGTHS} from '../utils/constants';
 import {useTimelineAuth} from '../../../context/timeline-auth-context';
@@ -10,6 +10,7 @@ import {Protocol} from '../../../utils/types';
 import {TimelineMotionFilter} from '../../../types/motion-filter';
 import {buildRequestUrl} from '../../../utils/url-builder';
 import {getAuthToken} from '../../../utils/getAuthToken';
+import {startOfDay, endOfDay, addDays, format} from 'date-fns';
 
 // Максимальный диапазон для одного запроса motion timeline (30 минут)
 const MAX_MOTION_TIMELINE_RANGE_MS = 30 * 60 * 1000;
@@ -34,8 +35,18 @@ export const useTimelineFragments = (
         serverTime?: Date | null;
     }
 ) => {
-    const {url, port, credentials, camera, protocol, proxy, motionFilter, motionFilterSignature, visibleTimeRange} =
-        params;
+    const {
+        url,
+        port,
+        credentials,
+        camera,
+        protocol,
+        proxy,
+        motionFilter,
+        motionFilterSignature,
+        visibleTimeRange,
+        serverTime
+    } = params;
     const {setTimelineAccess} = useTimelineAuth();
 
     // Массив с наличием фрагментов
@@ -60,6 +71,12 @@ export const useTimelineFragments = (
     const motionTimelineResultsRef = useRef<Map<string, number[]>>(new Map());
     // Ref для отслеживания загруженного интервала
     const loadedRangeRef = useRef<{start: Date; end: Date} | null>(null);
+
+    // Хранилище загруженных данных по дням для обычных фреймов (без фильтров)
+    // Ключ: строка с датой начала дня в формате 'YYYY-MM-DD', значение: массив фреймов (unit_len=1, посекундно)
+    const framesDataByDayRef = useRef<Map<string, number[]>>(new Map());
+    // Set для отслеживания дней, которые уже запрашиваются
+    const loadingDaysRef = useRef<Set<string>>(new Set());
     // Ref для отслеживания диапазона запросов в очереди
     const queuedRangeRef = useRef<{start: Date; end: Date} | null>(null);
     // Ref для debounce таймера
@@ -72,6 +89,183 @@ export const useTimelineFragments = (
     const loadFragmentsDebounceTimerRef = useRef<NodeJS.Timeout | null>(null);
     // Задержка для debounce (мс) - после окончания взаимодействия
     const DEBOUNCE_DELAY = 1000;
+    // Флаг инициализации - используется для предотвращения множественных загрузок при старте
+    const isInitialLoadCompletedRef = useRef(false);
+
+    /**
+     * Получает ключ дня из даты (строка в формате 'YYYY-MM-DD')
+     */
+    const getDayKey = useCallback((date: Date): string => {
+        return format(startOfDay(date), 'yyyy-MM-dd');
+    }, []);
+
+    /**
+     * Преобразует данные из секундных (unit_len=1) в нужный масштаб
+     * @param secondData Данные посекундно (unit_len=1)
+     * @param targetUnitLength Целевая длина единицы времени в секундах
+     * @param dayStart Начало дня
+     * @param rangeStart Начало нужного диапазона
+     * @param rangeEnd Конец нужного диапазона
+     * @returns Преобразованные данные для нужного диапазона
+     */
+    const convertSecondDataToScale = useCallback(
+        (
+            secondData: number[],
+            targetUnitLength: number,
+            dayStart: Date,
+            rangeStart: Date,
+            rangeEnd: Date
+        ): number[] => {
+            const dayStartTime = dayStart.getTime();
+            const rangeStartTime = rangeStart.getTime();
+            const rangeEndTime = rangeEnd.getTime();
+
+            // Вычисляем индексы в секундных данных
+            const startIndex = Math.max(0, Math.floor((rangeStartTime - dayStartTime) / 1000));
+            const endIndex = Math.min(secondData.length, Math.ceil((rangeEndTime - dayStartTime) / 1000));
+
+            // Если нужен масштаб 1 секунда, просто возвращаем нужный диапазон
+            if (targetUnitLength === 1) {
+                return secondData.slice(startIndex, endIndex);
+            }
+
+            // Преобразуем в нужный масштаб: группируем секунды в единицы нужной длины
+            const result: number[] = [];
+            const unitsInDay = Math.floor((endIndex - startIndex) / targetUnitLength);
+            const remainder = (endIndex - startIndex) % targetUnitLength;
+
+            for (let i = 0; i < unitsInDay; i++) {
+                const unitStart = startIndex + i * targetUnitLength;
+                const unitEnd = unitStart + targetUnitLength;
+                // Если хотя бы одна секунда в единице имеет фрейм, то единица имеет фрейм
+                let hasFrame = false;
+                for (let j = unitStart; j < unitEnd && j < endIndex; j++) {
+                    if (secondData[j] === 1 || secondData[j] > 0) {
+                        hasFrame = true;
+                        break;
+                    }
+                }
+                result.push(hasFrame ? 1 : 0);
+            }
+
+            // Обрабатываем остаток, если есть
+            if (remainder > 0) {
+                const unitStart = startIndex + unitsInDay * targetUnitLength;
+                let hasFrame = false;
+                for (let j = unitStart; j < endIndex; j++) {
+                    if (secondData[j] === 1 || secondData[j] > 0) {
+                        hasFrame = true;
+                        break;
+                    }
+                }
+                result.push(hasFrame ? 1 : 0);
+            }
+
+            return result;
+        },
+        []
+    );
+
+    /**
+     * Объединяет данные по дням для видимого диапазона и преобразует в нужный масштаб
+     */
+    const mergeDaysDataForRange = useCallback(
+        (rangeStart: Date, rangeEnd: Date, zoomIndex: number): {timeline: number[]; bufferRange: TimeRange} => {
+            const targetUnitLength = UNIT_LENGTHS[zoomIndex];
+            const result: number[] = [];
+            let bufferRangeStart: Date | null = null;
+            let bufferRangeEnd: Date | null = null;
+
+            // Проходим по всем дням в диапазоне
+            let currentDay = startOfDay(rangeStart);
+            const endDay = startOfDay(rangeEnd);
+
+            while (currentDay.getTime() <= endDay.getTime()) {
+                const dayKey = getDayKey(currentDay);
+                const dayData = framesDataByDayRef.current.get(dayKey);
+
+                if (dayData) {
+                    const dayStart = startOfDay(currentDay);
+                    const dayEnd = endOfDay(currentDay);
+                    const dayRangeStart = currentDay.getTime() === dayStart.getTime() ? rangeStart : dayStart;
+                    const dayRangeEnd =
+                        endDay.getTime() === currentDay.getTime() && rangeEnd.getTime() <= dayEnd.getTime()
+                            ? rangeEnd
+                            : dayEnd;
+
+                    const convertedData = convertSecondDataToScale(
+                        dayData,
+                        targetUnitLength,
+                        dayStart,
+                        dayRangeStart,
+                        dayRangeEnd
+                    );
+
+                    result.push(...convertedData);
+
+                    if (bufferRangeStart === null) {
+                        bufferRangeStart = dayRangeStart;
+                    }
+                    bufferRangeEnd = dayRangeEnd;
+                } else {
+                    // Если данных нет для дня, заполняем нулями
+                    const dayStart = startOfDay(currentDay);
+                    const dayEnd = endOfDay(currentDay);
+                    const dayRangeStart = currentDay.getTime() === dayStart.getTime() ? rangeStart : dayStart;
+                    const dayRangeEnd =
+                        endDay.getTime() === currentDay.getTime() && rangeEnd.getTime() <= dayEnd.getTime()
+                            ? rangeEnd
+                            : dayEnd;
+
+                    const duration = dayRangeEnd.getTime() - dayRangeStart.getTime();
+                    const units = Math.ceil(duration / (targetUnitLength * 1000));
+                    result.push(...new Array(units).fill(0));
+
+                    if (bufferRangeStart === null) {
+                        bufferRangeStart = dayRangeStart;
+                    }
+                    bufferRangeEnd = dayRangeEnd;
+                }
+
+                currentDay = addDays(currentDay, 1);
+            }
+
+            return {
+                timeline: result,
+                bufferRange: {
+                    start: bufferRangeStart || rangeStart,
+                    end: bufferRangeEnd || rangeEnd
+                }
+            };
+        },
+        [getDayKey, convertSecondDataToScale]
+    );
+
+    /**
+     * Определяет, какие дни нужно загрузить для видимого диапазона
+     */
+    const getDaysToLoad = useCallback(
+        (rangeStart: Date, rangeEnd: Date): Date[] => {
+            const daysToLoad: Date[] = [];
+            let currentDay = startOfDay(rangeStart);
+            const endDay = startOfDay(rangeEnd);
+
+            while (currentDay.getTime() <= endDay.getTime()) {
+                const dayKey = getDayKey(currentDay);
+                const hasData = framesDataByDayRef.current.has(dayKey);
+                const isLoading = loadingDaysRef.current.has(dayKey);
+
+                if (!hasData && !isLoading) {
+                    daysToLoad.push(currentDay);
+                }
+
+                currentDay = addDays(currentDay, 1);
+            }
+
+            return daysToLoad;
+        },
+        [getDayKey]
+    );
 
     // Вычисляем диапазоны времени для каждого фрагмента
     const fragmentRanges = useMemo((): FragmentTimeRange[] => {
@@ -436,6 +630,15 @@ export const useTimelineFragments = (
                     continue;
                 }
 
+                // Фильтруем запросы, которые находятся более чем на 2 дня в будущем
+                if (isRequestTooFarInFuture(request.start)) {
+                    console.log('processMotionTimelineQueue: пропускаем запрос из будущего (>2 дня)', {
+                        requestStart: request.start.toISOString(),
+                        now: new Date().toISOString()
+                    });
+                    continue;
+                }
+
                 // Проверяем, не выходит ли запрос в будущее (используем реальное текущее время)
                 const now = Date.now();
                 let requestEnd = request.end;
@@ -637,6 +840,85 @@ export const useTimelineFragments = (
     ]);
 
     /**
+     * Загружает данные для одного дня (unit_len=1, посекундно)
+     */
+    const loadDayData = useCallback(
+        async (day: Date, endTime?: Date): Promise<void> => {
+            const dayKey = getDayKey(day);
+
+            // Проверяем, не загружается ли уже этот день
+            if (loadingDaysRef.current.has(dayKey)) {
+                console.log('loadDayData: день уже загружается, пропускаем', dayKey);
+                return;
+            }
+
+            // Проверяем, не загружен ли уже этот день
+            if (framesDataByDayRef.current.has(dayKey)) {
+                console.log('loadDayData: день уже загружен, пропускаем', dayKey);
+                return;
+            }
+
+            // Сразу добавляем в loadingDays ДО любых async операций
+            loadingDaysRef.current.add(dayKey);
+            console.log('loadDayData: начинаем загрузку дня', dayKey);
+
+            try {
+                const dayStart = startOfDay(day);
+                const nextDayStart = startOfDay(addDays(day, 1));
+                // Используем endOfDay для получения конца текущего дня (23:59:59.999)
+                // Если передан endTime и он меньше начала следующего дня, используем его
+                const dayEnd = endTime && endTime.getTime() < nextDayStart.getTime() ? endTime : endOfDay(day);
+
+                // Дополнительная проверка: если диапазон пустой или некорректный, пропускаем
+                if (dayEnd.getTime() <= dayStart.getTime()) {
+                    console.warn('loadDayData: некорректный диапазон, пропускаем', {
+                        dayKey,
+                        dayStart: dayStart.toISOString(),
+                        dayEnd: dayEnd.toISOString()
+                    });
+                    return;
+                }
+
+                console.log('loadDayData: отправляем запрос', {
+                    dayKey,
+                    dayStart: dayStart.toISOString(),
+                    dayEnd: dayEnd.toISOString()
+                });
+
+                const response = await getFramesTimeline({
+                    startTime: dayStart,
+                    endTime: dayEnd,
+                    url,
+                    port,
+                    credentials,
+                    unitLength: 1, // Всегда unit_len=1
+                    stream: 'video',
+                    channel: camera,
+                    protocol,
+                    proxy
+                });
+
+                // Сохраняем данные по дню
+                framesDataByDayRef.current.set(dayKey, response.timeline);
+                console.log('loadDayData: загружены данные для дня', {
+                    day: dayKey,
+                    timelineLength: response.timeline.length,
+                    start: dayStart.toISOString(),
+                    end: dayEnd.toISOString()
+                });
+            } catch (error) {
+                console.error('loadDayData: ошибка при загрузке дня', error);
+                if (error instanceof Error && error.message === 'FORBIDDEN') {
+                    setTimelineAccess(false);
+                }
+            } finally {
+                loadingDaysRef.current.delete(dayKey);
+            }
+        },
+        [url, port, credentials, camera, protocol, proxy, getDayKey, setTimelineAccess]
+    );
+
+    /**
      * Функция для запуска загрузки из очереди
      */
     const processLoadQueue = useCallback(async (): Promise<void> => {
@@ -652,19 +934,6 @@ export const useTimelineFragments = (
             const bufferStart = new Date(start.getTime() - screenDuration * BUFFER_SCREENS);
             const bufferEnd = new Date(end.getTime() + screenDuration * BUFFER_SCREENS);
 
-            const requestBase = {
-                startTime: bufferStart,
-                url,
-                port,
-                credentials,
-                endTime: bufferEnd,
-                unitLength: UNIT_LENGTHS[zoomIndex],
-                stream: 'video' as const,
-                channel: camera,
-                protocol,
-                proxy
-            };
-
             activeRequestRef.current = {
                 start,
                 end,
@@ -672,9 +941,8 @@ export const useTimelineFragments = (
                 filterSignature: motionFilterSignature ?? null
             };
 
-            let response;
-
             if (motionFilter) {
+                // Для motion timeline используем старую логику
                 // Для motion timeline используем только видимый диапазон без буфера
                 // Не используем расширенный bufferStart/bufferEnd, чтобы не запрашивать слишком большой диапазон
                 if (!visibleTimeRange) {
@@ -776,20 +1044,18 @@ export const useTimelineFragments = (
                 // Не ждем завершения всех запросов - результаты будут обновляться по мере получения
                 // Объединяем уже имеющиеся результаты для немедленного отображения
                 const mergedTimeline = mergeMotionTimelineResults(motionBufferStart, motionBufferEnd, zoomIndex);
-                response = {timeline: mergedTimeline};
+                const response = {timeline: mergedTimeline};
 
                 // Обновляем fragmentsBufferRange для motion timeline
                 bufferStart.setTime(motionBufferStart.getTime());
                 bufferEnd.setTime(motionBufferEnd.getTime());
-            } else {
-                response = await getFramesTimeline(requestBase);
-            }
 
-            // Проверяем, не появился ли новый запрос в очереди
-            if (!loadQueue.current) {
-                setFragments(response.timeline);
-                setFragmentsBufferRange({start: bufferStart, end: bufferEnd});
-                lastAppliedFilterSignatureRef.current = motionFilterSignature ?? null;
+                // Проверяем, не появился ли новый запрос в очереди (только для motion timeline)
+                if (!loadQueue.current) {
+                    setFragments(response.timeline);
+                    setFragmentsBufferRange({start: bufferStart, end: bufferEnd});
+                    lastAppliedFilterSignatureRef.current = motionFilterSignature ?? null;
+                }
             }
         } catch (error) {
             console.error('Failed to load fragments:', error);
@@ -832,36 +1098,25 @@ export const useTimelineFragments = (
      */
     const loadFragments = useCallback(
         (start: Date, end: Date, zoomIndex: number = 0) => {
-            // Очищаем loadQueue, если запрос уже обработан (isLoadingFragments = true)
-            // Это важно, чтобы избежать ситуации, когда старый запрос блокирует новые запросы
-            if (loadQueue.current && isLoadingFragments) {
-                loadQueue.current = null;
-            }
+            console.log('loadFragments called:', {
+                start: start.toISOString(),
+                end: end.toISOString(),
+                zoomIndex,
+                motionFilter: !!motionFilter,
+                isInitialLoadCompleted: isInitialLoadCompletedRef.current,
+                stack: new Error().stack
+            });
 
-            // Проверяем, не загружается ли уже этот диапазон
-            // Важно: проверяем только если запрос еще не обработан (isLoadingFragments = false)
-            // Если запрос уже обрабатывается, то loadQueue.current будет null
-            if (
-                loadQueue.current &&
-                !isLoadingFragments &&
-                loadQueue.current.start.getTime() === start.getTime() &&
-                loadQueue.current.end.getTime() === end.getTime() &&
-                loadQueue.current.zoomIndex === zoomIndex
-            ) {
-                return;
-            }
-
-            // Проверяем, не покрывает ли текущий буферизованный диапазон запрашиваемый диапазон
             const screenDuration = end.getTime() - start.getTime();
             const bufferStart = new Date(start.getTime() - screenDuration * BUFFER_SCREENS);
             const bufferEnd = new Date(end.getTime() + screenDuration * BUFFER_SCREENS);
 
-            const currentBufferStart = fragmentsBufferRange.start.getTime();
-            const currentBufferEnd = fragmentsBufferRange.end.getTime();
-
             // Для motion filter используем более мягкую проверку
             // Проверяем только базовое покрытие буфером, но всегда добавляем запросы при изменении видимого диапазона
             if (motionFilter) {
+                const currentBufferStart = fragmentsBufferRange.start.getTime();
+                const currentBufferEnd = fragmentsBufferRange.end.getTime();
+
                 // Для motion filter проверяем только базовые условия
                 // Всегда добавляем запросы в очередь, если видимый диапазон изменился
                 // Это гарантирует обновление данных при перемещении таймлайна
@@ -874,32 +1129,68 @@ export const useTimelineFragments = (
                 if (isSameRange && !isLoadingFragments) {
                     return;
                 }
-            } else {
-                // Для обычных запросов (без motion filter) используем старую логику
-                // Если запрашиваемый диапазон уже покрыт текущим буфером и масштаб не изменился
+
+                const activeRequest = activeRequestRef.current;
                 if (
-                    currentBufferStart <= bufferStart.getTime() &&
-                    currentBufferEnd >= bufferEnd.getTime() &&
-                    currentBufferStart !== 0 && // Проверяем, что это не начальное состояние
-                    !isLoadingFragments &&
-                    lastAppliedFilterSignatureRef.current === (motionFilterSignature ?? null)
+                    activeRequest &&
+                    activeRequest.start.getTime() === start.getTime() &&
+                    activeRequest.end.getTime() === end.getTime() &&
+                    activeRequest.zoomIndex === zoomIndex &&
+                    activeRequest.filterSignature === (motionFilterSignature ?? null)
                 ) {
                     return;
                 }
-            }
 
-            const activeRequest = activeRequestRef.current;
-            if (
-                activeRequest &&
-                activeRequest.start.getTime() === start.getTime() &&
-                activeRequest.end.getTime() === end.getTime() &&
-                activeRequest.zoomIndex === zoomIndex &&
-                activeRequest.filterSignature === (motionFilterSignature ?? null)
-            ) {
+                loadQueue.current = {start, end, zoomIndex};
+            } else {
+                // Для обычных фреймов (без motion filter) используем новую логику
+
+                // Если начальная загрузка еще не завершена, не обрабатываем запрос
+                // Это предотвращает конкуренцию между useEffect инициализации и первым вызовом loadFragments
+                if (!isInitialLoadCompletedRef.current) {
+                    console.log('loadFragments: начальная загрузка не завершена, пропускаем');
+                    return;
+                }
+
+                // Проверяем, есть ли данные для всех дней в буферном диапазоне
+                const daysToLoad = getDaysToLoad(bufferStart, bufferEnd);
+
+                console.log('loadFragments: days to load', {
+                    bufferStart: bufferStart.toISOString(),
+                    bufferEnd: bufferEnd.toISOString(),
+                    daysToLoad: daysToLoad.map(d => d.toISOString()),
+                    loadedDays: Array.from(framesDataByDayRef.current.keys()),
+                    loadingDays: Array.from(loadingDaysRef.current)
+                });
+
+                // Всегда обновляем отображение с текущими данными (даже если не все дни загружены)
+                // Это важно для корректного отображения при изменении зума
+                const mergedData = mergeDaysDataForRange(bufferStart, bufferEnd, zoomIndex);
+                setFragments(mergedData.timeline);
+                setFragmentsBufferRange(mergedData.bufferRange);
+
+                // Если все дни уже загружены или загружаются, просто возвращаемся
+                if (daysToLoad.length === 0) {
+                    console.log('loadFragments: no days to load, returning');
+                    return;
+                }
+
+                // Есть дни, которые нужно загрузить
+                // Запускаем загрузку параллельно без добавления в очередь
+                console.log(
+                    'loadFragments: starting to load days',
+                    daysToLoad.map(d => d.toISOString())
+                );
+                Promise.all(daysToLoad.map(day => loadDayData(day))).then(() => {
+                    // После загрузки обновляем отображение
+                    console.log('loadFragments: days loaded, updating display');
+                    const updatedData = mergeDaysDataForRange(bufferStart, bufferEnd, zoomIndex);
+                    setFragments(updatedData.timeline);
+                    setFragmentsBufferRange(updatedData.bufferRange);
+                });
+
                 return;
             }
-
-            loadQueue.current = {start, end, zoomIndex};
 
             // Для motion filter используем debounce, чтобы не отправлять запросы при каждом движении
             if (motionFilter) {
@@ -927,17 +1218,19 @@ export const useTimelineFragments = (
                     // Таймер уже установлен - просто обновляем данные в очереди
                     // Таймер выполнится с новыми данными
                 }
-            } else {
-                // Для обычных запросов (без motion filter) вызываем сразу
-                // Очищаем предыдущий таймер, если он есть
-                if (loadFragmentsDebounceTimerRef.current) {
-                    clearTimeout(loadFragmentsDebounceTimerRef.current);
-                    loadFragmentsDebounceTimerRef.current = null;
-                }
-                processLoadQueue();
             }
+            // Для обычных фреймов загрузка происходит напрямую в коде выше (без очереди)
         },
-        [processLoadQueue, fragmentsBufferRange, motionFilterSignature, isLoadingFragments, motionFilter]
+        [
+            processLoadQueue,
+            fragmentsBufferRange,
+            motionFilterSignature,
+            isLoadingFragments,
+            motionFilter,
+            getDaysToLoad,
+            mergeDaysDataForRange,
+            loadDayData
+        ]
     );
 
     /**
@@ -956,6 +1249,9 @@ export const useTimelineFragments = (
         loadedRangeRef.current = null; // Очищаем загруженный диапазон
         queuedRangeRef.current = null; // Очищаем диапазон очереди
         currentMotionBufferRef.current = null; // Очищаем текущий буфер
+        // НЕ очищаем framesDataByDayRef - данные по дням сохраняем для переиспользования
+        // Очищаем только set загрузки дней
+        loadingDaysRef.current.clear();
         // Очищаем debounce таймеры
         if (debounceTimerRef.current) {
             clearTimeout(debounceTimerRef.current);
@@ -968,6 +1264,64 @@ export const useTimelineFragments = (
         // Останавливаем активные запросы
         stopProcessingQueue();
     }, [stopProcessingQueue]);
+
+    /**
+     * Функция для очистки кэша скачанных фреймов
+     * Используется при переключении камеры, чтобы очистить данные предыдущей камеры
+     */
+    const clearFramesCache = useCallback(() => {
+        framesDataByDayRef.current.clear();
+        loadingDaysRef.current.clear();
+    }, []);
+
+    /**
+     * Загружает данные при инициализации плеера: сегодняшний день полностью и предыдущий день полностью
+     */
+    useEffect(() => {
+        // Загружаем только для обычных фреймов (без фильтров)
+        if (motionFilter || !serverTime) {
+            return;
+        }
+
+        const currentDay = startOfDay(serverTime);
+        const previousDay = startOfDay(addDays(serverTime, -1));
+        const currentDayKey = getDayKey(currentDay);
+        const previousDayKey = getDayKey(previousDay);
+
+        // Проверяем, не загружены ли уже эти дни
+        const needsCurrentDay =
+            !framesDataByDayRef.current.has(currentDayKey) && !loadingDaysRef.current.has(currentDayKey);
+        const needsPreviousDay =
+            !framesDataByDayRef.current.has(previousDayKey) && !loadingDaysRef.current.has(previousDayKey);
+
+        if (needsCurrentDay || needsPreviousDay) {
+            console.log('use-timeline-fragments: загружаем данные при инициализации', {
+                currentDay: currentDayKey,
+                previousDay: previousDayKey,
+                needsCurrentDay,
+                needsPreviousDay
+            });
+
+            // Загружаем параллельно только недостающие дни
+            const loadPromises: Promise<void>[] = [];
+            if (needsCurrentDay) {
+                loadPromises.push(loadDayData(currentDay));
+            }
+            if (needsPreviousDay) {
+                loadPromises.push(loadDayData(previousDay));
+            }
+
+            // После завершения начальной загрузки устанавливаем флаг
+            Promise.all(loadPromises).then(() => {
+                console.log('use-timeline-fragments: начальная загрузка завершена');
+                isInitialLoadCompletedRef.current = true;
+            });
+        } else {
+            // Если дни уже загружены, сразу устанавливаем флаг
+            isInitialLoadCompletedRef.current = true;
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [motionFilter, serverTime]);
 
     /**
      * Очищает только запросы из очереди, которые выходят в будущее (но сохраняет результаты)
@@ -1102,6 +1456,7 @@ export const useTimelineFragments = (
         isLoadingFragments,
         loadFragments,
         resetFragments,
+        clearFramesCache,
         handleTimelineChange
     };
 };

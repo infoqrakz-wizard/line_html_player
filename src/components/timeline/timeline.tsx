@@ -45,19 +45,26 @@ export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
         // Используем хук для управления фрагментами
         const motionFilterSignature = useMemo(() => createMotionFilterSignature(motionFilter), [motionFilter]);
 
-        const {fragments, fragmentsBufferRange, fragmentRanges, loadFragments, resetFragments, handleTimelineChange} =
-            useTimelineFragments({
-                url,
-                port,
-                credentials,
-                camera,
-                protocol,
-                proxy,
-                motionFilter: motionFilter ?? null,
-                motionFilterSignature,
-                visibleTimeRange,
-                serverTime
-            });
+        const {
+            fragments,
+            fragmentsBufferRange,
+            fragmentRanges,
+            loadFragments,
+            resetFragments,
+            clearFramesCache,
+            handleTimelineChange
+        } = useTimelineFragments({
+            url,
+            port,
+            credentials,
+            camera,
+            protocol,
+            proxy,
+            motionFilter: motionFilter ?? null,
+            motionFilterSignature,
+            visibleTimeRange,
+            serverTime
+        });
 
         // Используем хук для обработки взаимодействий пользователя
         const {
@@ -112,6 +119,21 @@ export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
             resetCursorPosition();
         }, [handleMouseUp, resetCursorPosition]);
 
+        // Используем ref для хранения актуальных функций, чтобы избежать перезапуска эффектов
+        const loadFragmentsRef = useRef(loadFragments);
+        const resetFragmentsRef = useRef(resetFragments);
+        useEffect(() => {
+            loadFragmentsRef.current = loadFragments;
+            resetFragmentsRef.current = resetFragments;
+        }, [loadFragments, resetFragments]);
+
+        // Функция для перезагрузки фрагментов для текущего видимого диапазона
+        const reloadFragments = useCallback(() => {
+            if (!visibleTimeRange) return;
+            resetFragmentsRef.current();
+            loadFragmentsRef.current(visibleTimeRange.start, visibleTimeRange.end, intervalIndex);
+        }, [visibleTimeRange, intervalIndex]);
+
         // Экспортируем методы через ref
         useEffect(() => {
             if (ref) {
@@ -136,7 +158,9 @@ export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
                             const containerWidth = rect.width;
                             updateCursorPositionByTime(time, containerWidth);
                         }
-                    }
+                    },
+                    clearFramesCache,
+                    reloadFragments
                 };
             }
         }, [
@@ -148,7 +172,9 @@ export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
             fragmentsBufferRange,
             intervalIndex,
             fragmentRanges,
-            updateCursorPositionByTime
+            updateCursorPositionByTime,
+            clearFramesCache,
+            reloadFragments
         ]);
 
         // Устанавливаем обработчик колесика мыши
@@ -165,14 +191,6 @@ export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
                 intervalIndex
             };
         }, [visibleTimeRange, isLoading, intervalIndex]);
-
-        // Используем ref для хранения актуальных функций, чтобы избежать перезапуска эффектов
-        const loadFragmentsRef = useRef(loadFragments);
-        const resetFragmentsRef = useRef(resetFragments);
-        useEffect(() => {
-            loadFragmentsRef.current = loadFragments;
-            resetFragmentsRef.current = resetFragments;
-        }, [loadFragments, resetFragments]);
 
         // Загрузка фрагментов при изменении видимого диапазона времени
         useEffect(() => {

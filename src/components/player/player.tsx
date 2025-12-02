@@ -500,6 +500,12 @@ export const Player: React.FC<PlayerProps> = ({
 
         const currentIndex = availableCameras.findIndex(c => c.id === camera);
         const nextIndex = (currentIndex + 1) % availableCameras.length;
+        // Очищаем кэш скачанных фреймов при переключении камеры
+        if (timelineRef.current) {
+            timelineRef.current.clearFramesCache();
+            // Загружаем актуальные данные для новой камеры
+            timelineRef.current.reloadFragments();
+        }
         setCamera(availableCameras[nextIndex].id);
     }, [availableCameras, camera]);
 
@@ -510,6 +516,12 @@ export const Player: React.FC<PlayerProps> = ({
 
         const currentIndex = availableCameras.findIndex(c => c.id === camera);
         const prevIndex = currentIndex <= 0 ? availableCameras.length - 1 : currentIndex - 1;
+        // Очищаем кэш скачанных фреймов при переключении камеры
+        if (timelineRef.current) {
+            timelineRef.current.clearFramesCache();
+            // Загружаем актуальные данные для новой камеры
+            timelineRef.current.reloadFragments();
+        }
         setCamera(availableCameras[prevIndex].id);
     }, [availableCameras, camera]);
 
@@ -1085,7 +1097,15 @@ export const Player: React.FC<PlayerProps> = ({
                                 label: c.name ?? `Camera ${c.id}`
                             }))}
                             value={camera ?? ''}
-                            onChange={value => setCamera(Number(value))}
+                            onChange={value => {
+                                // Очищаем кэш скачанных фреймов при переключении камеры
+                                if (timelineRef.current) {
+                                    timelineRef.current.clearFramesCache();
+                                    // Загружаем актуальные данные для новой камеры
+                                    timelineRef.current.reloadFragments();
+                                }
+                                setCamera(Number(value));
+                            }}
                             aria-label="Выбор камеры"
                         />
                     </div>

@@ -107,17 +107,7 @@ export const useTimelineInteractions = ({
             setVisibleTimeRange({start: newStart, end: newEnd});
             setHasDragged(true);
         },
-        [
-            isDragging,
-            startX,
-            isVertical,
-            containerRef,
-            visibleTimeRange,
-            fragmentsBufferRange,
-            loadFragments,
-            setVisibleTimeRange,
-            intervalIndex
-        ]
+        [isDragging, startX, isVertical, containerRef, visibleTimeRange, setVisibleTimeRange]
     );
 
     /**
@@ -180,7 +170,7 @@ export const useTimelineInteractions = ({
                         // Сбрасываем и перезагружаем фрагменты при изменении масштаба (немедленно)
                         resetFragments();
                         setIntervalIndex(newIndex);
-                        loadFragments(newStart, newEnd, newIndex, true);
+                        loadFragments(newStart, newEnd, newIndex);
 
                         setVisibleTimeRange({start: newStart, end: newEnd});
 
@@ -197,7 +187,6 @@ export const useTimelineInteractions = ({
             intervalIndex,
             wheelDeltaAccumulator,
             canvasRef,
-            fragmentsBufferRange,
             loadFragments,
             resetFragments,
             setIntervalIndex,
@@ -381,7 +370,7 @@ export const useTimelineInteractions = ({
 
                             resetFragments();
                             setIntervalIndex(newIndex);
-                            loadFragments(newStart, newEnd, newIndex, true);
+                            loadFragments(newStart, newEnd, newIndex);
 
                             setVisibleTimeRange({start: newStart, end: newEnd});
 
@@ -437,7 +426,7 @@ export const useTimelineInteractions = ({
 
                             resetFragments();
                             setIntervalIndex(newIndex);
-                            loadFragments(newStart, newEnd, newIndex, true);
+                            loadFragments(newStart, newEnd, newIndex);
 
                             setVisibleTimeRange({start: newStart, end: newEnd});
 
@@ -476,7 +465,6 @@ export const useTimelineInteractions = ({
             isVertical,
             containerRef,
             visibleTimeRange,
-            fragmentsBufferRange,
             loadFragments,
             setVisibleTimeRange,
             intervalIndex,

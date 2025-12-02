@@ -65,13 +65,13 @@ class DevLinePlayer {
 
     private render() {
         this.root.render(
-            <React.StrictMode>
+            // <React.StrictMode>
                 <TimeProvider>
                     <TimelineAuthProvider>
                         <Player {...this.options} />
                     </TimelineAuthProvider>
                 </TimeProvider>
-            </React.StrictMode>
+            // </React.StrictMode>
         );
     }
 
