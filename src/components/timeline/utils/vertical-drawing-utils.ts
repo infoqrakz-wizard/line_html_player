@@ -396,6 +396,78 @@ export const drawVerticalFragments = (
 };
 
 /**
+ * Отрисовывает фреймы от серверного времени до текущего индикатора времени для вертикального таймлайна
+ * Это отдельная отрисовка, не зависящая от данных в fragments
+ * @param ctx Контекст canvas
+ * @param serverTime Серверное время (начало воспроизведения)
+ * @param currentTime Текущее время
+ * @param progress Прогресс воспроизведения в секундах
+ * @param visibleTimeRange Видимый диапазон времени
+ * @param width Ширина canvas
+ * @param height Высота canvas
+ * @param unitLengthMs Длина единицы времени в миллисекундах
+ */
+export const drawVerticalProgressFragments = (
+    ctx: CanvasRenderingContext2D,
+    serverTime: Date | null,
+    currentTime: Date,
+    progress: number,
+    visibleTimeRange: TimeRange,
+    width: number,
+    height: number,
+    unitLengthMs: number
+): void => {
+    if (!serverTime) return;
+
+    const screenDuration = visibleTimeRange.end.getTime() - visibleTimeRange.start.getTime();
+    const fragmentWidth = 4;
+    const fragmentX = 4;
+
+    // Вычисляем время индикатора (текущее время + прогресс)
+    const timeIndicatorMs = currentTime.getTime() + progress * 1000;
+    const serverTimeMs = serverTime.getTime();
+
+    // Если индикатор времени раньше серверного времени, ничего не рисуем
+    if (timeIndicatorMs <= serverTimeMs) return;
+
+    // Вычисляем диапазон от serverTime до timeIndicator
+    const progressStartTime = serverTimeMs;
+    const progressEndTime = timeIndicatorMs;
+
+    // Вычисляем начальный и конечный индексы единиц времени
+    const startUnitIndex = Math.floor((progressStartTime - visibleTimeRange.start.getTime()) / unitLengthMs);
+    const endUnitIndex = Math.ceil((progressEndTime - visibleTimeRange.start.getTime()) / unitLengthMs);
+
+    // Рисуем зеленые фреймы для каждой единицы времени в диапазоне
+    ctx.fillStyle = '#4CAF50';
+
+    for (let unitIndex = startUnitIndex; unitIndex < endUnitIndex; unitIndex++) {
+        const fragmentStartTime = visibleTimeRange.start.getTime() + unitIndex * unitLengthMs;
+        const fragmentEndTime = fragmentStartTime + unitLengthMs;
+
+        // Проверяем, пересекается ли фрагмент с видимой областью и диапазоном прогресса
+        if (
+            fragmentEndTime > visibleTimeRange.start.getTime() &&
+            fragmentStartTime < visibleTimeRange.end.getTime() &&
+            fragmentEndTime > progressStartTime &&
+            fragmentStartTime < progressEndTime
+        ) {
+            const fragmentStartY = Math.max(
+                0,
+                (fragmentStartTime - visibleTimeRange.start.getTime()) * (height / screenDuration)
+            );
+            const fragmentEndY = Math.min(
+                height,
+                (fragmentEndTime - visibleTimeRange.start.getTime()) * (height / screenDuration)
+            );
+
+            // Отрисовываем фрагмент
+            ctx.fillRect(fragmentX, fragmentStartY, fragmentWidth, fragmentEndY - fragmentStartY);
+        }
+    }
+};
+
+/**
  * Отрисовывает индикатор текущего времени для вертикального таймлайна
  * @param ctx Контекст canvas
  * @param currentTime Текущее время
@@ -429,21 +501,40 @@ export const drawVerticalCurrentTimeIndicator = (
  * Отрисовывает индикатор позиции курсора для вертикального таймлайна
  * @param ctx Контекст canvas
  * @param cursorPosition Позиция курсора
+ * @param visibleTimeRange Видимый диапазон времени
  * @param width Ширина canvas
+ * @param height Высота canvas
  */
 export const drawVerticalCursorPositionIndicator = (
     ctx: CanvasRenderingContext2D,
     cursorPosition: {x: number; time: Date},
-    width: number
+    visibleTimeRange: TimeRange,
+    width: number,
+    height: number
 ): void => {
-    // Для вертикального таймлайна используем Y-координату курсора
-    const y = cursorPosition.x; // В вертикальном режиме x содержит Y-координату
+    // Проверяем, что cursorPosition определен и содержит необходимые свойства
+    if (!cursorPosition || !cursorPosition.time) {
+        return; // Если нет данных о позиции курсора или времени, не рисуем индикатор
+    }
 
-    // Отрисовываем вертикальную линию позиции курсора
+    const screenDuration = visibleTimeRange.end.getTime() - visibleTimeRange.start.getTime();
+    const cursorTimeMs = cursorPosition.time.getTime();
+
+    // Вычисляем позицию Y на основе времени, как в drawVerticalFragments
+    const currentY = ((cursorTimeMs - visibleTimeRange.start.getTime()) / screenDuration) * height;
+
+    // Проверяем, находится ли курсор в видимой области
+    if (currentY < 0 || currentY > height) {
+        return; // Курсор вне видимой области
+    }
+
+    // Отрисовываем горизонтальную линию позиции курсора
     ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(width, y);
-    ctx.strokeStyle = 'rgba(255, 255, 0, 0.6)';
+    ctx.moveTo(0, currentY);
+    ctx.lineTo(width, currentY);
+    ctx.strokeStyle = '#FFFFFF';
     ctx.lineWidth = 1;
+    ctx.setLineDash([5, 3]); // Штриховая линия
     ctx.stroke();
+    ctx.setLineDash([]); // Сбрасываем штриховку
 };

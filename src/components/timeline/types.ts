@@ -136,6 +136,8 @@ export interface TimelineCanvasProps {
     loadFragments: (start: Date, end: Date, zoomIndex?: number, immediate?: boolean) => void;
     /** Текущее время */
     currentTime: Date;
+    /** Серверное время (начало воспроизведения) */
+    serverTime: Date | null;
     /** Прогресс воспроизведения в секундах */
     progress: number;
     /** Обработчик нажатия кнопки мыши */
@@ -234,6 +236,8 @@ export interface TimelineDrawingParams {
     loadFragments: (start: Date, end: Date, zoomIndex?: number, immediate?: boolean) => void;
     /** Текущее время */
     currentTime: Date;
+    /** Серверное время (начало воспроизведения) */
+    serverTime: Date | null;
     /** Прогресс воспроизведения в секундах */
     progress: number;
     /** Позиция курсора */

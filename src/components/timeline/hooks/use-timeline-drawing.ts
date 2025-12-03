@@ -10,14 +10,16 @@ import {
     drawCursorPositionIndicator,
     drawDayAndHourMarkers,
     drawFragments,
-    drawIntervalMarkers
+    drawIntervalMarkers,
+    drawProgressFragments
 } from '../utils/drawing-utils';
 import {
     drawVerticalDayAndHourMarkers,
     drawVerticalIntervalMarkers,
     drawVerticalFragments,
     drawVerticalCurrentTimeIndicator,
-    drawVerticalCursorPositionIndicator
+    drawVerticalCursorPositionIndicator,
+    drawVerticalProgressFragments
 } from '../utils/vertical-drawing-utils';
 
 /**
@@ -35,6 +37,7 @@ export const useTimelineDrawing = ({
     fragmentsBufferRange,
     loadFragments,
     currentTime,
+    serverTime,
     progress,
     cursorPosition,
     isVertical = false,
@@ -153,6 +156,34 @@ export const useTimelineDrawing = ({
                 );
             }
 
+            // Отрисовываем фреймы от serverTime до текущего индикатора времени
+            // Это отдельная отрисовка, не зависящая от данных в fragments
+            if (serverTime) {
+                if (isVertical) {
+                    drawVerticalProgressFragments(
+                        ctx,
+                        serverTime,
+                        currentTime,
+                        actualProgress,
+                        visibleTimeRange,
+                        containerRect.width,
+                        containerRect.height,
+                        UNIT_LENGTHS[intervalIndex] * 1000
+                    );
+                } else {
+                    drawProgressFragments(
+                        ctx,
+                        serverTime,
+                        currentTime,
+                        actualProgress,
+                        visibleTimeRange,
+                        containerRect.width,
+                        containerRect.height,
+                        UNIT_LENGTHS[intervalIndex] * 1000
+                    );
+                }
+            }
+
             // Отрисовываем индикатор текущего времени только если он находится в видимой области
             const currentTimeMs = currentTime.getTime() + actualProgress * 1000;
             const isCurrentTimeVisible =
@@ -183,9 +214,21 @@ export const useTimelineDrawing = ({
             // Отрисовываем индикатор позиции курсора, если он есть
             if (cursorPosition && !isMobile) {
                 if (isVertical) {
-                    drawVerticalCursorPositionIndicator(ctx, cursorPosition, containerRect.width);
+                    drawVerticalCursorPositionIndicator(
+                        ctx,
+                        cursorPosition,
+                        visibleTimeRange,
+                        containerRect.width,
+                        containerRect.height
+                    );
                 } else {
-                    drawCursorPositionIndicator(ctx, cursorPosition, containerRect.height);
+                    drawCursorPositionIndicator(
+                        ctx,
+                        cursorPosition,
+                        visibleTimeRange,
+                        containerRect.width,
+                        containerRect.height
+                    );
                 }
             }
         },
@@ -196,6 +239,7 @@ export const useTimelineDrawing = ({
             visibleTimeRange,
             progress,
             currentTime,
+            serverTime,
             cursorPosition,
             isMobile,
             intervalIndex,

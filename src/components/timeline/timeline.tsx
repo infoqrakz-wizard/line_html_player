@@ -274,6 +274,7 @@ export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
                     fragmentsBufferRange={fragmentsBufferRange}
                     loadFragments={loadFragments}
                     currentTime={serverTime || new Date()}
+                    serverTime={serverTime}
                     progress={progress}
                     onMouseDown={handleMouseDown}
                     onMouseUp={handleMouseUp}
