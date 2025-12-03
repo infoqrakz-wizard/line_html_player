@@ -164,6 +164,8 @@ export interface TimelineCanvasProps {
     isVertical?: boolean;
     /** Мобильное устройство */
     isMobile?: boolean;
+    /** Флаг перетаскивания таймлайна */
+    isDragging?: boolean;
 }
 
 /**
@@ -242,6 +244,8 @@ export interface TimelineDrawingParams {
     isVertical?: boolean;
     /** Мобильное устройство */
     isMobile?: boolean;
+    /** Флаг перетаскивания таймлайна */
+    isDragging?: boolean;
 }
 
 /**

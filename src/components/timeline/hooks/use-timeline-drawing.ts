@@ -38,7 +38,8 @@ export const useTimelineDrawing = ({
     progress,
     cursorPosition,
     isVertical = false,
-    isMobile = false
+    isMobile = false,
+    isDragging = false
 }: TimelineDrawingParams) => {
     // Сохраняем последнее известное время и прогресс
     const lastTimeRef = useRef<Date>(new Date(currentTime));
@@ -251,7 +252,7 @@ export const useTimelineDrawing = ({
     // Эффект для проверки необходимости загрузки новых фрагментов
     // Автоматический скроллинг удален
     useEffect(() => {
-        if (!containerRef.current) return;
+        if (!containerRef.current || isDragging) return; // Пропускаем обновления во время перетаскивания
 
         // Проверяем, нужно ли загрузить новые фрагменты
         const visibleDuration = visibleTimeRange.end.getTime() - visibleTimeRange.start.getTime();
@@ -261,7 +262,7 @@ export const useTimelineDrawing = ({
         if (distanceToStartBuffer < visibleDuration) {
             loadFragments(visibleTimeRange.start, visibleTimeRange.end, intervalIndex);
         }
-    }, [visibleTimeRange, containerRef, loadFragments, fragmentsBufferRange, intervalIndex]);
+    }, [visibleTimeRange, containerRef, loadFragments, fragmentsBufferRange, intervalIndex, isDragging]);
 
     // Возвращаем функцию отрисовки
     return drawTimeline;

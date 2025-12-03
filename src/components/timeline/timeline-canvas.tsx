@@ -32,7 +32,8 @@ export const TimelineCanvas = ({
     canvasRef,
     cursorPosition,
     isVertical = false,
-    isMobile = false
+    isMobile = false,
+    isDragging = false
 }: TimelineCanvasProps) => {
     // Используем хук для отрисовки временной шкалы
     useTimelineDrawing({
@@ -48,7 +49,8 @@ export const TimelineCanvas = ({
         progress,
         cursorPosition,
         isVertical,
-        isMobile
+        isMobile,
+        isDragging
     });
 
     return (

@@ -63,7 +63,8 @@ export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
             motionFilter: motionFilter ?? null,
             motionFilterSignature,
             visibleTimeRange,
-            serverTime
+            serverTime,
+            zoomIndex: intervalIndex
         });
 
         // Используем хук для обработки взаимодействий пользователя
@@ -75,7 +76,8 @@ export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
             handleTouchStart,
             handleTouchMove,
             handleTouchEnd,
-            setupWheelHandler
+            setupWheelHandler,
+            isDragging
         } = useTimelineInteractions({
             canvasRef,
             containerRef,
@@ -247,6 +249,9 @@ export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
             );
         }
 
+        console.log('111 visibleTimeRange', visibleTimeRange);
+        console.log('111 fragments', fragments)
+
         return (
             <>
                 <TimelineCanvas
@@ -271,6 +276,7 @@ export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
                     cursorPosition={cursorPosition}
                     isVertical={isVerticalTimeline}
                     isMobile={isMobile}
+                    isDragging={isDragging}
                 />
             </>
         );

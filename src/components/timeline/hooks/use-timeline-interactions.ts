@@ -543,6 +543,7 @@ export const useTimelineInteractions = ({
         handleTouchStart,
         handleTouchMove,
         handleTouchEnd,
-        setupWheelHandler
+        setupWheelHandler,
+        isDragging
     };
 };

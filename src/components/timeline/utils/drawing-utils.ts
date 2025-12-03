@@ -63,15 +63,25 @@ export const drawFragments = (
         if (hasFrame) {
             const fragmentStartTime = fragmentsBufferRange.start.getTime() + index * unitLengthMs;
             const fragmentEndTime = fragmentStartTime + unitLengthMs;
-            const xStart = ((fragmentStartTime - visibleTimeRange.start.getTime()) / screenDuration) * width;
-            const xEnd = ((fragmentEndTime - visibleTimeRange.start.getTime()) / screenDuration) * width;
 
-            if (xEnd >= 0 && xStart <= width) {
+            // Проверяем, пересекается ли фрагмент с видимой областью
+            // Это важно при перетаскивании, когда visibleTimeRange может сильно отличаться от fragmentsBufferRange
+            if (
+                fragmentEndTime > visibleTimeRange.start.getTime() &&
+                fragmentStartTime < visibleTimeRange.end.getTime()
+            ) {
+                const xStart = ((fragmentStartTime - visibleTimeRange.start.getTime()) / screenDuration) * width;
+                const xEnd = ((fragmentEndTime - visibleTimeRange.start.getTime()) / screenDuration) * width;
+
+                // Ограничиваем координаты видимой областью canvas
                 const visibleXStart = Math.max(0, xStart);
                 const visibleXEnd = Math.min(width, xEnd);
                 const visibleWidth = visibleXEnd - visibleXStart;
 
-                ctx.fillRect(visibleXStart, fragmentY, visibleWidth, fragmentHeight);
+                // Отрисовываем только если ширина больше нуля
+                if (visibleWidth > 0) {
+                    ctx.fillRect(visibleXStart, fragmentY, visibleWidth, fragmentHeight);
+                }
             }
         }
     });
