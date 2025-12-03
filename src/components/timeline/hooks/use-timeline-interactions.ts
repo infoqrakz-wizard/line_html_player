@@ -28,7 +28,6 @@ export const useTimelineInteractions = ({
     fragments,
     fragmentsBufferRange,
     loadFragments,
-    resetFragments,
     handleTimelineChange,
     currentTime, // eslint-disable-line @typescript-eslint/no-unused-vars
     onTimeClick,
@@ -167,10 +166,10 @@ export const useTimelineInteractions = ({
                         const newStart = new Date(timeUnderCursor.getTime() - cursorRatio * newRange);
                         const newEnd = new Date(newStart.getTime() + newRange);
 
-                        // Сбрасываем и перезагружаем фрагменты при изменении масштаба (немедленно)
-                        resetFragments();
+                        // При изменении масштаба переиспользуем уже загруженные данные без сброса
+                        // loadFragments преобразует данные в нужный масштаб без повторных запросов
                         setIntervalIndex(newIndex);
-                        loadFragments(newStart, newEnd, newIndex);
+                        loadFragments(newStart, newEnd, newIndex, true);
 
                         setVisibleTimeRange({start: newStart, end: newEnd});
 
@@ -188,7 +187,6 @@ export const useTimelineInteractions = ({
             wheelDeltaAccumulator,
             canvasRef,
             loadFragments,
-            resetFragments,
             setIntervalIndex,
             setVisibleTimeRange,
             handleTimelineChange
@@ -368,9 +366,10 @@ export const useTimelineInteractions = ({
                             const newStart = new Date(timeUnderFinger.getTime() - fingerRatio * newRange);
                             const newEnd = new Date(newStart.getTime() + newRange);
 
-                            resetFragments();
+                            // При изменении масштаба переиспользуем уже загруженные данные без сброса
+                            // loadFragments преобразует данные в нужный масштаб без повторных запросов
                             setIntervalIndex(newIndex);
-                            loadFragments(newStart, newEnd, newIndex);
+                            loadFragments(newStart, newEnd, newIndex, true);
 
                             setVisibleTimeRange({start: newStart, end: newEnd});
 
@@ -424,9 +423,10 @@ export const useTimelineInteractions = ({
                             const newStart = new Date(timeUnderFinger.getTime() - fingerRatio * newRange);
                             const newEnd = new Date(newStart.getTime() + newRange);
 
-                            resetFragments();
+                            // При изменении масштаба переиспользуем уже загруженные данные без сброса
+                            // loadFragments преобразует данные в нужный масштаб без повторных запросов
                             setIntervalIndex(newIndex);
-                            loadFragments(newStart, newEnd, newIndex);
+                            loadFragments(newStart, newEnd, newIndex, true);
 
                             setVisibleTimeRange({start: newStart, end: newEnd});
 
@@ -468,7 +468,6 @@ export const useTimelineInteractions = ({
             loadFragments,
             setVisibleTimeRange,
             intervalIndex,
-            resetFragments,
             setIntervalIndex,
             handleTimelineChange
         ]

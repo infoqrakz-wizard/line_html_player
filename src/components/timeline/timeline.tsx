@@ -88,7 +88,6 @@ export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
             fragments,
             fragmentsBufferRange,
             loadFragments,
-            resetFragments,
             handleTimelineChange,
             currentTime: serverTime || new Date(),
             onTimeClick,
@@ -215,12 +214,28 @@ export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
             if (!visibleTimeRange) return;
             if (previousFilterSignatureRef.current === motionFilterSignature) return;
 
-            if (previousFilterSignatureRef.current !== null) {
+            const isFilterBeingEnabled =
+                previousFilterSignatureRef.current === 'null' && motionFilterSignature !== 'null';
+            const isFilterBeingDisabled =
+                previousFilterSignatureRef.current !== 'null' && motionFilterSignature === 'null';
+            const isFilterChanging =
+                previousFilterSignatureRef.current !== null &&
+                previousFilterSignatureRef.current !== 'null' &&
+                motionFilterSignature !== 'null';
+
+            // При включении фильтра или изменении фильтра вызываем resetFragments
+            if (isFilterBeingEnabled || isFilterChanging) {
                 resetFragmentsRef.current();
             }
+            // При выключении фильтра не вызываем resetFragments - используем данные из кэша
 
             previousFilterSignatureRef.current = motionFilterSignature;
-            loadFragmentsRef.current(visibleTimeRange.start, visibleTimeRange.end, intervalIndex);
+
+            // Вызываем loadFragments только если фильтр включен или изменяется
+            // При выключении фильтра переключение на обычные фреймы происходит в use-timeline-fragments через useEffect
+            if (!isFilterBeingDisabled) {
+                loadFragmentsRef.current(visibleTimeRange.start, visibleTimeRange.end, intervalIndex);
+            }
         }, [motionFilterSignature, visibleTimeRange, intervalIndex]);
 
         // При смене режима Live → Record сбрасываем и перезагружаем фрагменты один раз
@@ -248,9 +263,6 @@ export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
                 </div>
             );
         }
-
-        console.log('111 visibleTimeRange', visibleTimeRange);
-        console.log('111 fragments', fragments)
 
         return (
             <>

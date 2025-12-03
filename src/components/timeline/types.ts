@@ -200,8 +200,6 @@ export interface TimelineInteractionsParams {
     fragmentsBufferRange: TimeRange;
     /** Загрузить фрагменты */
     loadFragments: (start: Date, end: Date, zoomIndex?: number, immediate?: boolean) => void;
-    /** Сбросить фрагменты */
-    resetFragments: () => void;
     /** Обработать изменения timeline (вызывается после окончания взаимодействия) */
     handleTimelineChange?: (visibleStart: Date, visibleEnd: Date, intervalIndex?: number) => void;
     /** Текущее время */

@@ -21,3 +21,4 @@ yarn-error.log*
 .vscode/*
 !.vscode/settings.json
 deploy-devline.sh
+.cursor
