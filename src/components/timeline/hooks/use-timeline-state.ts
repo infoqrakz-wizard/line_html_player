@@ -135,6 +135,22 @@ export const useTimelineState = (
         setVisibleTimeRangeState({start, end});
     }, [serverTime, ctxProgress, intervalIndex]);
 
+    /**
+     * Центрировать временную шкалу на указанном времени
+     */
+    const centerOnTime = useCallback(
+        (time: Date) => {
+            const currentInterval = INTERVALS[intervalIndex];
+            const halfInterval = currentInterval / 2;
+
+            const start = new Date(time.getTime() - halfInterval);
+            const end = new Date(time.getTime() + halfInterval);
+
+            setVisibleTimeRangeState({start, end});
+        },
+        [intervalIndex]
+    );
+
     // Центрирование таймлайна при изменении serverTime
     // Используем useRef для отслеживания предыдущего серверного времени
     const previousServerTimeRef = useRef<Date | null>(null);
@@ -215,6 +231,7 @@ export const useTimelineState = (
         visibleTimeRange,
         setVisibleTimeRange,
         centerOnCurrentTime,
+        centerOnTime,
         cursorPosition,
         updateCursorPosition,
         updateCursorPositionByTime,

@@ -2,6 +2,7 @@
  * Утилиты для отрисовки временной шкалы
  */
 import {TimeRange} from '../types';
+import {Mode} from '../../../utils/types';
 
 // Импортируем функции из новых файлов
 import {drawDayAndHourMarkers} from './day-hour-markers';
@@ -88,10 +89,10 @@ export const drawFragments = (
 };
 
 /**
- * Отрисовывает фреймы от серверного времени до текущего индикатора времени
+ * Отрисовывает фреймы от времени начала трансляции до текущего индикатора времени
  * Это отдельная отрисовка, не зависящая от данных в fragments
  * @param ctx Контекст canvas
- * @param serverTime Серверное время (начало воспроизведения)
+ * @param serverTime Время начала трансляции (время открытия плеера в режиме Live или серверное время)
  * @param currentTime Текущее время
  * @param progress Прогресс воспроизведения в секундах
  * @param visibleTimeRange Видимый диапазон времени
@@ -107,9 +108,13 @@ export const drawProgressFragments = (
     visibleTimeRange: TimeRange,
     width: number,
     height: number,
-    unitLengthMs: number
+    unitLengthMs: number,
+    mode?: Mode
 ): void => {
     if (!serverTime) return;
+
+    // Рисуем зеленые фреймы за timeindicator только в режиме прямой трансляции (Live)
+    if (mode !== Mode.Live) return;
 
     const screenDuration = visibleTimeRange.end.getTime() - visibleTimeRange.start.getTime();
     const fragmentHeight = 4;
@@ -117,13 +122,13 @@ export const drawProgressFragments = (
 
     // Вычисляем время индикатора (текущее время + прогресс)
     const timeIndicatorMs = currentTime.getTime() + progress * 1000;
-    const serverTimeMs = serverTime.getTime();
+    const streamStartTimeMs = serverTime.getTime();
 
-    // Если индикатор времени раньше серверного времени, ничего не рисуем
-    if (timeIndicatorMs <= serverTimeMs) return;
+    // Если индикатор времени раньше времени начала трансляции, ничего не рисуем
+    if (timeIndicatorMs <= streamStartTimeMs) return;
 
-    // Вычисляем диапазон от serverTime до timeIndicator
-    const progressStartTime = serverTimeMs;
+    // Вычисляем диапазон от времени начала трансляции до timeIndicator
+    const progressStartTime = streamStartTimeMs;
     const progressEndTime = timeIndicatorMs;
 
     // Вычисляем начальный и конечный индексы единиц времени

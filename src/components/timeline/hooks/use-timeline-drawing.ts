@@ -4,6 +4,7 @@
 import {useCallback, useEffect, useRef} from 'react';
 import {TimelineDrawingParams} from '../types';
 import {INTERVALS, UNIT_LENGTHS} from '../utils/constants';
+import {Mode} from '../../../utils/types';
 import {
     drawBackground,
     drawCurrentTimeIndicator,
@@ -38,11 +39,13 @@ export const useTimelineDrawing = ({
     loadFragments,
     currentTime,
     serverTime,
+    liveStreamStartTime,
     progress,
     cursorPosition,
     isVertical = false,
     isMobile = false,
-    isDragging = false
+    isDragging = false,
+    mode
 }: TimelineDrawingParams) => {
     // Сохраняем последнее известное время и прогресс
     const lastTimeRef = useRef<Date>(new Date(currentTime));
@@ -156,30 +159,35 @@ export const useTimelineDrawing = ({
                 );
             }
 
-            // Отрисовываем фреймы от serverTime до текущего индикатора времени
+            // Отрисовываем фреймы от времени начала трансляции до текущего индикатора времени
             // Это отдельная отрисовка, не зависящая от данных в fragments
-            if (serverTime) {
+            // Рисуем только в режиме прямой трансляции (Live)
+            // Используем liveStreamStartTime (время открытия плеера) вместо serverTime
+            const startTime = liveStreamStartTime || serverTime;
+            if (startTime && mode === Mode.Live) {
                 if (isVertical) {
                     drawVerticalProgressFragments(
                         ctx,
-                        serverTime,
+                        startTime,
                         currentTime,
                         actualProgress,
                         visibleTimeRange,
                         containerRect.width,
                         containerRect.height,
-                        UNIT_LENGTHS[intervalIndex] * 1000
+                        UNIT_LENGTHS[intervalIndex] * 1000,
+                        mode
                     );
                 } else {
                     drawProgressFragments(
                         ctx,
-                        serverTime,
+                        startTime,
                         currentTime,
                         actualProgress,
                         visibleTimeRange,
                         containerRect.width,
                         containerRect.height,
-                        UNIT_LENGTHS[intervalIndex] * 1000
+                        UNIT_LENGTHS[intervalIndex] * 1000,
+                        mode
                     );
                 }
             }
@@ -240,11 +248,13 @@ export const useTimelineDrawing = ({
             progress,
             currentTime,
             serverTime,
+            liveStreamStartTime,
             cursorPosition,
             isMobile,
             intervalIndex,
             fragments,
-            fragmentsBufferRange
+            fragmentsBufferRange,
+            mode
         ]
     );
 

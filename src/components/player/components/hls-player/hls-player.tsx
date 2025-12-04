@@ -601,14 +601,20 @@ export const HlsPlayer = forwardRef<PlayerRef, HlsPlayerProps>((props, ref) => {
                 if (video.playbackRate !== (playbackSpeed || 1)) {
                     video.playbackRate = playbackSpeed || 1;
                 }
-                if (playingRef.current) {
-                    video.play().catch(console.error);
-                }
                 console.log('[HLS][manifest-parsed]', {
                     pendingSeek: pendingSeekRef.current,
-                    startApplied: startAppliedRef.current
+                    startApplied: startAppliedRef.current,
+                    playingRef: playingRef.current,
+                    videoPaused: video.paused
                 });
                 applyPendingSeek();
+                // Убеждаемся, что видео начинает воспроизведение после загрузки манифеста
+                // если playing установлен в true
+                if (playingRef.current && video.paused) {
+                    video.play().catch(error => {
+                        console.error('[HLS][manifest-parsed] Ошибка при запуске воспроизведения:', error);
+                    });
+                }
             });
 
             hls.loadSource(url);

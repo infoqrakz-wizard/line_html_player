@@ -1,7 +1,7 @@
 /**
  * Основной компонент временной шкалы
  */
-import React, {useRef, useEffect, useCallback, useMemo} from 'react';
+import React, {useRef, useEffect, useCallback, useMemo, useState} from 'react';
 import {TimelineCanvas} from './timeline-canvas';
 import {TimelineProps, TimelineRef} from './types';
 import {useTimelineState} from './hooks/use-timeline-state';
@@ -26,6 +26,11 @@ export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
         // Определяем, нужно ли показывать вертикальный таймлайн
         const isVerticalTimeline = isMobile && orientation === 'landscape';
 
+        // Состояние для хранения времени начала прямой трансляции
+        // Это время устанавливается при первом открытии плеера в режиме Live
+        // и не изменяется при переключении режимов
+        const [liveStreamStartTime, setLiveStreamStartTime] = useState<Date | null>(null);
+
         // Используем хук для управления состоянием временной шкалы
         const {
             serverTime,
@@ -35,12 +40,21 @@ export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
             intervalIndex,
             setIntervalIndex,
             centerOnCurrentTime,
+            centerOnTime,
             cursorPosition,
             updateCursorPosition,
             updateCursorPositionByTime,
             resetCursorPosition,
             serverTimeError
         } = useTimelineState(progress, url, port, credentials, protocol, proxy);
+
+        // Инициализируем время начала прямой трансляции при первом получении serverTime в режиме Live
+        // или при переключении на режим Live, если время еще не установлено
+        useEffect(() => {
+            if (serverTime && mode === Mode.Live && liveStreamStartTime === null) {
+                setLiveStreamStartTime(new Date(serverTime));
+            }
+        }, [serverTime, mode, liveStreamStartTime]);
 
         // Используем хук для управления фрагментами
         const motionFilterSignature = useMemo(() => createMotionFilterSignature(motionFilter), [motionFilter]);
@@ -92,7 +106,8 @@ export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
             currentTime: serverTime || new Date(),
             onTimeClick,
             progress,
-            isVertical: isVerticalTimeline
+            isVertical: isVerticalTimeline,
+            motionFilter: motionFilter ?? null
         });
 
         // Обработчик движения мыши для отслеживания позиции курсора
@@ -141,7 +156,9 @@ export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
                 (ref as React.MutableRefObject<TimelineRef>).current = {
                     setVisibleTimeRange: (start: Date, end: Date) => setVisibleTimeRange({start, end}),
                     centerOnCurrentTime,
+                    centerOnTime,
                     getCurrentTime: () => serverTime,
+                    getVisibleTimeRange: () => visibleTimeRange,
                     getFragmentsData: () => {
                         if (!fragments || fragments.length === 0) {
                             return null;
@@ -168,7 +185,9 @@ export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
             ref,
             setVisibleTimeRange,
             centerOnCurrentTime,
+            centerOnTime,
             serverTime,
+            visibleTimeRange,
             fragments,
             fragmentsBufferRange,
             intervalIndex,
@@ -212,6 +231,9 @@ export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
         const previousFilterSignatureRef = useRef<string | null>(null);
         useEffect(() => {
             if (!visibleTimeRange) return;
+            // Если фильтр не изменился, не вызываем resetFragments
+            // Это предотвращает прерывание активных запросов при изменении зума или visibleTimeRange
+            // resetFragments должен вызываться ТОЛЬКО при изменении фильтра
             if (previousFilterSignatureRef.current === motionFilterSignature) return;
 
             const isFilterBeingEnabled =
@@ -239,17 +261,22 @@ export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
         }, [motionFilterSignature, visibleTimeRange, intervalIndex]);
 
         // При смене режима Live → Record сбрасываем и перезагружаем фрагменты один раз
+        // НО: если включен motion filter, не очищаем кэш - используем уже загруженные данные
         const previousModeRef = useRef<Mode | undefined>(mode);
         useEffect(() => {
             const previousMode = previousModeRef.current;
             if (previousMode !== mode) {
                 if (mode === Mode.Record && visibleTimeRange) {
-                    resetFragmentsRef.current();
+                    // Если включен motion filter, не вызываем resetFragments - сохраняем кэш
+                    // Просто обновляем отображение для текущего диапазона
+                    if (!motionFilter) {
+                        resetFragmentsRef.current();
+                    }
                     loadFragmentsRef.current(visibleTimeRange.start, visibleTimeRange.end, intervalIndex);
                 }
                 previousModeRef.current = mode;
             }
-        }, [mode, visibleTimeRange, intervalIndex]);
+        }, [mode, visibleTimeRange, intervalIndex, motionFilter]);
 
         if (serverTimeError) {
             return null;
@@ -275,6 +302,7 @@ export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
                     loadFragments={loadFragments}
                     currentTime={serverTime || new Date()}
                     serverTime={serverTime}
+                    liveStreamStartTime={liveStreamStartTime}
                     progress={progress}
                     onMouseDown={handleMouseDown}
                     onMouseUp={handleMouseUp}
@@ -290,6 +318,7 @@ export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
                     isVertical={isVerticalTimeline}
                     isMobile={isMobile}
                     isDragging={isDragging}
+                    mode={mode}
                 />
             </>
         );

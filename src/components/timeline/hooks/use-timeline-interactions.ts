@@ -11,7 +11,7 @@ import {
     HORIZONTAL_SWIPE_THRESHOLD,
     ZOOM_SWIPE_DISTANCE
 } from '../utils/constants';
-import {findNearestAvailableFragment} from '../utils/fragment-utils';
+import {findNearestAvailableFragment, findNearestVisibleFragment} from '../utils/fragment-utils';
 
 /**
  * Хук для обработки взаимодействий пользователя с временной шкалой
@@ -32,7 +32,8 @@ export const useTimelineInteractions = ({
     currentTime, // eslint-disable-line @typescript-eslint/no-unused-vars
     onTimeClick,
     progress, // eslint-disable-line @typescript-eslint/no-unused-vars
-    isVertical = false
+    isVertical = false,
+    motionFilter
 }: TimelineInteractionsParams) => {
     // Состояние для отслеживания перетаскивания
     const [isDragging, setIsDragging] = useState(false);
@@ -229,16 +230,30 @@ export const useTimelineInteractions = ({
 
                 const clickedTime = new Date(visibleTimeRange.start.getTime() + timeOffset);
 
-                // Ищем ближайший доступный фрагмент
-                const nearestFragmentTime = findNearestAvailableFragment(
-                    clickedTime,
-                    fragments,
-                    fragmentsBufferRange,
-                    UNIT_LENGTHS[intervalIndex]
-                );
+                // При включенном фильтре проверяем, кликнул ли пользователь на отображаемом фрагменте
+                // Если нет, ищем ближайший будущий отображаемый фрагмент
+                let finalTime: Date;
+                if (motionFilter) {
+                    const nearestVisibleFragmentTime = findNearestVisibleFragment(
+                        clickedTime,
+                        fragments,
+                        fragmentsBufferRange,
+                        UNIT_LENGTHS[intervalIndex]
+                    );
+                    // Если найден ближайший отображаемый фрагмент, используем его время
+                    // Иначе используем clicked time (будет обработано при воспроизведении)
+                    finalTime = nearestVisibleFragmentTime || clickedTime;
+                } else {
+                    // Для обычных фреймов используем стандартную логику
+                    const nearestFragmentTime = findNearestAvailableFragment(
+                        clickedTime,
+                        fragments,
+                        fragmentsBufferRange,
+                        UNIT_LENGTHS[intervalIndex]
+                    );
+                    finalTime = nearestFragmentTime || clickedTime;
+                }
 
-                // Если найден ближайший фрагмент, используем его время, иначе используем clicked time
-                const finalTime = nearestFragmentTime || clickedTime;
                 onTimeClick(finalTime);
             }
         },
@@ -250,7 +265,8 @@ export const useTimelineInteractions = ({
             fragments,
             fragmentsBufferRange,
             intervalIndex,
-            isVertical
+            isVertical,
+            motionFilter
         ]
     );
 
@@ -505,14 +521,30 @@ export const useTimelineInteractions = ({
 
                 const clickedTime = new Date(visibleTimeRange.start.getTime() + timeOffset);
 
-                const nearestFragmentTime = findNearestAvailableFragment(
-                    clickedTime,
-                    fragments,
-                    fragmentsBufferRange,
-                    UNIT_LENGTHS[intervalIndex]
-                );
+                // При включенном фильтре проверяем, кликнул ли пользователь на отображаемом фрагменте
+                // Если нет, ищем ближайший будущий отображаемый фрагмент
+                let finalTime: Date;
+                if (motionFilter) {
+                    const nearestVisibleFragmentTime = findNearestVisibleFragment(
+                        clickedTime,
+                        fragments,
+                        fragmentsBufferRange,
+                        UNIT_LENGTHS[intervalIndex]
+                    );
+                    // Если найден ближайший отображаемый фрагмент, используем его время
+                    // Иначе используем clicked time (будет обработано при воспроизведении)
+                    finalTime = nearestVisibleFragmentTime || clickedTime;
+                } else {
+                    // Для обычных фреймов используем стандартную логику
+                    const nearestFragmentTime = findNearestAvailableFragment(
+                        clickedTime,
+                        fragments,
+                        fragmentsBufferRange,
+                        UNIT_LENGTHS[intervalIndex]
+                    );
+                    finalTime = nearestFragmentTime || clickedTime;
+                }
 
-                const finalTime = nearestFragmentTime || clickedTime;
                 onTimeClick(finalTime);
             }
 
@@ -530,7 +562,8 @@ export const useTimelineInteractions = ({
             fragmentsBufferRange,
             intervalIndex,
             isVertical,
-            handleTimelineChange
+            handleTimelineChange,
+            motionFilter
         ]
     );
 

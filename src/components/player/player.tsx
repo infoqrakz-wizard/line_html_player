@@ -5,12 +5,17 @@ import {getProtocol, formatUrlForDownload, clickA} from '../../utils/url-params'
 import {Mode, Protocol} from '../../utils/types';
 import {getCameraState, getCamerasList, type CameraInfo} from '../../utils/api';
 import {ControlPanel} from '../control-panel';
-import {CAMERA_SWIPE_THRESHOLD_PERCENT, PLAYER_HORIZONTAL_SWIPE_THRESHOLD} from '../timeline/utils/constants';
+import {
+    CAMERA_SWIPE_THRESHOLD_PERCENT,
+    PLAYER_HORIZONTAL_SWIPE_THRESHOLD,
+    UNIT_LENGTHS
+} from '../timeline/utils/constants';
 
 import {useTime} from '../../context/time-context';
 import {useTimelineState} from '../timeline/hooks/use-timeline-state';
 import {useOrientation} from '../timeline/hooks/use-orientation';
 import {TimelineRef} from '../timeline/types';
+import {hasVisibleFramesInNextSeconds, findNextVisibleFrame} from '../timeline/utils/fragment-utils';
 
 import {HlsPlayer, VideoTag, SaveStreamModal, ModeIndicator, ZoomMagnifier, PlayOverlay, Loader} from './components';
 import {PlayerComponentProps, PlaybackStatus} from './components/player-interface';
@@ -987,6 +992,53 @@ export const Player: React.FC<PlayerProps> = ({
         [getFragmentsFromTimeline]
     );
 
+    // Функция для поиска следующего отображаемого фрейма (используется при включенном фильтре)
+    const findNextVisibleFrameFromTimeline = useCallback(
+        (currentAbsoluteTime: Date) => {
+            const fragmentsData = getFragmentsFromTimeline();
+            if (!fragmentsData) {
+                return null;
+            }
+
+            const {fragments, fragmentsBufferRange, intervalIndex} = fragmentsData;
+
+            // Вычисляем unitLengthSeconds на основе реальных данных, а не intervalIndex из состояния
+            // Это важно, так как данные могли быть созданы с другим zoomIndex при изменении зума
+            const bufferDurationMs = fragmentsBufferRange.end.getTime() - fragmentsBufferRange.start.getTime();
+            const calculatedUnitLengthSeconds =
+                fragments.length > 0 ? bufferDurationMs / (fragments.length * 1000) : UNIT_LENGTHS[intervalIndex];
+
+            return findNextVisibleFrame(
+                currentAbsoluteTime,
+                fragments,
+                fragmentsBufferRange,
+                calculatedUnitLengthSeconds
+            );
+        },
+        [getFragmentsFromTimeline]
+    );
+
+    // Функция для проверки наличия отображаемых фреймов в ближайшие 5 секунд
+    const checkVisibleFramesInNextSeconds = useCallback(
+        (currentAbsoluteTime: Date, lookAheadSeconds: number = 5) => {
+            const fragmentsData = getFragmentsFromTimeline();
+            if (!fragmentsData) {
+                return false;
+            }
+
+            const {fragments, fragmentsBufferRange, intervalIndex} = fragmentsData;
+
+            return hasVisibleFramesInNextSeconds(
+                currentAbsoluteTime,
+                fragments,
+                fragmentsBufferRange,
+                UNIT_LENGTHS[intervalIndex],
+                lookAheadSeconds
+            );
+        },
+        [getFragmentsFromTimeline]
+    );
+
     // Функция для проверки, достиг ли указатель конца текущего фрагмента
     const checkIfAtEndOfCurrentSegment = useCallback(
         (currentAbsoluteTime: Date) => {
@@ -1033,33 +1085,152 @@ export const Player: React.FC<PlayerProps> = ({
                 const currentTotalProgress = p.currentTime + fragmetsGapRef.current;
                 const currentAbsoluteTime = new Date(serverTime.getTime() + currentTotalProgress * 1000);
 
-                // Проверяем, достигли ли мы конца текущего фрагмента
-                if (checkIfAtEndOfCurrentSegment(currentAbsoluteTime)) {
-                    // Ищем следующий доступный фрагмент
-                    const nextSegmentTime = findNextRecordingSegment(currentAbsoluteTime);
-
-                    if (nextSegmentTime && nextFragmentTimeRef.current !== nextSegmentTime) {
-                        nextFragmentTimeRef.current = nextSegmentTime;
-                        const newProgress = (nextSegmentTime.getTime() - serverTime.getTime()) / 1000;
-
-                        // Устанавливаем флаг перехода и обновляем gap
-                        isTransitioningToNextFragmentRef.current = true;
-
-                        // Gap равен разности между желаемой позицией и текущей позицией плеера
-                        fragmetsGapRef.current = newProgress - p.currentTime;
-
-                        setProgress(newProgress);
+                // При включенном фильтре проверяем наличие отображаемых фреймов в ближайшие 5 секунд
+                if (appliedMotionFilter) {
+                    // Пропускаем проверку во время перехода к новому фрагменту
+                    if (isTransitioningToNextFragmentRef.current) {
                         return;
-                    } else {
-                        console.log('No next segment found, stopping playback');
-                        setIsPlaying(false);
+                    }
+
+                    const hasVisibleFrames = checkVisibleFramesInNextSeconds(currentAbsoluteTime, 5);
+
+                    if (!hasVisibleFrames) {
+                        // Если нет отображаемых фреймов в ближайшие 5 секунд,
+                        // находим следующий отображаемый фрейм и переключаемся на него
+                        const nextVisibleFrameTime = findNextVisibleFrameFromTimeline(currentAbsoluteTime);
+
+                        console.log('[PLAYBACK DEBUG] Filter active, no visible frames in next 5s', {
+                            currentAbsoluteTime: currentAbsoluteTime.toISOString(),
+                            hasVisibleFrames,
+                            nextVisibleFrameTime: nextVisibleFrameTime?.toISOString() || null,
+                            nextFragmentTimeRef: nextFragmentTimeRef.current?.toISOString() || null,
+                            areEqual:
+                                nextVisibleFrameTime && nextFragmentTimeRef.current
+                                    ? nextVisibleFrameTime.getTime() === nextFragmentTimeRef.current.getTime()
+                                    : false
+                        });
+
+                        if (nextVisibleFrameTime && nextFragmentTimeRef.current !== nextVisibleFrameTime) {
+                            console.log('[PLAYBACK DEBUG] Switching to next visible frame', {
+                                from: currentAbsoluteTime.toISOString(),
+                                to: nextVisibleFrameTime.toISOString()
+                            });
+
+                            nextFragmentTimeRef.current = nextVisibleFrameTime;
+                            const newProgress = (nextVisibleFrameTime.getTime() - serverTime.getTime()) / 1000;
+
+                            // Устанавливаем флаг перехода и обновляем gap
+                            isTransitioningToNextFragmentRef.current = true;
+
+                            // Gap равен разности между желаемой позицией и текущей позицией плеера
+                            fragmetsGapRef.current = newProgress - p.currentTime;
+
+                            // Проверяем, находится ли следующий фрейм за пределами видимого таймлайна
+                            // Если да, центрируем таймлайн по времени этого фрейма
+                            if (timelineRef.current) {
+                                const visibleTimeRange = timelineRef.current.getVisibleTimeRange();
+                                if (visibleTimeRange) {
+                                    const nextFrameTime = nextVisibleFrameTime.getTime();
+                                    const visibleStart = visibleTimeRange.start.getTime();
+                                    const visibleEnd = visibleTimeRange.end.getTime();
+
+                                    // Проверяем, находится ли следующий фрейм за пределами видимого диапазона
+                                    const isOutsideVisibleRange =
+                                        nextFrameTime < visibleStart || nextFrameTime > visibleEnd;
+
+                                    if (isOutsideVisibleRange) {
+                                        timelineRef.current.centerOnTime(nextVisibleFrameTime);
+                                    }
+                                }
+                            }
+
+                            // Обновляем serverTime для переключения на новый m3u8 с временной меткой следующего фрейма
+                            // Проверяем, что новое время отличается от текущего serverTime, чтобы избежать бесконечных циклов
+                            if (!serverTime || Math.abs(serverTime.getTime() - nextVisibleFrameTime.getTime()) > 1000) {
+                                handleChangeMode(Mode.Record, nextVisibleFrameTime);
+                            }
+
+                            setProgress(newProgress);
+                            return;
+                        } else {
+                            // Детальное логирование причины остановки
+                            const fragmentsData = getFragmentsFromTimeline();
+                            const currentFragmentIndex = fragmentsData
+                                ? Math.floor(
+                                      (currentAbsoluteTime.getTime() -
+                                          fragmentsData.fragmentsBufferRange.start.getTime()) /
+                                          (UNIT_LENGTHS[fragmentsData.intervalIndex] * 1000)
+                                  )
+                                : -1;
+                            console.warn('[PLAYBACK DEBUG] Stopping playback - no next visible frame', {
+                                currentAbsoluteTime: currentAbsoluteTime.toISOString(),
+                                nextVisibleFrameTime: nextVisibleFrameTime?.toISOString() || null,
+                                nextFragmentTimeRef: nextFragmentTimeRef.current?.toISOString() || null,
+                                fragmentsData: fragmentsData
+                                    ? {
+                                          fragmentsLength: fragmentsData.fragments.length,
+                                          fragmentsBufferRange: {
+                                              start: fragmentsData.fragmentsBufferRange.start.toISOString(),
+                                              end: fragmentsData.fragmentsBufferRange.end.toISOString()
+                                          },
+                                          visibleFramesCount: fragmentsData.fragments.filter(f => f > 0).length,
+                                          currentFragmentIndex,
+                                          futureVisibleFramesCount: fragmentsData.fragments
+                                              .slice(currentFragmentIndex + 1)
+                                              .filter(f => f > 0).length
+                                      }
+                                    : null,
+                                reason: !nextVisibleFrameTime
+                                    ? 'findNextVisibleFrame returned null'
+                                    : nextFragmentTimeRef.current === nextVisibleFrameTime
+                                      ? 'nextFragmentTimeRef equals nextVisibleFrameTime (duplicate transition blocked)'
+                                      : 'unknown'
+                            });
+                            setIsPlaying(false);
+                            return;
+                        }
+                    }
+                    // Если есть отображаемые фреймы в ближайшие 5 секунд, продолжаем воспроизведение
+                } else {
+                    // Для обычных фреймов используем стандартную логику
+                    // Проверяем, достигли ли мы конца текущего фрагмента
+                    if (checkIfAtEndOfCurrentSegment(currentAbsoluteTime)) {
+                        // Ищем следующий доступный фрагмент
+                        const nextSegmentTime = findNextRecordingSegment(currentAbsoluteTime);
+
+                        if (nextSegmentTime && nextFragmentTimeRef.current !== nextSegmentTime) {
+                            nextFragmentTimeRef.current = nextSegmentTime;
+                            const newProgress = (nextSegmentTime.getTime() - serverTime.getTime()) / 1000;
+
+                            // Устанавливаем флаг перехода и обновляем gap
+                            isTransitioningToNextFragmentRef.current = true;
+
+                            // Gap равен разности между желаемой позицией и текущей позицией плеера
+                            fragmetsGapRef.current = newProgress - p.currentTime;
+
+                            setProgress(newProgress);
+                            return;
+                        } else {
+                            console.log('No next segment found, stopping playback');
+                            setIsPlaying(false);
+                            return;
+                        }
                     }
                 }
             }
 
             // Пропускаем обычное обновление сразу после перехода к новому фрагменту
             if (isTransitioningToNextFragmentRef.current) {
-                console.log('Skipping normal update after fragment transition');
+                if (currentMode === Mode.Record && serverTime) {
+                    const currentTotalProgress = p.currentTime + fragmetsGapRef.current;
+                    const currentAbsTime = new Date(serverTime.getTime() + currentTotalProgress * 1000);
+                    console.log('[PLAYBACK DEBUG] Skipping normal update after fragment transition', {
+                        nextFragmentTimeRef: nextFragmentTimeRef.current?.toISOString() || null,
+                        currentAbsoluteTime: currentAbsTime.toISOString()
+                    });
+                } else {
+                    console.log('[PLAYBACK DEBUG] Skipping normal update after fragment transition');
+                }
                 isTransitioningToNextFragmentRef.current = false;
                 // Очищаем ссылку на предыдущий фрагмент, чтобы не блокировать следующие переходы
                 nextFragmentTimeRef.current = null;

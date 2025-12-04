@@ -57,6 +57,12 @@ export const useTimelineFragments = (
     } = params;
     const {setTimelineAccess} = useTimelineAuth();
 
+    // Ref для хранения актуального zoomIndex, чтобы использовать его в асинхронных операциях
+    const zoomIndexRef = useRef<number>(zoomIndex);
+    useEffect(() => {
+        zoomIndexRef.current = zoomIndex;
+    }, [zoomIndex]);
+
     // Массив с наличием фрагментов
     const [fragments, _setFragments] = useState<number[]>([]);
 
@@ -754,9 +760,23 @@ export const useTimelineFragments = (
 
                 // Если данные уже загружены для нужного диапазона и фильтр не изменился,
                 // просто преобразуем их в нужный масштаб без запросов
+                // Используем расширенный диапазон, чтобы сохранить все загруженные данные
                 if (hasAllDataForRange && lastAppliedFilterSignatureRef.current === (motionFilterSignature ?? null)) {
-                    // Преобразуем данные в нужный масштаб
-                    const mergedData = mergeMotionIntervalsDataForRange(bufferStart, actualBufferEnd, zoomIndex);
+                    // Используем расширенный диапазон, чтобы включить все уже загруженные данные из кэша
+                    const expandedBufferStart = Math.min(
+                        bufferStart.getTime(),
+                        currentBufferStart !== 0 ? currentBufferStart : bufferStart.getTime()
+                    );
+                    const expandedBufferEnd = Math.max(
+                        actualBufferEnd.getTime(),
+                        currentBufferEnd !== 0 ? currentBufferEnd : actualBufferEnd.getTime()
+                    );
+
+                    const mergedData = mergeMotionIntervalsDataForRange(
+                        new Date(expandedBufferStart),
+                        new Date(expandedBufferEnd),
+                        zoomIndex
+                    );
                     setFragments(mergedData.timeline);
                     setFragmentsBufferRange(mergedData.bufferRange);
                     return;
@@ -774,14 +794,104 @@ export const useTimelineFragments = (
                 }
 
                 const activeRequest = activeRequestRef.current;
+                // Если есть активный запрос для того же фильтра, не прерываем его
+                // Позволяем ему продолжить загрузку, даже если zoomIndex изменился
+                // Данные можно преобразовать в новый масштаб без повторной загрузки
                 if (
                     activeRequest &&
-                    activeRequest.start.getTime() === start.getTime() &&
-                    activeRequest.end.getTime() === end.getTime() &&
-                    activeRequest.zoomIndex === zoomIndex &&
-                    activeRequest.filterSignature === (motionFilterSignature ?? null)
+                    activeRequest.filterSignature === (motionFilterSignature ?? null) &&
+                    isLoadingFragments
                 ) {
-                    return;
+                    // Проверяем, пересекается ли новый диапазон с активным запросом
+                    // Если да, то не прерываем запрос, так как данные могут быть полезны
+                    const activeRequestStart = activeRequest.start.getTime();
+                    const activeRequestEnd = activeRequest.end.getTime();
+                    const newRequestStart = bufferStart.getTime();
+                    const newRequestEnd = bufferEnd.getTime();
+
+                    // Если новый диапазон полностью внутри активного запроса или пересекается с ним,
+                    // не прерываем запрос - он продолжит загружать нужные данные
+                    // При изменении зума просто преобразуем уже загруженные данные в новый масштаб
+                    const rangesOverlap =
+                        (newRequestStart >= activeRequestStart && newRequestStart <= activeRequestEnd) ||
+                        (newRequestEnd >= activeRequestStart && newRequestEnd <= activeRequestEnd) ||
+                        (newRequestStart <= activeRequestStart && newRequestEnd >= activeRequestEnd);
+
+                    if (rangesOverlap) {
+                        // Если zoomIndex изменился, но диапазоны пересекаются, обновляем отображение
+                        // с уже загруженными данными в новом масштабе, не прерывая загрузку
+                        if (activeRequest.zoomIndex !== zoomIndex) {
+                            // Ограничиваем максимальную границу реальным текущим временем
+                            const now = Date.now();
+                            let actualBufferEnd = bufferEnd;
+                            if (actualBufferEnd.getTime() > now) {
+                                actualBufferEnd = new Date(now);
+                            }
+
+                            // Определяем реальный диапазон загруженных данных на основе motionDataByIntervalRef
+                            // Это важно, так как fragmentsBufferRange может быть неполным во время загрузки
+                            let actualLoadedStart: number | null = null;
+                            let actualLoadedEnd: number | null = null;
+                            const loadedIntervals: number[] = [];
+                            motionDataByIntervalRef.current.forEach((_, intervalTimestamp) => {
+                                loadedIntervals.push(intervalTimestamp);
+                                if (actualLoadedStart === null || intervalTimestamp < actualLoadedStart) {
+                                    actualLoadedStart = intervalTimestamp;
+                                }
+                                const intervalEnd = intervalTimestamp + THIRTY_MINUTES_MS;
+                                if (actualLoadedEnd === null || intervalEnd > actualLoadedEnd) {
+                                    actualLoadedEnd = intervalEnd;
+                                }
+                            });
+
+                            // Используем реально загруженный диапазон или fallback на fragmentsBufferRange
+                            const expandedBufferStart = Math.min(
+                                bufferStart.getTime(),
+                                actualLoadedStart !== null
+                                    ? actualLoadedStart
+                                    : currentBufferStart !== 0
+                                      ? currentBufferStart
+                                      : bufferStart.getTime()
+                            );
+                            const expandedBufferEnd = Math.max(
+                                actualBufferEnd.getTime(),
+                                actualLoadedEnd !== null
+                                    ? actualLoadedEnd
+                                    : currentBufferEnd !== 0
+                                      ? currentBufferEnd
+                                      : actualBufferEnd.getTime()
+                            );
+
+                            // ВАЖНО: Используем актуальный zoomIndex из ref, а не из замыкания
+                            // Это гарантирует, что данные всегда пересчитываются для текущего зума
+                            const currentZoomIndex = zoomIndexRef.current;
+
+                            const mergedData = mergeMotionIntervalsDataForRange(
+                                new Date(expandedBufferStart),
+                                new Date(expandedBufferEnd),
+                                currentZoomIndex
+                            );
+
+                            setFragments(mergedData.timeline);
+                            setFragmentsBufferRange(mergedData.bufferRange);
+                            // Принудительно обновляем компонент после изменения зума
+                            // Используем двойной requestAnimationFrame для гарантии, что React перерисует компонент
+                            // после того, как браузер будет готов к обновлению и React обработает первое обновление
+                            requestAnimationFrame(() => {
+                                requestAnimationFrame(() => {
+                                    // Дополнительное обновление для гарантии перерисовки
+                                    // Используем функцию-обновление, чтобы гарантировать, что React увидит изменение
+                                    _setFragments(prev => {
+                                        // Создаем новый массив, чтобы гарантировать изменение ссылки
+                                        const newArray = [...prev];
+                                        return newArray;
+                                    });
+                                });
+                            });
+                        }
+                        // Не прерываем запрос, если диапазоны пересекаются и запрос еще выполняется
+                        return;
+                    }
                 }
 
                 // Функция для выполнения обновления motion filter
@@ -809,7 +919,22 @@ export const useTimelineFragments = (
                     const intervalsToLoad = getMotionIntervalsToLoad(bufferStart, actualBufferEnd);
 
                     // Всегда обновляем отображение с текущими данными (даже если не все интервалы загружены)
-                    const mergedData = mergeMotionIntervalsDataForRange(bufferStart, actualBufferEnd, zoomIndex);
+                    // Используем расширенный диапазон, чтобы включить все уже загруженные данные из кэша
+                    // Это предотвращает "пропадание" фреймов при изменении visibleTimeRange
+                    const expandedBufferStart = Math.min(
+                        bufferStart.getTime(),
+                        currentBufferStart !== 0 ? currentBufferStart : bufferStart.getTime()
+                    );
+                    const expandedBufferEnd = Math.max(
+                        actualBufferEnd.getTime(),
+                        currentBufferEnd !== 0 ? currentBufferEnd : actualBufferEnd.getTime()
+                    );
+
+                    const mergedData = mergeMotionIntervalsDataForRange(
+                        new Date(expandedBufferStart),
+                        new Date(expandedBufferEnd),
+                        zoomIndex
+                    );
                     setFragments(mergedData.timeline);
                     setFragmentsBufferRange(mergedData.bufferRange);
                     lastAppliedFilterSignatureRef.current = motionFilterSignature ?? null;
@@ -835,10 +960,29 @@ export const useTimelineFragments = (
                                 }
 
                                 // После загрузки каждого интервала обновляем отображение
+                                // Используем расширенный диапазон, чтобы сохранить все загруженные данные
+                                // ВАЖНО: Используем актуальный zoomIndex из ref, а не из замыкания,
+                                // чтобы данные всегда пересчитывались для текущего зума
+                                const currentZoomIndex = zoomIndexRef.current;
+                                const currentFragmentsBufferStart = fragmentsBufferRange.start.getTime();
+                                const currentFragmentsBufferEnd = fragmentsBufferRange.end.getTime();
+                                const expandedBufferStart = Math.min(
+                                    bufferStart.getTime(),
+                                    currentFragmentsBufferStart !== 0
+                                        ? currentFragmentsBufferStart
+                                        : bufferStart.getTime()
+                                );
+                                const expandedBufferEnd = Math.max(
+                                    actualBufferEnd.getTime(),
+                                    currentFragmentsBufferEnd !== 0
+                                        ? currentFragmentsBufferEnd
+                                        : actualBufferEnd.getTime()
+                                );
+
                                 const updatedData = mergeMotionIntervalsDataForRange(
-                                    bufferStart,
-                                    actualBufferEnd,
-                                    zoomIndex
+                                    new Date(expandedBufferStart),
+                                    new Date(expandedBufferEnd),
+                                    currentZoomIndex
                                 );
                                 setFragments(updatedData.timeline);
                                 setFragmentsBufferRange(updatedData.bufferRange);
@@ -950,6 +1094,9 @@ export const useTimelineFragments = (
 
     /**
      * Функция для сброса фрагментов
+     * ВНИМАНИЕ: Эта функция прерывает все активные запросы фильтров!
+     * Должна вызываться ТОЛЬКО при изменении фильтра (включение/изменение параметров)
+     * НЕ должна вызываться при изменении зума или visibleTimeRange
      */
     const resetFragments = useCallback(() => {
         setFragments([]);
@@ -975,6 +1122,8 @@ export const useTimelineFragments = (
         activeMotionXhrRef.current.clear();
         motionDataByIntervalRef.current.clear();
         loadingMotionIntervalsRef.current.clear();
+        // Очищаем активный запрос - это прерывает загрузку фильтров
+        activeRequestRef.current = null;
         // Очищаем debounce таймеры
         if (debounceTimerRef.current) {
             clearTimeout(debounceTimerRef.current);
@@ -994,7 +1143,8 @@ export const useTimelineFragments = (
 
     /**
      * Функция для очистки кэша данных фильтров (motion/objects)
-     * Используется при выключении фильтров
+     * Используется ТОЛЬКО при выключении фильтров
+     * ВНИМАНИЕ: Эта функция прерывает все активные запросы фильтров!
      */
     const clearMotionFilterCache = useCallback(() => {
         // Отменяем все активные XHR запросы фильтров
@@ -1007,7 +1157,7 @@ export const useTimelineFragments = (
         motionDataByIntervalRef.current.clear();
         loadingMotionIntervalsRef.current.clear();
 
-        // Очищаем активный запрос
+        // Очищаем активный запрос - это прерывает загрузку фильтров
         activeRequestRef.current = null;
 
         // Останавливаем загрузку фрагментов
@@ -1144,8 +1294,9 @@ export const useTimelineFragments = (
      */
     const handleTimelineChange = useCallback(
         (visibleStart: Date, visibleEnd: Date, zoomIndex?: number) => {
-            // Очищаем активный запрос, чтобы не блокировать новые запросы
-            activeRequestRef.current = null;
+            // НЕ очищаем активный запрос для motion filter, чтобы не прерывать загрузку
+            // loadFragments сам проверит, нужно ли прерывать запрос или можно продолжить
+            // Очищаем activeRequestRef только если это действительно новый запрос с другими параметрами
 
             // Очищаем таймеры loadFragments ДО вызова loadFragments
             if (loadFragmentsDebounceTimerRef.current) {
@@ -1162,6 +1313,7 @@ export const useTimelineFragments = (
             const currentZoomIndex = zoomIndex ?? 0;
 
             // Вызываем loadFragments с immediate=true для немедленного обновления после отпускания
+            // loadFragments сам решит, нужно ли прерывать текущие запросы или можно продолжить
             loadFragments(visibleStart, visibleEnd, currentZoomIndex, true);
         },
         [loadFragments]

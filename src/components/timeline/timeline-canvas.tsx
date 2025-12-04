@@ -20,6 +20,7 @@ export const TimelineCanvas = ({
     loadFragments,
     currentTime,
     serverTime,
+    liveStreamStartTime,
     progress,
     onMouseDown,
     onMouseUp,
@@ -34,7 +35,8 @@ export const TimelineCanvas = ({
     cursorPosition,
     isVertical = false,
     isMobile = false,
-    isDragging = false
+    isDragging = false,
+    mode
 }: TimelineCanvasProps) => {
     // Используем хук для отрисовки временной шкалы
     useTimelineDrawing({
@@ -48,11 +50,13 @@ export const TimelineCanvas = ({
         loadFragments,
         currentTime,
         serverTime,
+        liveStreamStartTime,
         progress,
         cursorPosition,
         isVertical,
         isMobile,
-        isDragging
+        isDragging,
+        mode
     });
 
     return (

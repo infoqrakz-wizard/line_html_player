@@ -41,8 +41,12 @@ export interface TimelineRef {
     setVisibleTimeRange: (start: Date, end: Date) => void;
     /** Центрировать на текущем времени */
     centerOnCurrentTime: () => void;
+    /** Центрировать таймлайн на указанном времени */
+    centerOnTime: (time: Date) => void;
     /** Получить текущее серверное время */
     getCurrentTime: () => Date | null;
+    /** Получить видимый диапазон времени */
+    getVisibleTimeRange: () => TimeRange | null;
     /** Получить данные фрагментов */
     getFragmentsData: () => {
         fragments: number[];
@@ -138,6 +142,8 @@ export interface TimelineCanvasProps {
     currentTime: Date;
     /** Серверное время (начало воспроизведения) */
     serverTime: Date | null;
+    /** Время начала прямой трансляции (время открытия плеера в режиме Live) */
+    liveStreamStartTime?: Date | null;
     /** Прогресс воспроизведения в секундах */
     progress: number;
     /** Обработчик нажатия кнопки мыши */
@@ -168,6 +174,8 @@ export interface TimelineCanvasProps {
     isMobile?: boolean;
     /** Флаг перетаскивания таймлайна */
     isDragging?: boolean;
+    /** Режим воспроизведения (live/record) */
+    mode?: Mode;
 }
 
 /**
@@ -212,6 +220,8 @@ export interface TimelineInteractionsParams {
     progress: number;
     /** Вертикальный режим таймлайна */
     isVertical?: boolean;
+    /** Фильтр движения (если включен, используется логика отображаемых фрагментов) */
+    motionFilter?: TimelineMotionFilter | null;
 }
 
 /**
@@ -238,6 +248,8 @@ export interface TimelineDrawingParams {
     currentTime: Date;
     /** Серверное время (начало воспроизведения) */
     serverTime: Date | null;
+    /** Время начала прямой трансляции (время открытия плеера в режиме Live) */
+    liveStreamStartTime?: Date | null;
     /** Прогресс воспроизведения в секундах */
     progress: number;
     /** Позиция курсора */
@@ -248,6 +260,8 @@ export interface TimelineDrawingParams {
     isMobile?: boolean;
     /** Флаг перетаскивания таймлайна */
     isDragging?: boolean;
+    /** Режим воспроизведения (live/record) */
+    mode?: Mode;
 }
 
 /**
