@@ -97,7 +97,6 @@ export const HlsPlayer = forwardRef<PlayerRef, HlsPlayerProps>((props, ref) => {
         if (handler && video) {
             video.removeEventListener('loadedmetadata', handler);
             metadataListenerRef.current = null;
-            console.log('[HLS][seek-cleanup] removed loadedmetadata listener');
         }
     };
 
@@ -107,10 +106,6 @@ export const HlsPlayer = forwardRef<PlayerRef, HlsPlayerProps>((props, ref) => {
 
         if (parsed !== null) {
             targetStartDateRef.current = parsed;
-            console.log('[HLS][next_time]', {
-                url: candidateUrl,
-                targetStartDate: new Date(parsed).toISOString()
-            });
         }
     };
 
@@ -131,15 +126,6 @@ export const HlsPlayer = forwardRef<PlayerRef, HlsPlayerProps>((props, ref) => {
                 : videoRef.current?.currentTime || 0;
 
         pendingSeekRef.current = Math.max(0, fragStartSeconds + cappedOffset);
-        console.log('[HLS][seek-calc]', {
-            targetStartDate: new Date(targetStartDateRef.current).toISOString(),
-            fragmentStartMs,
-            offsetSeconds,
-            cappedOffset,
-            fragStartSeconds,
-            pendingSeek: pendingSeekRef.current,
-            fragUrl
-        });
     };
 
     const buildUrlWithTimeParam = (baseUrl: string, isoTime: string): string | null => {
@@ -186,7 +172,6 @@ export const HlsPlayer = forwardRef<PlayerRef, HlsPlayerProps>((props, ref) => {
 
         const currentTarget = targetStartDateRef.current;
         if (currentTarget && Math.abs(currentTarget - nextTimeMs) < 1) {
-            console.log('[HLS][next_time][skip]', {nextTimeMs, fragmentUrl});
             return;
         }
 
@@ -203,7 +188,6 @@ export const HlsPlayer = forwardRef<PlayerRef, HlsPlayerProps>((props, ref) => {
         cleanupMetadataListener();
         setIsLoading(true);
 
-        console.log('[HLS][next_time][reload]', {nextTime: isoTime, nextSource});
         hls.loadSource(nextSource);
         hls.startLoad(0);
     };
@@ -215,7 +199,6 @@ export const HlsPlayer = forwardRef<PlayerRef, HlsPlayerProps>((props, ref) => {
 
         const seekTo = pendingSeekRef.current;
         const performSeek = () => {
-            console.log('[HLS][seek-apply]', {seekTo});
             video.currentTime = seekTo;
             startAppliedRef.current = true;
             pendingSeekRef.current = null;
@@ -234,7 +217,6 @@ export const HlsPlayer = forwardRef<PlayerRef, HlsPlayerProps>((props, ref) => {
         const handleLoadedMetadata = () => {
             video.removeEventListener('loadedmetadata', handleLoadedMetadata);
             metadataListenerRef.current = null;
-            console.log('[HLS][seek-apply] loadedmetadata fired');
             performSeek();
         };
 
@@ -647,22 +629,6 @@ export const HlsPlayer = forwardRef<PlayerRef, HlsPlayerProps>((props, ref) => {
                         hasBufferAhead = true;
                         break;
                     }
-                }
-
-                if (stallCount.current % 5 === 0 || !hasBufferAhead) {
-                    // console.log('Playback state:', {
-                    //     currentTime,
-                    //     duration: video.duration,
-                    //     buffered: bufferInfo,
-                    //     hasBufferAhead,
-                    //     stallCount: stallCount.current,
-                    //     readyState: video.readyState,
-                    //     networkState: video.networkState,
-                    //     error: video.error,
-                    //     activeFragLoads: activeFragLoads.current,
-                    //     isBuffering,
-                    //     isFragLoading
-                    // });
                 }
 
                 if (currentTime === lastPlayheadPosition.current && !hasBufferAhead) {

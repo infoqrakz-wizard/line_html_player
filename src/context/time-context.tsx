@@ -18,15 +18,12 @@ export const TimeProvider: React.FC<{children: React.ReactNode}> = ({children}) 
     const setServerTime = useCallback((date: Date | null, skipCenterTimeline?: boolean) => {
         setServerTimeState(date);
         // сбрасываем progress при смене базового времени
-        console.log('call setProgressState(0)');
         setProgressState(0);
         setSkipCenterTimeline(skipCenterTimeline || false);
     }, []);
 
     const setProgress = useCallback((seconds: number) => {
         setSkipCenterTimeline(true);
-        console.log('call setProgressState(seconds)', seconds);
-
         setProgressState(seconds);
     }, []);
 

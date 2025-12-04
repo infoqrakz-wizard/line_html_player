@@ -1099,23 +1099,7 @@ export const Player: React.FC<PlayerProps> = ({
                         // находим следующий отображаемый фрейм и переключаемся на него
                         const nextVisibleFrameTime = findNextVisibleFrameFromTimeline(currentAbsoluteTime);
 
-                        console.log('[PLAYBACK DEBUG] Filter active, no visible frames in next 5s', {
-                            currentAbsoluteTime: currentAbsoluteTime.toISOString(),
-                            hasVisibleFrames,
-                            nextVisibleFrameTime: nextVisibleFrameTime?.toISOString() || null,
-                            nextFragmentTimeRef: nextFragmentTimeRef.current?.toISOString() || null,
-                            areEqual:
-                                nextVisibleFrameTime && nextFragmentTimeRef.current
-                                    ? nextVisibleFrameTime.getTime() === nextFragmentTimeRef.current.getTime()
-                                    : false
-                        });
-
                         if (nextVisibleFrameTime && nextFragmentTimeRef.current !== nextVisibleFrameTime) {
-                            console.log('[PLAYBACK DEBUG] Switching to next visible frame', {
-                                from: currentAbsoluteTime.toISOString(),
-                                to: nextVisibleFrameTime.toISOString()
-                            });
-
                             nextFragmentTimeRef.current = nextVisibleFrameTime;
                             const newProgress = (nextVisibleFrameTime.getTime() - serverTime.getTime()) / 1000;
 
@@ -1211,7 +1195,6 @@ export const Player: React.FC<PlayerProps> = ({
                             setProgress(newProgress);
                             return;
                         } else {
-                            console.log('No next segment found, stopping playback');
                             setIsPlaying(false);
                             return;
                         }
@@ -1221,16 +1204,6 @@ export const Player: React.FC<PlayerProps> = ({
 
             // Пропускаем обычное обновление сразу после перехода к новому фрагменту
             if (isTransitioningToNextFragmentRef.current) {
-                if (currentMode === Mode.Record && serverTime) {
-                    const currentTotalProgress = p.currentTime + fragmetsGapRef.current;
-                    const currentAbsTime = new Date(serverTime.getTime() + currentTotalProgress * 1000);
-                    console.log('[PLAYBACK DEBUG] Skipping normal update after fragment transition', {
-                        nextFragmentTimeRef: nextFragmentTimeRef.current?.toISOString() || null,
-                        currentAbsoluteTime: currentAbsTime.toISOString()
-                    });
-                } else {
-                    console.log('[PLAYBACK DEBUG] Skipping normal update after fragment transition');
-                }
                 isTransitioningToNextFragmentRef.current = false;
                 // Очищаем ссылку на предыдущий фрагмент, чтобы не блокировать следующие переходы
                 nextFragmentTimeRef.current = null;

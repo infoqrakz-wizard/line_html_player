@@ -49,10 +49,8 @@ export const useTimelineState = (
         _setVisibleTimeRangeState(currentRange => {
             // Проверяем, действительно ли изменился диапазон
             if (areTimeRangesEqual(currentRange, range)) {
-                console.log('setVisibleTimeRangeState: диапазон не изменился, пропускаем обновление');
                 return currentRange; // Возвращаем текущий диапазон без изменений
             }
-            console.log('setVisibleTimeRangeState: обновляем диапазон', range);
             return range;
         });
     }, []);
@@ -165,7 +163,6 @@ export const useTimelineState = (
             // Проверяем, изменилось ли время более чем на 1 секунду
             // (чтобы избежать центрирования при мелких корректировках времени)
             if (!previousTime || Math.abs(currentTime.getTime() - previousTime.getTime()) > 1000) {
-                console.log('Центрируем таймлайн: серверное время изменилось значительно');
                 centerOnCurrentTime();
             }
         }

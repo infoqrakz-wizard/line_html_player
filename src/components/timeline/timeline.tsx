@@ -217,13 +217,6 @@ export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
             if (fragmentsLoadKey) {
                 const startDate = new Date(fragmentsLoadKey.startTime);
                 const endDate = new Date(fragmentsLoadKey.endTime);
-                const durationHours = (fragmentsLoadKey.endTime - fragmentsLoadKey.startTime) / (1000 * 60 * 60);
-                console.log('Timeline: Загружаем фрагменты для диапазона:', {
-                    start: startDate.toISOString(),
-                    end: endDate.toISOString(),
-                    durationHours: durationHours.toFixed(2),
-                    intervalIndex: fragmentsLoadKey.intervalIndex
-                });
                 loadFragmentsRef.current(startDate, endDate, fragmentsLoadKey.intervalIndex);
             }
         }, [fragmentsLoadKey]);

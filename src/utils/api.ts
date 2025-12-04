@@ -66,8 +66,6 @@ const makeSingleDayRequest = (
         ...(stream !== undefined && {stream})
     };
 
-    console.log('single day request params', requestParams.start_time, requestParams.end_time);
-
     return new Promise((resolve, reject) => {
         const rpcUrl = buildRequestUrl({
             host: url,

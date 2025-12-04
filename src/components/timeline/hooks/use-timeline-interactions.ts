@@ -277,7 +277,6 @@ export const useTimelineInteractions = ({
         (e: React.TouchEvent) => {
             // e.preventDefault();
             if (e.touches.length === 1) {
-                console.log('touch start');
                 const touch = e.touches[0];
                 setIsDragging(true);
                 setHasDragged(false);
@@ -312,25 +311,20 @@ export const useTimelineInteractions = ({
                     // Для вертикального таймлайна: вертикальный свайп = движение, горизонтальный = зум
                     // Используем более низкий порог для вертикального свайпа, так как это основное действие
                     if (absDeltaY > 15 && absDeltaY > absDeltaX) {
-                        console.log('vertical - move timeline');
                         swipeTypeRef.current = 'vertical';
                     } else if (absDeltaX > 20 && absDeltaX > absDeltaY) {
-                        console.log('horizontal - zoom');
                         swipeTypeRef.current = 'horizontal';
                     }
                 } else {
                     // Для горизонтального таймлайна: горизонтальный свайп = движение, вертикальный = зум
                     if (absDeltaY > VERTICAL_SWIPE_THRESHOLD && absDeltaY > absDeltaX) {
-                        console.log('vertical - zoom');
                         swipeTypeRef.current = 'vertical';
                     } else if (absDeltaX > HORIZONTAL_SWIPE_THRESHOLD && absDeltaX > absDeltaY) {
-                        console.log('horizontal - move timeline');
                         swipeTypeRef.current = 'horizontal';
                     }
                 }
             }
 
-            console.log('swipeType', swipeTypeRef.current);
             if (swipeTypeRef.current === 'vertical') {
                 if (isVertical) {
                     // Для вертикального таймлайна: вертикальный свайп = движение таймлайна
@@ -348,7 +342,6 @@ export const useTimelineInteractions = ({
                     setVisibleTimeRange({start: newStart, end: newEnd});
                     setHasDragged(true);
                 } else {
-                    console.log('horizontal - zoom process');
                     // Для горизонтального таймлайна: вертикальный свайп = зум
                     const containerRect = containerRef.current.getBoundingClientRect();
                     const mouseX = touch.clientX - containerRect.left;
@@ -424,11 +417,9 @@ export const useTimelineInteractions = ({
                         const timeOffset = (mouseY / containerRect.height) * timeRange;
                         const timeUnderFinger = new Date(visibleTimeRange.start.getTime() + timeOffset);
 
-                        console.log('timeUnderFinger', timeUnderFinger);
                         const zoomIn = currentDirection === 'left';
                         const newIndex = Math.min(Math.max(intervalIndex + (zoomIn ? -1 : 1), 0), INTERVALS.length - 1);
 
-                        console.log('newIndex', newIndex);
                         if (newIndex !== intervalIndex) {
                             const currentRange = visibleTimeRange.end.getTime() - visibleTimeRange.start.getTime();
                             const zoomFactor = INTERVALS[newIndex] / INTERVALS[intervalIndex];
