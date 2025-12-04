@@ -23,18 +23,18 @@ interface DebugPlayerParams extends PlayerProps {
 const DebugPlayer: React.FC = () => {
     // Состояние для параметров плеера
     const [params, setParams] = useState<DebugPlayerParams>({
-        streamUrl: 'lc10.ru.devline.tv',
-        streamPort: 2056,
-        login: 'admin',
-        password: 'Dqs9yaf3C',
-        mode: Mode.Live,
+        streamUrl: '8.devline.ru',
+        streamPort: 443,
+        login: 'h264',
+        password: '',
+        mode: 'live',
         autoplay: true,
         muted: true,
-        camera: 1,
-        protocol: Protocol.Https,
+        camera: 2,
+        protocol: 'https',
         showCameraSelector: true,
         proxy: 'https://proxy.devline.ru'
-    });
+});
 
     // Обработчик изменения параметров
     const handleParamChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {

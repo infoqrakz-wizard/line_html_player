@@ -992,6 +992,24 @@ export const Player: React.FC<PlayerProps> = ({
         [getFragmentsFromTimeline]
     );
 
+    // Функция для нормализации unitLengthSeconds к ближайшему значению из UNIT_LENGTHS
+    // Это необходимо для избежания проблем с плавающей точкой
+    const normalizeUnitLength = useCallback((calculatedValue: number): number => {
+        // Находим ближайшее значение из UNIT_LENGTHS
+        let closestValue = UNIT_LENGTHS[0];
+        let minDifference = Math.abs(calculatedValue - closestValue);
+
+        for (let i = 1; i < UNIT_LENGTHS.length; i++) {
+            const difference = Math.abs(calculatedValue - UNIT_LENGTHS[i]);
+            if (difference < minDifference) {
+                minDifference = difference;
+                closestValue = UNIT_LENGTHS[i];
+            }
+        }
+
+        return closestValue;
+    }, []);
+
     // Функция для поиска следующего отображаемого фрейма (используется при включенном фильтре)
     const findNextVisibleFrameFromTimeline = useCallback(
         (currentAbsoluteTime: Date) => {
@@ -1008,14 +1026,17 @@ export const Player: React.FC<PlayerProps> = ({
             const calculatedUnitLengthSeconds =
                 fragments.length > 0 ? bufferDurationMs / (fragments.length * 1000) : UNIT_LENGTHS[intervalIndex];
 
+            // Нормализуем значение к ближайшему из UNIT_LENGTHS, чтобы избежать проблем с плавающей точкой
+            const normalizedUnitLengthSeconds = normalizeUnitLength(calculatedUnitLengthSeconds);
+
             return findNextVisibleFrame(
                 currentAbsoluteTime,
                 fragments,
                 fragmentsBufferRange,
-                calculatedUnitLengthSeconds
+                normalizedUnitLengthSeconds
             );
         },
-        [getFragmentsFromTimeline]
+        [getFragmentsFromTimeline, normalizeUnitLength]
     );
 
     // Функция для проверки наличия отображаемых фреймов в ближайшие 5 секунд
