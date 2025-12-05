@@ -137,7 +137,13 @@ export const getFramesTimeline = async (params: GetFramesTimelineParams): Promis
     let currentDate = startOfDay(startTime);
     const endDate = startOfDay(endTime);
 
+    // Если endTime это начало дня (00:00:00), то это означает полные сутки до этого момента
+    // В этом случае мы не включаем этот день в запросы, так как он уже покрыт предыдущим днем
+    const isEndTimeAtDayStart = endTime.getTime() === endDate.getTime();
+
+    // Первый день: от startTime до начала следующего дня (00:00:00 следующего дня)
     const firstDayEnd = startOfDay(addDays(startTime, 1));
+    // Ограничиваем концом запроса, если он меньше начала следующего дня
     const actualFirstDayEnd = endTime.getTime() < firstDayEnd.getTime() ? endTime : firstDayEnd;
     if (startTime.getTime() < actualFirstDayEnd.getTime()) {
         requests.push(
@@ -157,8 +163,11 @@ export const getFramesTimeline = async (params: GetFramesTimelineParams): Promis
     }
 
     // Промежуточные дни: от начала до начала следующего дня (00:00:00 следующего дня)
+    // Пропускаем первый день, так как он уже обработан выше
     currentDate = addDays(currentDate, 1);
-    while (currentDate < endDate) {
+    // Если endTime это начало дня, не включаем этот день в промежуточные дни
+    const intermediateEndDate = isEndTimeAtDayStart ? addDays(endDate, -1) : endDate;
+    while (currentDate <= intermediateEndDate) {
         const dayStart = startOfDay(currentDate);
         const dayEnd = startOfDay(addDays(currentDate, 1));
         requests.push(
@@ -178,32 +187,42 @@ export const getFramesTimeline = async (params: GetFramesTimelineParams): Promis
         currentDate = addDays(currentDate, 1);
     }
 
-    // Последний день: от начала дня до endTime
-    const lastDayStart = startOfDay(endTime);
-    if (lastDayStart.getTime() < endTime.getTime()) {
-        requests.push(
-            makeSingleDayRequest(
-                url,
-                port,
-                credentials,
-                lastDayStart,
-                endTime,
-                unitLength,
-                channel,
-                stream,
-                preferredProtocol,
-                proxy
-            )
-        );
+    // Последний день: от начала дня до endTime (только если endTime не начало дня)
+    if (!isEndTimeAtDayStart) {
+        const lastDayStart = startOfDay(endTime);
+        if (lastDayStart.getTime() < endTime.getTime()) {
+            requests.push(
+                makeSingleDayRequest(
+                    url,
+                    port,
+                    credentials,
+                    lastDayStart,
+                    endTime,
+                    unitLength,
+                    channel,
+                    stream,
+                    preferredProtocol,
+                    proxy
+                )
+            );
+        }
     }
 
     // Выполняем все запросы параллельно и объединяем результаты
     try {
         const results = await Promise.all(requests);
-        const combinedTimeline: number[] = [];
 
+        // Вычисляем общий размер для предварительного выделения памяти
+        const totalLength = results.reduce((sum, result) => sum + result.timeline.length, 0);
+        const combinedTimeline: number[] = new Array(totalLength);
+
+        // Копируем данные без использования spread оператора для больших массивов
+        let offset = 0;
         for (const result of results) {
-            combinedTimeline.push(...result.timeline);
+            for (let i = 0; i < result.timeline.length; i++) {
+                combinedTimeline[offset + i] = result.timeline[i];
+            }
+            offset += result.timeline.length;
         }
 
         return {timeline: combinedTimeline};
