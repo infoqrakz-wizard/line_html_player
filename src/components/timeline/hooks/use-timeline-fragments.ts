@@ -522,9 +522,9 @@ export const useTimelineFragments = (
             try {
                 const dayStart = startOfDay(day);
                 const nextDayStart = startOfDay(addDays(day, 1));
-                // Используем endOfDay для получения конца текущего дня (23:59:59.999)
+                // Используем начало следующего дня как конец запроса (00:00:00 следующего дня)
                 // Если передан endTime и он меньше начала следующего дня, используем его
-                const dayEnd = endTime && endTime.getTime() < nextDayStart.getTime() ? endTime : endOfDay(day);
+                const dayEnd = endTime && endTime.getTime() < nextDayStart.getTime() ? endTime : nextDayStart;
 
                 // Дополнительная проверка: если диапазон пустой или некорректный, пропускаем
                 if (dayEnd.getTime() <= dayStart.getTime()) {
@@ -549,8 +549,13 @@ export const useTimelineFragments = (
                     proxy
                 });
 
+                // Бэкенд всегда возвращает 31 день в месяце, заполняя несуществующие дни нулями
+                // Берем только первые 86400 элементов (первые запрашиваемые сутки)
+                const SECONDS_IN_DAY = 86400;
+                const dayTimeline = response.timeline.slice(0, SECONDS_IN_DAY);
+
                 // Сохраняем данные по дню
-                framesDataByDayRef.current.set(dayKey, response.timeline);
+                framesDataByDayRef.current.set(dayKey, dayTimeline);
             } catch (error) {
                 console.error('loadDayData: ошибка при загрузке дня', error);
                 if (error instanceof Error && error.message === 'FORBIDDEN') {

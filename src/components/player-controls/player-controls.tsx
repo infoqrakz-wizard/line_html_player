@@ -3,11 +3,13 @@ import {shift, flip} from '@floating-ui/dom';
 import DatePicker, {registerLocale} from 'react-datepicker';
 import type ReactDatePicker from 'react-datepicker';
 import {ru} from 'date-fns/locale/ru';
-import {addMonths, format, startOfDay, startOfMonth} from 'date-fns';
+import {addMonths, format, startOfMonth, getDaysInMonth} from 'date-fns';
 
 import {Mode, Protocol} from '../../utils/types';
-import {getFramesTimeline} from '../../utils/api';
 import {useTimelineAuth} from '../../context/timeline-auth-context';
+import {buildRequestUrl} from '../../utils/url-builder';
+import {getAuthToken} from '../../utils/getAuthToken';
+import {getProtocol} from '../../utils/url-params';
 
 import {Icons} from '../icons';
 import {MotionFilterOption} from '../../types/motion-filter';
@@ -81,8 +83,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
     isFilterPanelOpen = false,
     activeFilterType = null,
     onToggleFilterPanel,
-    onSelectFilterOption,
-    onClearFilter
+    onSelectFilterOption
 }) => {
     const {hasTimelineAccess, setTimelineAccess} = useTimelineAuth();
     const [startDate, setStartDate] = useState(new Date());
@@ -100,6 +101,82 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
     const isMobileLandscape = isMobile && orientation === 'landscape';
 
     const allowedDayKeys = useMemo(() => new Set(highlightedDates.map(dayKey)), [highlightedDates]);
+
+    const fetchMonthTimeline = async (
+        startTime: Date,
+        endTime: Date,
+        preferredProtocol: Protocol
+    ): Promise<{timeline: number[]}> => {
+        if (!url || !port || !credentials) {
+            throw new Error('Missing required parameters');
+        }
+
+        const requestParams = {
+            start_time: [
+                startTime.getFullYear(),
+                startTime.getMonth() + 1,
+                startTime.getDate(),
+                startTime.getHours(),
+                startTime.getMinutes(),
+                startTime.getSeconds()
+            ],
+            end_time: [
+                endTime.getFullYear(),
+                endTime.getMonth() + 1,
+                endTime.getDate(),
+                endTime.getHours(),
+                endTime.getMinutes(),
+                endTime.getSeconds()
+            ],
+            unit_len: 86400,
+            ...(camera !== undefined && {channel: camera})
+        };
+
+        return new Promise((resolve, reject) => {
+            const rpcUrl = buildRequestUrl({
+                host: url,
+                port,
+                protocol: preferredProtocol,
+                proxy,
+                path: proxy
+                    ? '/rpc'
+                    : `/rpc?authorization=Basic ${getAuthToken(credentials)}&content-type=application/json`
+            });
+
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', rpcUrl, true);
+
+            if (proxy) {
+                xhr.setRequestHeader('Content-Type', 'application/json');
+                xhr.setRequestHeader('Authorization', `Basic ${getAuthToken(credentials)}`);
+            }
+
+            xhr.onload = function () {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    try {
+                        const data = JSON.parse(xhr.responseText);
+
+                        if (data.error && data.error.type === 'auth' && data.error.message === 'forbidden') {
+                            reject(new Error('FORBIDDEN'));
+                            return;
+                        }
+
+                        resolve(data.result);
+                    } catch (parseError) {
+                        reject(new Error('Failed to parse timeline data'));
+                    }
+                } else {
+                    reject(new Error('Failed to fetch timeline data'));
+                }
+            };
+
+            xhr.onerror = function () {
+                reject(new Error('Failed to fetch timeline data'));
+            };
+
+            xhr.send(JSON.stringify({method: 'archive.get_frames_timeline', params: requestParams, version: 13}));
+        });
+    };
     const onChangeDatepickerDate = (date: Date | null) => {
         if (!date) return;
         setStartDate(date);
@@ -133,24 +210,18 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
             });
         }
 
+        const preferredProtocol = protocol ?? getProtocol();
+
         for (const month of monthsToLoad) {
             try {
-                const result = await getFramesTimeline({
-                    url,
-                    port,
-                    credentials,
-                    startTime: startOfDay(month.start),
-                    endTime: startOfDay(month.end),
-                    unitLength: 86400,
-                    channel: camera,
-                    protocol,
-                    proxy
-                });
+                const result = await fetchMonthTimeline(month.start, month.end, preferredProtocol);
+
+                const daysInMonth = getDaysInMonth(month.start);
+                const timeline = result.timeline.slice(0, daysInMonth);
 
                 const days: Date[] = [];
-                const totalDays = result.timeline.length;
-                for (let i = 0; i < totalDays; i += 1) {
-                    if (result.timeline[i] > 0) {
+                for (let i = 0; i < timeline.length; i += 1) {
+                    if (timeline[i] > 0) {
                         const d = new Date(month.start);
                         d.setDate(month.start.getDate() + i);
                         days.push(d);

@@ -1,5 +1,5 @@
 import {getProtocol} from './url-params';
-import {differenceInSeconds, format, startOfDay, endOfDay, addDays, isSameDay} from 'date-fns';
+import {differenceInSeconds, format, startOfDay, addDays, isSameDay} from 'date-fns';
 import {Protocol} from './types';
 import {getAuthToken} from './getAuthToken';
 import {buildRequestUrl} from './url-builder';
@@ -137,28 +137,30 @@ export const getFramesTimeline = async (params: GetFramesTimelineParams): Promis
     let currentDate = startOfDay(startTime);
     const endDate = startOfDay(endTime);
 
-    // Первый день: от startTime до конца дня (23:59:59)
-    const firstDayEnd = endOfDay(startTime);
-    requests.push(
-        makeSingleDayRequest(
-            url,
-            port,
-            credentials,
-            startTime,
-            firstDayEnd,
-            unitLength,
-            channel,
-            stream,
-            preferredProtocol,
-            proxy
-        )
-    );
+    const firstDayEnd = startOfDay(addDays(startTime, 1));
+    const actualFirstDayEnd = endTime.getTime() < firstDayEnd.getTime() ? endTime : firstDayEnd;
+    if (startTime.getTime() < actualFirstDayEnd.getTime()) {
+        requests.push(
+            makeSingleDayRequest(
+                url,
+                port,
+                credentials,
+                startTime,
+                actualFirstDayEnd,
+                unitLength,
+                channel,
+                stream,
+                preferredProtocol,
+                proxy
+            )
+        );
+    }
 
-    // Промежуточные дни: от начала до конца дня
+    // Промежуточные дни: от начала до начала следующего дня (00:00:00 следующего дня)
     currentDate = addDays(currentDate, 1);
     while (currentDate < endDate) {
         const dayStart = startOfDay(currentDate);
-        const dayEnd = endOfDay(currentDate);
+        const dayEnd = startOfDay(addDays(currentDate, 1));
         requests.push(
             makeSingleDayRequest(
                 url,
@@ -178,20 +180,22 @@ export const getFramesTimeline = async (params: GetFramesTimelineParams): Promis
 
     // Последний день: от начала дня до endTime
     const lastDayStart = startOfDay(endTime);
-    requests.push(
-        makeSingleDayRequest(
-            url,
-            port,
-            credentials,
-            lastDayStart,
-            endTime,
-            unitLength,
-            channel,
-            stream,
-            preferredProtocol,
-            proxy
-        )
-    );
+    if (lastDayStart.getTime() < endTime.getTime()) {
+        requests.push(
+            makeSingleDayRequest(
+                url,
+                port,
+                credentials,
+                lastDayStart,
+                endTime,
+                unitLength,
+                channel,
+                stream,
+                preferredProtocol,
+                proxy
+            )
+        );
+    }
 
     // Выполняем все запросы параллельно и объединяем результаты
     try {
