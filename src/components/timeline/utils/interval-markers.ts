@@ -33,45 +33,8 @@ export const drawIntervalMarkers = (
 ): void => {
     ctx.fillStyle = '#ffffff';
 
-    // Адаптивный размер шрифта в зависимости от интервала и устройства
-    let fontSize = 12;
-    if (isMobile) {
-        // Для мобильных устройств используем более крупные шрифты
-        if (timeIntervalForMarkers <= 5 * 60 * 1000) {
-            // 5 минут - средний шрифт для мобильных
-            fontSize = 10;
-        } else if (timeIntervalForMarkers <= 15 * 60 * 1000) {
-            // 10-15 минут - стандартный шрифт для мобильных
-            fontSize = 12;
-        } else if (timeIntervalForMarkers <= 60 * 60 * 1000) {
-            // 30 минут - 1 час - большой шрифт для мобильных
-            fontSize = 14;
-        } else if (timeIntervalForMarkers <= 6 * 60 * 60 * 1000) {
-            // 4-6 часов - очень большой шрифт для мобильных
-            fontSize = 16;
-        } else {
-            // 12+ часов - максимальный шрифт для мобильных
-            fontSize = 18;
-        }
-    } else {
-        // Для десктопных устройств используем стандартные размеры
-        if (timeIntervalForMarkers <= 5 * 60 * 1000) {
-            // 5 минут - маленький шрифт
-            fontSize = 8;
-        } else if (timeIntervalForMarkers <= 15 * 60 * 1000) {
-            // 10-15 минут - средний шрифт
-            fontSize = 10;
-        } else if (timeIntervalForMarkers <= 60 * 60 * 1000) {
-            // 30 минут - 1 час - стандартный шрифт
-            fontSize = 12;
-        } else if (timeIntervalForMarkers <= 6 * 60 * 60 * 1000) {
-            // 4-6 часов - большой шрифт
-            fontSize = 14;
-        } else {
-            // 12+ часов - очень большой шрифт
-            fontSize = 16;
-        }
-    }
+    // Используем такой же размер шрифта, как и для дат/часов
+    const fontSize = isMobile ? 14 : 12;
 
     ctx.font = `${fontSize}px Arial`;
     ctx.textAlign = 'center';
@@ -262,7 +225,8 @@ export const drawSubMarkers = (
     width: number,
     height: number,
     pixelsPerMilli: number,
-    timeIntervalForMarkers: number
+    timeIntervalForMarkers: number,
+    isMobile: boolean = false
 ): void => {
     if (timeIntervalForMarkers <= 30 * 60 * 1000) {
         // 30 минут или меньше
@@ -285,7 +249,8 @@ export const drawSubMarkers = (
 
                     // Метка 5 минут над маркером
                     ctx.fillStyle = '#ffffff';
-                    ctx.font = '8px Arial'; // Маленький шрифт для субмаркеров
+                    const subMarkerFontSize = isMobile ? 14 : 12;
+                    ctx.font = `${subMarkerFontSize}px Arial`;
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'top';
                     ctx.fillText(formatTime(fiveMinMarkerTime), fiveMinX, height - 35);
@@ -310,7 +275,8 @@ export const drawSubMarkers = (
 
                     // Метка 15 минут над маркером
                     ctx.fillStyle = '#ffffff';
-                    ctx.font = '10px Arial'; // Средний шрифт для 15-минутных субмаркеров
+                    const subMarkerFontSize = isMobile ? 14 : 12;
+                    ctx.font = `${subMarkerFontSize}px Arial`;
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'top';
                     ctx.fillText(formatTime(fifteenMinMarkerTime), fifteenMinX, height - 35);
@@ -334,7 +300,8 @@ export const drawSubMarkers = (
 
                     // Метка минуты над маркером
                     ctx.fillStyle = '#ffffff';
-                    ctx.font = '12px Arial';
+                    const subMarkerFontSize = isMobile ? 14 : 12;
+                    ctx.font = `${subMarkerFontSize}px Arial`;
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'top';
                     ctx.fillText(formatTime(minuteMarkerTime), minuteX, height - 35);
@@ -359,7 +326,8 @@ export const drawSubMarkers = (
 
                         // Метка 5 минут над маркером
                         ctx.fillStyle = '#ffffff';
-                        ctx.font = '12px Arial';
+                        const subMarkerFontSize = isMobile ? 14 : 12;
+                        ctx.font = `${subMarkerFontSize}px Arial`;
                         ctx.textAlign = 'center';
                         ctx.textBaseline = 'top';
                         ctx.fillText(formatTime(fiveMinMarkerTime), fiveMinX, height - 35);

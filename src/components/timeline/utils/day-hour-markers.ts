@@ -11,13 +11,15 @@ import {formatDay, formatTime, isStartOfDay, isStartOfHour, shouldShowHourText} 
  * @param width Ширина canvas
  * @param height Высота canvas
  * @param pixelsPerMilli Количество пикселей на миллисекунду
+ * @param isMobile Флаг мобильного устройства
  */
 export const drawDayAndHourMarkers = (
     ctx: CanvasRenderingContext2D,
     visibleTimeRange: TimeRange,
     width: number,
     height: number,
-    pixelsPerMilli: number
+    pixelsPerMilli: number,
+    isMobile: boolean = false
 ): void => {
     // Начинаем с начала часа
     let markerTime = new Date(visibleTimeRange.start);
@@ -49,7 +51,8 @@ export const drawDayAndHourMarkers = (
 
                 // Метка дня под маркером с отступом 10px от линии
                 ctx.fillStyle = '#4CAF50';
-                ctx.font = 'bold 12px Arial';
+                const dayFontSize = isMobile ? 14 : 12;
+                ctx.font = `bold ${dayFontSize}px Arial`;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'top';
                 ctx.fillText(formatDay(markerTime), x, 20);
@@ -66,7 +69,8 @@ export const drawDayAndHourMarkers = (
                 const timeInterval = visibleTimeRange.end.getTime() - visibleTimeRange.start.getTime();
                 if (shouldShowHourText(markerTime, timeInterval)) {
                     ctx.fillStyle = '#ffffff';
-                    ctx.font = '12px Arial';
+                    const hourFontSize = isMobile ? 14 : 12;
+                    ctx.font = `${hourFontSize}px Arial`;
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'top';
                     ctx.fillText(formatTime(markerTime), x, 20);

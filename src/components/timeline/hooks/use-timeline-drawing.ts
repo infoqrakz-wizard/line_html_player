@@ -103,10 +103,11 @@ export const useTimelineDrawing = ({
                     visibleTimeRange,
                     containerRect.width,
                     containerRect.height,
-                    pixelsPerMilli
+                    pixelsPerMilli,
+                    isMobile
                 );
             } else {
-                drawDayAndHourMarkers(ctx, visibleTimeRange, containerRect.width, containerRect.height, pixelsPerMilli);
+                drawDayAndHourMarkers(ctx, visibleTimeRange, containerRect.width, containerRect.height, pixelsPerMilli, isMobile);
             }
 
             // Отрисовываем маркеры интервалов

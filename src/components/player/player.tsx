@@ -184,6 +184,7 @@ export const Player: React.FC<PlayerProps> = ({
     const archiveTargetTimeRef = useRef<Date | null>(null);
     const forwardAccumOffsetRef = useRef<number | null>(null);
     const wasPlayingBeforeHiddenRef = useRef<boolean>(false);
+    const [liveStreamCacheBuster, setLiveStreamCacheBuster] = useState<number>(Date.now());
 
     const protocol = preferredProtocol ?? getProtocol();
     const [availableCameras, setAvailableCameras] = useState<CameraInfo[]>([]);
@@ -225,7 +226,9 @@ export const Player: React.FC<PlayerProps> = ({
         if (currentMode === 'record' && serverTime) {
             finalStreamUrl = `${videoUrl}&time=${formatDate(serverTime)}&autoplay=1${!isMuted && !isNoSound ? '&audio=1' : ''}`;
         } else {
-            finalStreamUrl = videoUrl || '';
+            // Для Live режима добавляем cache buster для принудительной перезагрузки
+            const separator = videoUrl.includes('?') ? '&' : '?';
+            finalStreamUrl = `${videoUrl}${separator}_t=${liveStreamCacheBuster}`;
         }
     }
 
@@ -396,8 +399,24 @@ export const Player: React.FC<PlayerProps> = ({
         setCurrentMode(Mode.Record);
     };
 
-    const handlePlayPause = (value?: boolean) => {
-        setIsPlaying(value ?? !isPlaying);
+    const handlePlayPause = async (value?: boolean) => {
+        const newPlayingState = value ?? !isPlaying;
+
+        // Если переключаемся с паузы на play в режиме Live
+        if (!isPlaying && newPlayingState && currentMode === Mode.Live) {
+            // Обновляем серверное время для актуальной прямой трансляции
+            await updateServerTime();
+            // Сбрасываем progress на актуальное время
+            setProgress(0);
+            // Обновляем cache buster для принудительной перезагрузки видео
+            setLiveStreamCacheBuster(Date.now());
+            // Запрашиваем актуальные фреймы
+            if (timelineRef.current) {
+                timelineRef.current.reloadFragments();
+            }
+        }
+
+        setIsPlaying(newPlayingState);
     };
 
     const handleMuteToggle = () => {
