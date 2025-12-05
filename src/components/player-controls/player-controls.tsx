@@ -132,50 +132,43 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
             ...(camera !== undefined && {channel: camera})
         };
 
-        return new Promise((resolve, reject) => {
-            const rpcUrl = buildRequestUrl({
-                host: url,
-                port,
-                protocol: preferredProtocol,
-                proxy,
-                path: proxy
-                    ? '/rpc'
-                    : `/rpc?authorization=Basic ${getAuthToken(credentials)}&content-type=application/json`
-            });
-
-            const xhr = new XMLHttpRequest();
-            xhr.open('POST', rpcUrl, true);
-
-            if (proxy) {
-                xhr.setRequestHeader('Content-Type', 'application/json');
-                xhr.setRequestHeader('Authorization', `Basic ${getAuthToken(credentials)}`);
-            }
-
-            xhr.onload = function () {
-                if (xhr.status >= 200 && xhr.status < 300) {
-                    try {
-                        const data = JSON.parse(xhr.responseText);
-
-                        if (data.error && data.error.type === 'auth' && data.error.message === 'forbidden') {
-                            reject(new Error('FORBIDDEN'));
-                            return;
-                        }
-
-                        resolve(data.result);
-                    } catch (parseError) {
-                        reject(new Error('Failed to parse timeline data'));
-                    }
-                } else {
-                    reject(new Error('Failed to fetch timeline data'));
-                }
-            };
-
-            xhr.onerror = function () {
-                reject(new Error('Failed to fetch timeline data'));
-            };
-
-            xhr.send(JSON.stringify({method: 'archive.get_frames_timeline', params: requestParams, version: 13}));
+        const rpcUrl = buildRequestUrl({
+            host: url,
+            port,
+            protocol: preferredProtocol,
+            proxy,
+            path: proxy ? '/rpc' : `/rpc?authorization=Basic ${getAuthToken(credentials)}&content-type=application/json`
         });
+
+        const headers: HeadersInit = {};
+        if (proxy) {
+            headers['Content-Type'] = 'application/json';
+            headers['Authorization'] = `Basic ${getAuthToken(credentials)}`;
+        }
+
+        return fetch(rpcUrl, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({method: 'archive.get_frames_timeline', params: requestParams, version: 13})
+        })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Failed to fetch timeline data');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.error && data.error.type === 'auth' && data.error.message === 'forbidden') {
+                    throw new Error('FORBIDDEN');
+                }
+                return data.result;
+            })
+            .catch(error => {
+                if (error instanceof Error && error.message === 'FORBIDDEN') {
+                    throw error;
+                }
+                throw new Error('Failed to fetch timeline data');
+            });
     };
     const onChangeDatepickerDate = (date: Date | null) => {
         if (!date) return;

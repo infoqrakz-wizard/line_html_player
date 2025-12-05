@@ -25,7 +25,6 @@ interface MotionTimelineRequest {
     start: Date;
     end: Date;
     zoomIndex: number;
-    xhr?: XMLHttpRequest;
 }
 
 /**
@@ -117,9 +116,9 @@ export const useTimelineFragments = (
     // Set для отслеживания 30-минутных интервалов motion filter, которые уже запрашиваются
     // Ключ: timestamp начала 30-минутного интервала в миллисекундах
     const loadingMotionIntervalsRef = useRef<Set<number>>(new Set());
-    // Map для хранения активных XHR запросов фильтров (для возможности отмены)
-    // Ключ: timestamp начала 30-минутного интервала в миллисекундах, значение: XMLHttpRequest
-    const activeMotionXhrRef = useRef<Map<number, XMLHttpRequest>>(new Map());
+    // Map для хранения активных AbortController запросов фильтров (для возможности отмены)
+    // Ключ: timestamp начала 30-минутного интервала в миллисекундах, значение: AbortController
+    const activeMotionAbortControllerRef = useRef<Map<number, AbortController>>(new Map());
     // Ref для отслеживания диапазона запросов в очереди
     const queuedRangeRef = useRef<{start: Date; end: Date} | null>(null);
     // Ref для debounce таймера
@@ -289,12 +288,16 @@ export const useTimelineFragments = (
      * Определяет, какие дни нужно загрузить для видимого диапазона
      */
     const getDaysToLoad = useCallback(
-        (rangeStart: Date, rangeEnd: Date): Date[] => {
+        (rangeStart: Date, rangeEnd: Date, serverTime?: Date | null): Date[] => {
             const daysToLoad: Date[] = [];
             let currentDay = startOfDay(rangeStart);
             const endDay = startOfDay(rangeEnd);
 
-            while (currentDay.getTime() <= endDay.getTime()) {
+            // Ограничиваем максимальную дату текущим временем сервера (если оно доступно)
+            const maxDay = serverTime ? startOfDay(serverTime) : endDay;
+            const actualEndDay = endDay.getTime() > maxDay.getTime() ? maxDay : endDay;
+
+            while (currentDay.getTime() <= actualEndDay.getTime()) {
                 const dayKey = getDayKey(currentDay);
                 const hasData = framesDataByDayRef.current.has(dayKey);
                 const isLoading = loadingDaysRef.current.has(dayKey);
@@ -609,113 +612,99 @@ export const useTimelineFragments = (
                     return;
                 }
 
-                // Создаем XHR для motion timeline request
-                const xhr = new XMLHttpRequest();
-                // Сохраняем XHR в ref для возможности отмены
-                activeMotionXhrRef.current.set(intervalStartTimestamp, xhr);
+                // Создаем AbortController для motion timeline request
+                const abortController = new AbortController();
+                // Сохраняем AbortController в ref для возможности отмены
+                activeMotionAbortControllerRef.current.set(intervalStartTimestamp, abortController);
 
-                const response = await new Promise<{timeline: number[]}>((resolve, reject) => {
-                    const rpcUrl = buildRequestUrl({
-                        host: url,
-                        port,
-                        protocol: protocol ?? 'http',
-                        proxy,
-                        path: proxy
-                            ? '/rpc'
-                            : `/rpc?authorization=Basic ${getAuthToken(credentials)}&content-type=application/json`
-                    });
-
-                    xhr.open('POST', rpcUrl, true);
-
-                    if (proxy) {
-                        xhr.setRequestHeader('Content-Type', 'application/json');
-                        xhr.setRequestHeader('Authorization', `Basic ${getAuthToken(credentials)}`);
-                    }
-
-                    xhr.onload = function () {
-                        if (xhr.status >= 200 && xhr.status < 300) {
-                            try {
-                                const data = JSON.parse(xhr.responseText);
-                                if (data.error && data.error.type === 'auth' && data.error.message === 'forbidden') {
-                                    reject(new Error('FORBIDDEN'));
-                                    return;
-                                }
-                                resolve(data.result);
-                            } catch (parseError) {
-                                reject(new Error('Failed to parse motion timeline data'));
-                            }
-                        } else {
-                            reject(new Error('Failed to fetch motion timeline data'));
-                        }
-                    };
-
-                    xhr.onerror = function () {
-                        reject(new Error('Failed to fetch motion timeline data'));
-                    };
-
-                    xhr.onabort = function () {
-                        reject(new Error('Request aborted'));
-                    };
-
-                    // Определяем метод API и параметры фильтра в зависимости от типа фильтра
-                    const hasTypes = motionFilter?.types && motionFilter.types.length > 0;
-                    const apiMethod = hasTypes ? 'archive.get_objects_timeline' : 'archive.get_motions_timeline';
-
-                    // Формируем параметры фильтра: для объектов передаем types и mask, для движения - весь фильтр
-                    const filterParam = hasTypes
-                        ? {
-                              types: motionFilter.types,
-                              ...(motionFilter.mask && {mask: motionFilter.mask})
-                          }
-                        : motionFilter;
-
-                    const version = hasTypes ? 71 : 13;
-
-                    xhr.send(
-                        JSON.stringify({
-                            method: apiMethod,
-                            params: {
-                                start_time: [
-                                    intervalStart.getFullYear(),
-                                    intervalStart.getMonth() + 1,
-                                    intervalStart.getDate(),
-                                    intervalStart.getHours(),
-                                    intervalStart.getMinutes(),
-                                    intervalStart.getSeconds()
-                                ],
-                                end_time: [
-                                    actualIntervalEnd.getFullYear(),
-                                    actualIntervalEnd.getMonth() + 1,
-                                    actualIntervalEnd.getDate(),
-                                    actualIntervalEnd.getHours(),
-                                    actualIntervalEnd.getMinutes(),
-                                    actualIntervalEnd.getSeconds()
-                                ],
-                                unit_len: 1, // Всегда загружаем посекундно
-                                channel: camera,
-                                stream: 'video',
-                                filter: filterParam
-                            },
-                            version
-                        })
-                    );
+                const rpcUrl = buildRequestUrl({
+                    host: url,
+                    port,
+                    protocol: protocol ?? 'http',
+                    proxy,
+                    path: proxy
+                        ? '/rpc'
+                        : `/rpc?authorization=Basic ${getAuthToken(credentials)}&content-type=application/json`
                 });
+
+                const headers: HeadersInit = {};
+                if (proxy) {
+                    headers['Content-Type'] = 'application/json';
+                    headers['Authorization'] = `Basic ${getAuthToken(credentials)}`;
+                }
+
+                // Определяем метод API и параметры фильтра в зависимости от типа фильтра
+                const hasTypes = motionFilter?.types && motionFilter.types.length > 0;
+                const apiMethod = hasTypes ? 'archive.get_objects_timeline' : 'archive.get_motions_timeline';
+
+                // Формируем параметры фильтра: для объектов передаем types и mask, для движения - весь фильтр
+                const filterParam = hasTypes
+                    ? {
+                          types: motionFilter.types,
+                          ...(motionFilter.mask && {mask: motionFilter.mask})
+                      }
+                    : motionFilter;
+
+                const version = hasTypes ? 71 : 13;
+
+                const response = await fetch(rpcUrl, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({
+                        method: apiMethod,
+                        params: {
+                            start_time: [
+                                intervalStart.getFullYear(),
+                                intervalStart.getMonth() + 1,
+                                intervalStart.getDate(),
+                                intervalStart.getHours(),
+                                intervalStart.getMinutes(),
+                                intervalStart.getSeconds()
+                            ],
+                            end_time: [
+                                actualIntervalEnd.getFullYear(),
+                                actualIntervalEnd.getMonth() + 1,
+                                actualIntervalEnd.getDate(),
+                                actualIntervalEnd.getHours(),
+                                actualIntervalEnd.getMinutes(),
+                                actualIntervalEnd.getSeconds()
+                            ],
+                            unit_len: 1, // Всегда загружаем посекундно
+                            channel: camera,
+                            stream: 'video',
+                            filter: filterParam
+                        },
+                        version
+                    }),
+                    signal: abortController.signal
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to fetch motion timeline data');
+                }
+
+                const data = await response.json();
+                if (data.error && data.error.type === 'auth' && data.error.message === 'forbidden') {
+                    throw new Error('FORBIDDEN');
+                }
+
+                const result = data.result;
 
                 // Проверяем, что активный запрос не был отменен перед сохранением данных
                 if (activeRequestRef.current === null) {
                     return;
                 }
 
-                // Проверяем, что запрос не был отменен (XHR все еще в ref)
-                if (!activeMotionXhrRef.current.has(intervalStartTimestamp)) {
+                // Проверяем, что запрос не был отменен (AbortController все еще в ref)
+                if (!activeMotionAbortControllerRef.current.has(intervalStartTimestamp)) {
                     return;
                 }
 
                 // Сохраняем данные по интервалу
-                motionDataByIntervalRef.current.set(intervalStartTimestamp, response.timeline);
+                motionDataByIntervalRef.current.set(intervalStartTimestamp, result.timeline);
             } catch (error) {
                 // Игнорируем ошибку, если запрос был отменен
-                if (error instanceof Error && error.message === 'Request aborted') {
+                if (error instanceof Error && (error.name === 'AbortError' || error.message === 'Request aborted')) {
                     return;
                 }
                 console.error('loadMotionIntervalData: ошибка при загрузке интервала', error);
@@ -724,8 +713,8 @@ export const useTimelineFragments = (
                 }
             } finally {
                 loadingMotionIntervalsRef.current.delete(intervalStartTimestamp);
-                // Удаляем XHR из ref после завершения запроса
-                activeMotionXhrRef.current.delete(intervalStartTimestamp);
+                // Удаляем AbortController из ref после завершения запроса
+                activeMotionAbortControllerRef.current.delete(intervalStartTimestamp);
             }
         },
         [url, port, credentials, camera, protocol, proxy, setTimelineAccess, motionFilter]
@@ -1039,11 +1028,17 @@ export const useTimelineFragments = (
 
                 // Функция для выполнения обновления фреймов
                 const executeUpdate = () => {
+                    // Ограничиваем максимальную границу реальным текущим временем сервера
+                    let actualBufferEnd = bufferEnd;
+                    if (serverTime && actualBufferEnd.getTime() > serverTime.getTime()) {
+                        actualBufferEnd = serverTime;
+                    }
+
                     // Проверяем, нужно ли загружать новые дни
-                    const daysToLoad = getDaysToLoad(bufferStart, bufferEnd);
+                    const daysToLoad = getDaysToLoad(bufferStart, actualBufferEnd, serverTime);
 
                     // Всегда обновляем отображение для нового видимого диапазона
-                    const mergedData = mergeDaysDataForRange(bufferStart, bufferEnd, zoomIndex);
+                    const mergedData = mergeDaysDataForRange(bufferStart, actualBufferEnd, zoomIndex);
                     setFragments(mergedData.timeline);
                     setFragmentsBufferRange(mergedData.bufferRange);
 
@@ -1055,7 +1050,7 @@ export const useTimelineFragments = (
                     // Запускаем загрузку дней параллельно
                     Promise.all(daysToLoad.map(day => loadDayData(day))).then(() => {
                         // После загрузки обновляем отображение
-                        const updatedData = mergeDaysDataForRange(bufferStart, bufferEnd, zoomIndex);
+                        const updatedData = mergeDaysDataForRange(bufferStart, actualBufferEnd, zoomIndex);
                         setFragments(updatedData.timeline);
                         setFragmentsBufferRange(updatedData.bufferRange);
                     });
@@ -1120,11 +1115,11 @@ export const useTimelineFragments = (
         // Очищаем только set загрузки дней
         loadingDaysRef.current.clear();
         // Очищаем данные motion filter при сбросе
-        // Отменяем все активные XHR запросы фильтров
-        activeMotionXhrRef.current.forEach(xhr => {
-            xhr.abort();
+        // Отменяем все активные запросы фильтров
+        activeMotionAbortControllerRef.current.forEach(controller => {
+            controller.abort();
         });
-        activeMotionXhrRef.current.clear();
+        activeMotionAbortControllerRef.current.clear();
         motionDataByIntervalRef.current.clear();
         loadingMotionIntervalsRef.current.clear();
         // Очищаем активный запрос - это прерывает загрузку фильтров
@@ -1152,10 +1147,10 @@ export const useTimelineFragments = (
      * ВНИМАНИЕ: Эта функция прерывает все активные запросы фильтров!
      */
     const clearMotionFilterCache = useCallback(() => {
-        // Отменяем все активные XHR запросы фильтров
-        activeMotionXhrRef.current.forEach((xhr, intervalTimestamp) => {
-            xhr.abort();
-            activeMotionXhrRef.current.delete(intervalTimestamp);
+        // Отменяем все активные запросы фильтров
+        activeMotionAbortControllerRef.current.forEach((controller, intervalTimestamp) => {
+            controller.abort();
+            activeMotionAbortControllerRef.current.delete(intervalTimestamp);
         });
 
         // Очищаем данные и очередь загрузки
@@ -1174,11 +1169,11 @@ export const useTimelineFragments = (
      * Используется при переключении камеры, чтобы очистить данные предыдущей камеры
      */
     const clearFramesCache = useCallback(() => {
-        // Отменяем все активные XHR запросы фильтров
-        activeMotionXhrRef.current.forEach(xhr => {
-            xhr.abort();
+        // Отменяем все активные запросы фильтров
+        activeMotionAbortControllerRef.current.forEach(controller => {
+            controller.abort();
         });
-        activeMotionXhrRef.current.clear();
+        activeMotionAbortControllerRef.current.clear();
         // Очищаем данные для текущей камеры в глобальном хранилище
         framesDataByDayRef.current.clear();
         loadingDaysRef.current.clear();
