@@ -394,9 +394,32 @@ export const Player: React.FC<PlayerProps> = ({
     };
 
     // Обработчики событий
-    const handleTimeChange = (time: Date) => {
-        setServerTime(time);
+    const handleTimeChange = async (time: Date) => {
+        setServerTime(time, true); // skipCenterTimeline=true, чтобы центрировать вручную
         setCurrentMode(Mode.Record);
+        // Явно центрируем таймлайн на выбранном времени
+        if (timelineRef.current) {
+            timelineRef.current.centerOnTime(time);
+            // Ждем обновления visibleTimeRange после центрирования
+            // Используем requestAnimationFrame для ожидания следующего рендера
+            requestAnimationFrame(() => {
+                requestAnimationFrame(async () => {
+                    const visibleTimeRange = timelineRef.current?.getVisibleTimeRange();
+                    if (visibleTimeRange && timelineRef.current) {
+                        // Получаем intervalIndex из данных фрагментов
+                        const fragmentsData = timelineRef.current.getFragmentsData();
+                        const zoomIndex = fragmentsData?.intervalIndex ?? 8;
+                        // Проверяем наличие данных для дней в visibleTimeRange и загружаем недостающие
+                        // Данные, которые уже есть в кэше, будут отображены сразу
+                        await timelineRef.current.checkAndLoadDaysForRange(
+                            visibleTimeRange.start,
+                            visibleTimeRange.end,
+                            zoomIndex
+                        );
+                    }
+                });
+            });
+        }
     };
 
     const handlePlayPause = async (value?: boolean) => {

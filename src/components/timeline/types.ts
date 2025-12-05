@@ -60,6 +60,8 @@ export interface TimelineRef {
     clearFramesCache: () => void;
     /** Перезагрузить фрагменты для текущего видимого диапазона */
     reloadFragments: () => void;
+    /** Проверить наличие данных для дней в диапазоне и загрузить недостающие */
+    checkAndLoadDaysForRange: (rangeStart: Date, rangeEnd: Date, zoomIndex?: number) => Promise<void>;
 }
 
 /**

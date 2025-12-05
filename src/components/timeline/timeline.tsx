@@ -66,7 +66,8 @@ export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
             loadFragments,
             resetFragments,
             clearFramesCache,
-            handleTimelineChange
+            handleTimelineChange,
+            checkAndLoadDaysForRange
         } = useTimelineFragments({
             url,
             port,
@@ -178,7 +179,8 @@ export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
                         }
                     },
                     clearFramesCache,
-                    reloadFragments
+                    reloadFragments,
+                    checkAndLoadDaysForRange
                 };
             }
         }, [
@@ -194,7 +196,8 @@ export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
             fragmentRanges,
             updateCursorPositionByTime,
             clearFramesCache,
-            reloadFragments
+            reloadFragments,
+            checkAndLoadDaysForRange
         ]);
 
         // Устанавливаем обработчик колесика мыши

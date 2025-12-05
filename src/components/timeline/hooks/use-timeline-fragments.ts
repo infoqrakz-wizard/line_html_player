@@ -16,9 +16,10 @@ import {startOfDay, endOfDay, addDays, format} from 'date-fns';
 const THIRTY_MINUTES_MS = 30 * 60 * 1000;
 
 // Глобальное хранилище данных по камерам (чтобы сохранять данные между размонтированием и монтированием компонента)
-// Ключ: `${camera}-${url}-${port}`, значение: Map<dayKey, framesData>
 const globalFramesDataByCamera = new Map<string, Map<string, number[]>>();
 // Глобальное хранилище для отслеживания загрузки по камерам
+// Структура: Map<cameraKey, Set<dayKey>>
+// Отслеживает, какие дни сейчас загружаются, чтобы избежать дублирующих запросов
 const globalLoadingDaysByCamera = new Map<string, Set<string>>();
 
 interface MotionTimelineRequest {
@@ -208,6 +209,10 @@ export const useTimelineFragments = (
 
     /**
      * Объединяет данные по дням для видимого диапазона и преобразует в нужный масштаб
+     * @param rangeStart Начало диапазона
+     * @param rangeEnd Конец диапазона
+     * @param zoomIndex Индекс масштаба для преобразования данных
+     * @returns Объединенные данные и диапазон буфера
      */
     const mergeDaysDataForRange = useCallback(
         (rangeStart: Date, rangeEnd: Date, zoomIndex: number): {timeline: number[]; bufferRange: TimeRange} => {
@@ -286,15 +291,22 @@ export const useTimelineFragments = (
 
     /**
      * Определяет, какие дни нужно загрузить для видимого диапазона
+     *
+     * Работает с кэшем по дням: проверяет каждый день в диапазоне и определяет,
+     * какие дни отсутствуют в кэше и не загружаются сейчас.
+     *
+     * @param rangeStart Начало диапазона
+     * @param rangeEnd Конец диапазона
+     * @returns Массив дат дней, которые нужно загрузить
      */
     const getDaysToLoad = useCallback(
-        (rangeStart: Date, rangeEnd: Date, serverTime?: Date | null): Date[] => {
+        (rangeStart: Date, rangeEnd: Date): Date[] => {
             const daysToLoad: Date[] = [];
             let currentDay = startOfDay(rangeStart);
             const endDay = startOfDay(rangeEnd);
 
             // Ограничиваем максимальную дату текущим временем сервера (если оно доступно)
-            const maxDay = serverTime ? startOfDay(serverTime) : endDay;
+            const maxDay = endDay;
             const actualEndDay = endDay.getTime() > maxDay.getTime() ? maxDay : endDay;
 
             while (currentDay.getTime() <= actualEndDay.getTime()) {
@@ -503,7 +515,10 @@ export const useTimelineFragments = (
     }, []);
 
     /**
-     * Загружает данные для одного дня (unit_len=1, посекундно)
+     * Загружает данные для одного дня (unit_len=1, посекундно) и сохраняет в кэш по дням
+     *
+     * @param day Дата дня для загрузки
+     * @param endTime Опциональное время окончания (если день неполный)
      */
     const loadDayData = useCallback(
         async (day: Date, endTime?: Date): Promise<void> => {
@@ -1020,27 +1035,29 @@ export const useTimelineFragments = (
                 }
             } else {
                 // Для обычных фреймов (без motion filter) используем per-day загрузку
-
-                // Если начальная загрузка еще не завершена, не обрабатываем запрос
-                if (!isInitialLoadCompletedRef.current) {
-                    return;
-                }
+                // Кэш хранит данные по дням независимо друг от друга, что позволяет:
+                // - При переключении на дальнюю дату (например, с 3 декабря на 15 ноября)
+                //   загружать только недостающие дни (15 ноября), не сбрасывая кэш
+                // - Сохранять данные за разные дни при переключении между датами
+                // - Избегать разрывов в данных при переключении на дальние даты
 
                 // Функция для выполнения обновления фреймов
                 const executeUpdate = () => {
-                    // Ограничиваем максимальную границу реальным текущим временем сервера
-                    let actualBufferEnd = bufferEnd;
-                    if (serverTime && actualBufferEnd.getTime() > serverTime.getTime()) {
-                        actualBufferEnd = serverTime;
-                    }
-
+                    const actualBufferEnd = bufferEnd;
                     // Проверяем, нужно ли загружать новые дни
-                    const daysToLoad = getDaysToLoad(bufferStart, actualBufferEnd, serverTime);
+                    const daysToLoad = getDaysToLoad(bufferStart, actualBufferEnd);
 
                     // Всегда обновляем отображение для нового видимого диапазона
+                    // Это применяет данные к отображению, даже если начальная загрузка еще не завершена
                     const mergedData = mergeDaysDataForRange(bufferStart, actualBufferEnd, zoomIndex);
                     setFragments(mergedData.timeline);
                     setFragmentsBufferRange(mergedData.bufferRange);
+
+                    // Если начальная загрузка еще не завершена, не загружаем новые дни
+                    // Но данные, которые уже есть в кэше, уже применены к отображению выше
+                    if (!isInitialLoadCompletedRef.current) {
+                        return;
+                    }
 
                     // Если все дни уже загружены, просто возвращаемся
                     if (daysToLoad.length === 0) {
@@ -1077,11 +1094,14 @@ export const useTimelineFragments = (
             }
         },
         [
+            // fragmentsBufferRange используется только в motion filter части для оптимизации,
+            // но не влияет на логику загрузки обычных фреймов (данные определяются по дням через framesDataByDayRef)
             fragmentsBufferRange,
             motionFilterSignature,
             isLoadingFragments,
             motionFilter,
             visibleTimeRange,
+            serverTime,
             getDaysToLoad,
             mergeDaysDataForRange,
             loadDayData,
@@ -1359,6 +1379,51 @@ export const useTimelineFragments = (
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [motionFilter]);
 
+    /**
+     * Проверяет наличие данных для дней в диапазоне и загружает недостающие
+     * Также сразу отображает данные, которые уже есть в кэше
+     * @param rangeStart Начало видимого диапазона (без буфера)
+     * @param rangeEnd Конец видимого диапазона (без буфера)
+     * @param zoomIndex Индекс масштаба
+     */
+    const checkAndLoadDaysForRange = useCallback(
+        async (rangeStart: Date, rangeEnd: Date, zoomIndex: number = 0) => {
+            // Для motion filter используем другую логику
+            if (motionFilter) {
+                // Для motion filter просто вызываем loadFragments, который сам проверит и загрузит данные
+                loadFragments(rangeStart, rangeEnd, zoomIndex, true);
+                return;
+            }
+
+            // Для обычных фреймов проверяем и загружаем дни
+            // ВАЖНО: проверяем и загружаем только дни из видимого диапазона (без буфера)
+            // Это гарантирует, что запрашиваются только те дни, которые визуально видны на таймлайне
+            const daysToLoad = getDaysToLoad(rangeStart, rangeEnd);
+
+            // Вычисляем буферный диапазон для отображения (чтобы данные уже были загружены при скролле)
+            const screenDuration = rangeEnd.getTime() - rangeStart.getTime();
+            const bufferStart = new Date(rangeStart.getTime() - screenDuration * BUFFER_SCREENS);
+            const bufferEnd = new Date(rangeEnd.getTime() + screenDuration * BUFFER_SCREENS);
+
+            // Сразу отображаем данные, которые уже есть в кэше (используем буферный диапазон для отображения)
+            const mergedData = mergeDaysDataForRange(bufferStart, bufferEnd, zoomIndex);
+            setFragments(mergedData.timeline);
+            setFragmentsBufferRange(mergedData.bufferRange);
+
+            // Если есть дни для загрузки, загружаем их
+            if (daysToLoad.length > 0) {
+                // Загружаем дни параллельно
+                await Promise.all(daysToLoad.map(day => loadDayData(day)));
+
+                // После загрузки обновляем отображение
+                const updatedData = mergeDaysDataForRange(bufferStart, bufferEnd, zoomIndex);
+                setFragments(updatedData.timeline);
+                setFragmentsBufferRange(updatedData.bufferRange);
+            }
+        },
+        [motionFilter, loadFragments, getDaysToLoad, mergeDaysDataForRange, loadDayData, serverTime]
+    );
+
     return {
         fragments,
         fragmentsBufferRange,
@@ -1368,6 +1433,7 @@ export const useTimelineFragments = (
         resetFragments,
         clearFramesCache,
         clearMotionFilterCache,
-        handleTimelineChange
+        handleTimelineChange,
+        checkAndLoadDaysForRange
     };
 };
