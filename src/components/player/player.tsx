@@ -1283,8 +1283,6 @@ export const Player: React.FC<PlayerProps> = ({
     const isVerticalTimeline = isMobileDevice && orientation === 'landscape';
 
     const shouldHideUiForMask = isMaskEditorVisible;
-    // Скрываем PLAYBACK когда активен фильтр (с маской или с типами объектов)
-    const shouldHidePlaybackLabel = !!(appliedMotionFilter?.mask || appliedMotionFilter?.types);
 
     return (
         <>
@@ -1318,7 +1316,7 @@ export const Player: React.FC<PlayerProps> = ({
                     </div>
                 )}
 
-                {!shouldHideUiForMask && !shouldHidePlaybackLabel && (
+                {!shouldHideUiForMask && (
                     <div
                         className={`${styles.topControls} ${
                             isVerticalTimeline ? styles.mobileLandscapeTopControls : ''
@@ -1328,21 +1326,6 @@ export const Player: React.FC<PlayerProps> = ({
                             mode={currentMode}
                             playbackStatus={playbackStatus}
                         />
-                    </div>
-                )}
-                {!shouldHideUiForMask && shouldHidePlaybackLabel && (
-                    <div
-                        className={`${styles.topControls} ${
-                            isVerticalTimeline ? styles.mobileLandscapeTopControls : ''
-                        }`}
-                    >
-                        <button
-                            className={styles.resetFilterButton}
-                            onClick={handleClearMotionFilter}
-                            aria-label="Сброс фильтра"
-                        >
-                            Сброс
-                        </button>
                     </div>
                 )}
                 <div
@@ -1515,6 +1498,21 @@ export const Player: React.FC<PlayerProps> = ({
                         </div>
                     )}
                 </div>
+                {!shouldHideUiForMask && appliedMotionFilter && isPlaying && (
+                    <button
+                        className={styles.resetFilterButton}
+                        onClick={handleClearMotionFilter}
+                        aria-label="Сброс фильтра"
+                        style={{
+                            position: 'absolute',
+                            bottom: showControls || isMobile ? '90px' : '10px',
+                            right: '10px',
+                            zIndex: 10
+                        }}
+                    >
+                        Сброс
+                    </button>
+                )}
                 {!shouldHideUiForMask && (
                     <div
                         className={styles.controlArea}

@@ -83,12 +83,15 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
     isFilterPanelOpen = false,
     activeFilterType = null,
     onToggleFilterPanel,
-    onSelectFilterOption
+    onSelectFilterOption,
+    onClearFilter
 }) => {
     const {hasTimelineAccess, setTimelineAccess} = useTimelineAuth();
     const [startDate, setStartDate] = useState(new Date());
     const datePickerRef = useRef<ReactDatePicker | null>(null);
     const rightControlsRef = useRef<HTMLDivElement>(null);
+    const filterPanelRef = useRef<HTMLDivElement>(null);
+    const filterControlsRef = useRef<HTMLDivElement>(null);
     const [arrowOffset, setArrowOffset] = useState<number>(0);
 
     const [highlightedDates, setHighlightedDates] = useState<Date[]>([]);
@@ -302,6 +305,27 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
         onSelectFilterOption?.(option);
     };
 
+    useEffect(() => {
+        if (!isFilterPanelOpen) return;
+
+        const handleClickOutside = (event: MouseEvent) => {
+            const target = event.target as Node;
+            if (
+                filterPanelRef.current &&
+                filterControlsRef.current &&
+                !filterPanelRef.current.contains(target) &&
+                !filterControlsRef.current.contains(target)
+            ) {
+                onToggleFilterPanel?.();
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [isFilterPanelOpen, onToggleFilterPanel]);
+
     return (
         <div className={`${styles.controls} ${isMobileLandscape ? styles.mobileLandscape : ''}`}>
             <div className={styles.leftControls}>
@@ -334,7 +358,10 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
                 ref={rightControlsRef}
             >
                 {hasTimelineAccess && (
-                    <div className={styles.filterControls}>
+                    <div
+                        className={styles.filterControls}
+                        ref={filterControlsRef}
+                    >
                         <button
                             className={`${styles.controlButton} ${activeFilterType ? styles.filterActive : ''}`}
                             onClick={handleFilterToggle}
@@ -346,6 +373,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
                         </button>
                         {isFilterPanelOpen && (
                             <div
+                                ref={filterPanelRef}
                                 className={styles.filterPanel}
                                 role="menu"
                             >
@@ -362,6 +390,15 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
                                         <span>{option.label}</span>
                                     </button>
                                 ))}
+                                {activeFilterType !== null && (
+                                    <button
+                                        className={styles.filterResetButton}
+                                        onClick={onClearFilter}
+                                        aria-label="Сброс фильтра"
+                                    >
+                                        Сброс
+                                    </button>
+                                )}
                             </div>
                         )}
                     </div>
