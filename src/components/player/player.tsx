@@ -891,17 +891,20 @@ export const Player: React.FC<PlayerProps> = ({
         };
 
         const handleWheel = (e: WheelEvent) => {
+            if (showSaveModal) return;
+
             // Обрабатываем скролл для зума видео без Ctrl
             if (!enableVideoZoom || !containerRef.current || !videoContainerRef.current) return;
 
             const target = e.target as HTMLElement | null;
 
-            // Проверяем, не находится ли курсор над Timeline, ControlPanel или ControlArea
             if (
                 target &&
                 (target.closest('[class*="timeline"]') ||
                     target.closest('[class*="controlPanel"]') ||
-                    target.closest('[class*="controlArea"]'))
+                    target.closest('[class*="controlArea"]') ||
+                    target.closest('[class*="modalOverlay"]') ||
+                    target.closest('[class*="modal"]'))
             ) {
                 return;
             }
@@ -958,7 +961,7 @@ export const Player: React.FC<PlayerProps> = ({
                 videoContainer.removeEventListener('mouseenter', handleMouseEnter as EventListener);
             }
         };
-    }, [enableZoomMagnifier, enableVideoZoom, isMaskEditorVisible]);
+    }, [enableZoomMagnifier, enableVideoZoom, isMaskEditorVisible, showSaveModal]);
 
     const handleSaveStreamFinish = (start: Date, end: Date) => {
         const fileName = `record_${formatDate(start, 'yyyy-MM-dd_HH-mm')}_${formatDate(end, 'yyyy-MM-dd_HH-mm')}`;
