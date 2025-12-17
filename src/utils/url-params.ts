@@ -98,14 +98,16 @@ export const formatUrlForDownload = ({
     url,
     start,
     end,
-    fileName
+    fileName,
+    audio
 }: {
     url: string;
     start: Date;
     end: Date;
     fileName: string;
+    audio?: boolean;
 }) => {
     const startTimestamp = Math.floor(start.getTime() / 1000);
     const endTimestamp = Math.floor(end.getTime() / 1000);
-    return `${url}&start=${startTimestamp}&end=${endTimestamp}&filename=${encodeURIComponent(fileName)}.mp4`;
+    return `${url}&start=${startTimestamp}&end=${endTimestamp}${audio ? '&audio=1' : ''}&filename=${encodeURIComponent(fileName)}.mp4`;
 };

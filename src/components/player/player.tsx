@@ -990,7 +990,8 @@ export const Player: React.FC<PlayerProps> = ({
             url,
             start,
             end,
-            fileName
+            fileName,
+            audio: !isNoSound
         });
 
         clickA(downloadUrl);
