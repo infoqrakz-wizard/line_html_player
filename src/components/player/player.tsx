@@ -975,7 +975,7 @@ export const Player: React.FC<PlayerProps> = ({
             return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
         };
 
-        const date = start.toISOString().split('.')[0];
+        const date = formatDate(start, "yyyy-MM-dd'T'HH:mm:ss");
 
         const url = buildRequestUrl({
             host: streamUrl,
