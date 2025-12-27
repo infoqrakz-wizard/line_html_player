@@ -52,6 +52,7 @@ export interface HlsPlayerProps {
     overlayText?: string;
     isLandscape?: boolean;
     onFragmentTimeUpdate?: (time: Date) => void;
+    onNextTime?: (time: Date) => void;
 }
 
 import type {PlayerRef} from '../player-interface';
@@ -66,7 +67,8 @@ export const HlsPlayer = forwardRef<PlayerRef, HlsPlayerProps>((props, ref) => {
         playbackSpeed,
         muted = true,
         isLandscape = false,
-        onFragmentTimeUpdate
+        onFragmentTimeUpdate,
+        onNextTime
     } = props;
     const videoRef = useRef<HTMLVideoElement>(null);
     const hlsRef = useRef<Hls | null>(null);
@@ -153,7 +155,7 @@ export const HlsPlayer = forwardRef<PlayerRef, HlsPlayerProps>((props, ref) => {
                 } catch {
                     decodedKey = rawKey;
                 }
-                if (decodedKey === 'time' || decodedKey === 'next_time') {
+                if (decodedKey === 'time' || decodedKey === 'next_time' || decodedKey === 'filter_seconds') {
                     return;
                 }
                 preservedParams.push(param);
@@ -473,6 +475,10 @@ export const HlsPlayer = forwardRef<PlayerRef, HlsPlayerProps>((props, ref) => {
                 updatePendingSeekFromFragment(data.frag, fragmentUrl);
                 const nextTimeFromFragment = extractTimestampFromParams(fragmentUrl || undefined, 'next_time');
                 if (nextTimeFromFragment !== null) {
+                    // Уведомляем родительский компонент о next_time для пересчета filter_seconds
+                    if (onNextTime) {
+                        onNextTime(new Date(nextTimeFromFragment));
+                    }
                     reloadFromNextTime(nextTimeFromFragment, fragmentUrl || undefined);
                 }
                 // Перехватываем первый запрос к .ts файлу с параметром time для обновления индикатора времени

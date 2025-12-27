@@ -42,6 +42,7 @@ interface ControlPanelProps {
     onToggleFilterPanel?: () => void;
     onSelectFilterOption?: (option: MotionFilterOption) => void;
     onClearFilter?: () => void;
+    serverVersion?: number | null;
 }
 
 export const ControlPanel: React.FC<ControlPanelProps> = ({
@@ -76,7 +77,8 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
     activeFilterType,
     onToggleFilterPanel,
     onSelectFilterOption,
-    onClearFilter
+    onClearFilter,
+    serverVersion
 }) => {
     const {hasTimelineAccess} = useTimelineAuth();
     const {isMobile, orientation} = useOrientation();
@@ -117,6 +119,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                 onToggleFilterPanel={onToggleFilterPanel}
                 onSelectFilterOption={onSelectFilterOption}
                 onClearFilter={onClearFilter}
+                serverVersion={serverVersion}
             />
             {hasTimelineAccess && (
                 <Timeline

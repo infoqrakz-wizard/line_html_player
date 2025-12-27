@@ -96,7 +96,6 @@ const buildMaskPayload = (grid: MaskGrid): MotionMaskPayload => {
 };
 
 export interface PlayerProps {
-    // Основные пропсы из DevLinePlayerProps
     streamUrl: string;
     streamPort: number;
     login: string;
@@ -127,7 +126,6 @@ export const Player: React.FC<PlayerProps> = ({
     enableZoomMagnifier = true,
     enableVideoZoom = true
 }) => {
-    // Local auth state to allow updating credentials when 401 occurs
     const [authLogin, setAuthLogin] = useState<string>(login);
     const [authPassword, setAuthPassword] = useState<string>(password ?? '');
     const [currentMode, setCurrentMode] = useState<Mode>(mode);
@@ -138,7 +136,6 @@ export const Player: React.FC<PlayerProps> = ({
     const [isNoSound, setIsNoSound] = useState<boolean>(false);
     const [showH265Warning, setShowH265Warning] = useState<boolean>(false);
 
-    // Availability/auth check state
     const [isCheckingAvailability, setIsCheckingAvailability] = useState<boolean>(false);
     const [authRequired, setAuthRequired] = useState<boolean>(false);
     const [serverUnavailable, setServerUnavailable] = useState<boolean>(false);
@@ -157,10 +154,8 @@ export const Player: React.FC<PlayerProps> = ({
     const [isMobile, setIsMobile] = useState<boolean>(false);
     const [showControls, setShowControls] = useState<boolean>(false);
 
-    // Определяем ориентацию и тип устройства
     const {orientation, isMobile: isMobileDevice, isSafari, isAndroid, isIOS} = useOrientation();
 
-    // Состояние для отслеживания свайпов по плееру
     const [isPlayerSwipeActive, setIsPlayerSwipeActive] = useState<boolean>(false);
     const [playerSwipeStartX, setPlayerSwipeStartX] = useState<number>(0);
     const [playerSwipeStartY, setPlayerSwipeStartY] = useState<number>(0);
@@ -190,7 +185,6 @@ export const Player: React.FC<PlayerProps> = ({
     const [availableCameras, setAvailableCameras] = useState<CameraInfo[]>([]);
     const [camera, setCamera] = useState<number | undefined>(initialCamera);
 
-    // Обрабатываем логику proxy на уровне Player
     const effectiveProxy = isUseProxy ? (proxy ?? 'https://proxy.devline.ru') : undefined;
 
     const getStreamUrl = (type: string, isNoSound: boolean, isMuted: boolean) =>
@@ -204,9 +198,6 @@ export const Player: React.FC<PlayerProps> = ({
             )}${!isMuted && !isNoSound ? '&audio=1' : ''}`
         });
 
-    // const posterUrl = `${protocol}://${streamUrl}:${streamPort}/cameras/${camera}/image?stream=main&authorization=Basic%20${btoa(`${login}:${password}`)}`;
-
-    // Для iPhone всегда используем m3u8, так как hls.js не работает нативно
     const streamType = isSafari ? 'm3u8' : currentMode === 'record' ? 'm3u8' : 'mp4';
     const authorization = `${authLogin}:${authPassword}`;
     const videoUrl = getStreamUrl(streamType, isNoSound, isMuted);
@@ -220,17 +211,182 @@ export const Player: React.FC<PlayerProps> = ({
         effectiveProxy
     );
 
-    // Формирование URL для потока в зависимости от режима и серверного времени
-    let finalStreamUrl = '';
-    if (authVerified && camera !== undefined) {
-        if (currentMode === 'record' && serverTime) {
-            finalStreamUrl = `${videoUrl}&time=${formatDate(serverTime)}&autoplay=1${!isMuted && !isNoSound ? '&audio=1' : ''}`;
-        } else {
-            // Для Live режима добавляем cache buster для принудительной перезагрузки
-            const separator = videoUrl.includes('?') ? '&' : '?';
-            finalStreamUrl = `${videoUrl}${separator}_t=${liveStreamCacheBuster}`;
+    const [isFilterPanelOpen, setIsFilterPanelOpen] = useState<boolean>(false);
+    const [activeFilterType, setActiveFilterType] = useState<MotionFilterOption | null>(null);
+    const [maskGrid, setMaskGrid] = useState<MaskGrid>(() => createFilledMaskGrid(0));
+    const [isMaskEditorVisible, setIsMaskEditorVisible] = useState<boolean>(false);
+    const [appliedMotionFilter, setAppliedMotionFilter] = useState<TimelineMotionFilter | null>(null);
+    const maskEditorInitialGridRef = useRef<MaskGrid | null>(null);
+    const editingFilterTypeRef = useRef<MotionFilterOption | null>(null);
+    const [serverApiVersion, setServerApiVersion] = useState<number | null>(null);
+
+    const getFragmentsFromTimeline = useCallback(() => {
+        if (!timelineRef.current) {
+            return null;
         }
-    }
+
+        const fragmentsData = timelineRef.current.getFragmentsData();
+        if (!fragmentsData) {
+            return null;
+        }
+
+        return fragmentsData;
+    }, []);
+
+    const normalizeUnitLength = useCallback((calculatedValue: number): number => {
+        let closestValue = UNIT_LENGTHS[0];
+        let minDifference = Math.abs(calculatedValue - closestValue);
+
+        for (let i = 1; i < UNIT_LENGTHS.length; i++) {
+            const difference = Math.abs(calculatedValue - UNIT_LENGTHS[i]);
+            if (difference < minDifference) {
+                minDifference = difference;
+                closestValue = UNIT_LENGTHS[i];
+            }
+        }
+
+        return closestValue;
+    }, []);
+
+    const buildFilterSeconds = useCallback(
+        (baseTime: Date): string | null => {
+            if (!appliedMotionFilter || !serverTime) {
+                return null;
+            }
+
+            const fragmentsData = getFragmentsFromTimeline();
+            if (!fragmentsData) {
+                return null;
+            }
+
+            const {fragments, fragmentsBufferRange, intervalIndex} = fragmentsData;
+            if (fragments.length === 0) {
+                return null;
+            }
+
+            const bufferDurationMs = fragmentsBufferRange.end.getTime() - fragmentsBufferRange.start.getTime();
+            const calculatedUnitLengthSeconds =
+                fragments.length > 0 ? bufferDurationMs / (fragments.length * 1000) : UNIT_LENGTHS[intervalIndex];
+            const normalizedUnitLengthSeconds = normalizeUnitLength(calculatedUnitLengthSeconds);
+            const unitLengthMs = normalizedUnitLengthSeconds * 1000;
+
+            const baseTimeMs = baseTime.getTime();
+            const bufferStartTime = fragmentsBufferRange.start.getTime();
+
+            interface Range {
+                startOffset: number;
+                duration: number;
+            }
+
+            const ranges: Range[] = [];
+            let currentRangeStart: number | null = null;
+            let currentRangeStartIndex: number | null = null;
+            const MAX_TOTAL_DURATION = 300;
+            let totalDuration = 0;
+
+            for (let i = 0; i < fragments.length; i++) {
+                if (fragments[i] > 0) {
+                    const fragmentStartTime = bufferStartTime + i * unitLengthMs;
+                    const offsetFromBase = (fragmentStartTime - baseTimeMs) / 1000;
+
+                    if (currentRangeStart === null) {
+                        currentRangeStart = offsetFromBase;
+                        currentRangeStartIndex = i;
+                    }
+                } else {
+                    if (currentRangeStart !== null && currentRangeStartIndex !== null) {
+                        const lastVisibleIndex = i - 1;
+                        const fragmentEndTime = bufferStartTime + (lastVisibleIndex + 1) * unitLengthMs;
+                        const rangeEndOffset = (fragmentEndTime - baseTimeMs) / 1000;
+                        const duration = rangeEndOffset - currentRangeStart;
+
+                        if (totalDuration + duration <= MAX_TOTAL_DURATION) {
+                            ranges.push({
+                                startOffset: Math.max(0, currentRangeStart),
+                                duration: duration
+                            });
+                            totalDuration += duration;
+                        } else {
+                            const remainingDuration = MAX_TOTAL_DURATION - totalDuration;
+                            if (remainingDuration > 0) {
+                                ranges.push({
+                                    startOffset: Math.max(0, currentRangeStart),
+                                    duration: remainingDuration
+                                });
+                            }
+                            break;
+                        }
+
+                        currentRangeStart = null;
+                        currentRangeStartIndex = null;
+                    }
+                }
+            }
+
+            if (currentRangeStart !== null && currentRangeStartIndex !== null) {
+                const lastIndex = fragments.length - 1;
+                const fragmentEndTime = bufferStartTime + (lastIndex + 1) * unitLengthMs;
+                const rangeEndOffset = (fragmentEndTime - baseTimeMs) / 1000;
+                const duration = rangeEndOffset - currentRangeStart;
+
+                if (totalDuration + duration <= MAX_TOTAL_DURATION) {
+                    ranges.push({
+                        startOffset: Math.max(0, currentRangeStart),
+                        duration: duration
+                    });
+                } else {
+                    const remainingDuration = MAX_TOTAL_DURATION - totalDuration;
+                    if (remainingDuration > 0) {
+                        ranges.push({
+                            startOffset: Math.max(0, currentRangeStart),
+                            duration: remainingDuration
+                        });
+                    }
+                }
+            }
+
+            if (ranges.length === 0) {
+                return null;
+            }
+
+            return ranges.map(range => `${range.startOffset},${range.duration}`).join(';') + ';';
+        },
+        [appliedMotionFilter, serverTime, getFragmentsFromTimeline, normalizeUnitLength]
+    );
+
+    const finalStreamUrl = React.useMemo(() => {
+        if (!authVerified || camera === undefined) {
+            return '';
+        }
+
+        if (currentMode === 'record' && serverTime) {
+            let url = `${videoUrl}&time=${formatDate(serverTime)}&autoplay=1${!isMuted && !isNoSound ? '&audio=1' : ''}`;
+
+            if (appliedMotionFilter && serverApiVersion !== null && serverApiVersion >= 90) {
+                const filterSeconds = buildFilterSeconds(serverTime);
+                if (filterSeconds) {
+                    url += `&filter_seconds=${encodeURIComponent(filterSeconds)}`;
+                }
+            }
+
+            return url;
+        } else {
+            const separator = videoUrl.includes('?') ? '&' : '?';
+            return `${videoUrl}${separator}_t=${liveStreamCacheBuster}`;
+        }
+    }, [
+        authVerified,
+        camera,
+        currentMode,
+        serverTime,
+        videoUrl,
+        isMuted,
+        isNoSound,
+        appliedMotionFilter,
+        serverApiVersion,
+        buildFilterSeconds,
+        liveStreamCacheBuster
+    ]);
 
     useEffect(() => {
         fragmetsGapRef.current = 0;
@@ -238,7 +394,6 @@ export const Player: React.FC<PlayerProps> = ({
         nextFragmentTimeRef.current = null;
     }, [serverTime]);
 
-    // Отслеживаем переключение режимов для определения, что это уже не первая загрузка
     useEffect(() => {
         if (isFirstLoad && currentMode !== mode) {
             setIsFirstLoad(false);
@@ -259,7 +414,6 @@ export const Player: React.FC<PlayerProps> = ({
             const isH265 = result.result.state.video_streams.video.codec === 'h265';
             setIsNoSound(result.result.state.audio_streams.audio.signal === 'no');
 
-            // Если кодек H.265 и это не Android/iOS, показываем предупреждение и не запускаем воспроизведение
             if (isH265 && !isAndroid && !isIOS) {
                 setShowH265Warning(true);
                 setIsPlaying(false); // Отключаем автовоспроизведение
@@ -272,6 +426,51 @@ export const Player: React.FC<PlayerProps> = ({
             void fetchCameraState();
         }
     }, [authVerified, streamUrl, streamPort, authorization, camera, protocol, effectiveProxy, isAndroid, isIOS]);
+
+    useEffect(() => {
+        const fetchServerVersion = async () => {
+            if (!authVerified || !streamUrl || !streamPort || !authorization) {
+                return;
+            }
+
+            const rpcUrl = buildRequestUrl({
+                host: streamUrl,
+                port: streamPort,
+                protocol,
+                proxy: effectiveProxy,
+                path: effectiveProxy
+                    ? '/rpc'
+                    : `/rpc?authorization=Basic ${getAuthToken(authorization)}&content-type=application/json`
+            });
+
+            const headers: HeadersInit = {};
+            if (effectiveProxy) {
+                headers['Content-Type'] = 'application/json';
+                headers['Authorization'] = `Basic ${getAuthToken(authorization)}`;
+            }
+
+            try {
+                const response = await fetch(rpcUrl, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({method: 'get_version'})
+                });
+
+                if (!response.ok) {
+                    return;
+                }
+
+                const data = await response.json();
+                if (data.result && data.result.version && typeof data.result.version.value === 'number') {
+                    setServerApiVersion(data.result.version.value);
+                }
+            } catch (error) {
+                // ignore
+            }
+        };
+
+        void fetchServerVersion();
+    }, [authVerified, streamUrl, streamPort, authorization, protocol, effectiveProxy]);
 
     const checkAvailability = useCallback(
         async (credentials: string) => {
@@ -287,7 +486,6 @@ export const Player: React.FC<PlayerProps> = ({
                 setServerUnavailable(false);
                 setAuthVerified(true);
             } catch (e) {
-                // Проверяем, является ли ошибка связанной с авторизацией (401)
                 if ((e as Error)?.message === 'FORBIDDEN') {
                     setAuthRequired(true);
                     setServerUnavailable(false);
@@ -303,7 +501,6 @@ export const Player: React.FC<PlayerProps> = ({
         [streamUrl, streamPort, protocol, effectiveProxy]
     );
 
-    // Функция для проверки авторизации при клике на кнопку "войти"
     const handleLoginSubmit = useCallback(
         async (e: React.FormEvent) => {
             e.preventDefault();
@@ -312,7 +509,6 @@ export const Player: React.FC<PlayerProps> = ({
         [checkAvailability, authLogin, authPassword]
     );
 
-    // Проверяем авторизацию только при изменении основных параметров подключения
     useEffect(() => {
         void checkAvailability(`${authLogin}:${authPassword}`);
     }, [checkAvailability, streamUrl, streamPort, camera, authLogin, authPassword]);
@@ -331,32 +527,22 @@ export const Player: React.FC<PlayerProps> = ({
                 );
                 setAvailableCameras(list);
             } catch (err) {
-                // keep silent; availability flow will show errors
+                // ignore
             }
         };
         void loadCameras();
     }, [authVerified, streamUrl, streamPort, authLogin, authPassword, camera, protocol, effectiveProxy]);
 
-    // Устанавливаем начальные значения логина и пароля без автоматической проверки
     useEffect(() => {
         setAuthLogin(login);
         setAuthPassword(password ?? '');
     }, [login, password]);
 
-    // Проверяем авторизацию при первоначальной загрузке страницы
     useEffect(() => {
         if (streamUrl && streamPort) {
             void checkAvailability(`${login}:${password ?? ''}`);
         }
     }, [streamUrl, streamPort, login, password, checkAvailability]);
-
-    const [isFilterPanelOpen, setIsFilterPanelOpen] = useState<boolean>(false);
-    const [activeFilterType, setActiveFilterType] = useState<MotionFilterOption | null>(null);
-    const [maskGrid, setMaskGrid] = useState<MaskGrid>(() => createFilledMaskGrid(0));
-    const [isMaskEditorVisible, setIsMaskEditorVisible] = useState<boolean>(false);
-    const [appliedMotionFilter, setAppliedMotionFilter] = useState<TimelineMotionFilter | null>(null);
-    const maskEditorInitialGridRef = useRef<MaskGrid | null>(null);
-    const editingFilterTypeRef = useRef<MotionFilterOption | null>(null);
 
     const handleChangeMode = (newMode: Mode, time?: Date) => {
         setCurrentMode(newMode);
@@ -369,27 +555,18 @@ export const Player: React.FC<PlayerProps> = ({
     };
 
     const handleTimelineClick = async (clickedTime: Date) => {
-        // Сразу устанавливаем статус loading, так как мы не можем сразу продолжить воспроизведение
         setPlaybackStatus('loading');
 
-        // Получаем текущее время сервера или используем текущее время системы
         const currentServerTime = await updateServerTime();
-
-        // Проверяем, является ли выбранное время в будущем
-        // Добавляем небольшой буфер (5 секунд) для более точного определения
         const isFutureTime = clickedTime.getTime() > (currentServerTime?.getTime() ?? 0);
 
         if (isFutureTime) {
-            // Если время в будущем - переключаемся на прямую трансляцию
             setCurrentMode(Mode.Live);
-            // Обновляем позицию на timeline без изменения serverTime
-            setProgress(0); // Сбрасываем progress для корректного отображения
+            setProgress(0);
         } else {
-            // Если время в прошлом - переключаемся на запись
             handleChangeMode(Mode.Record, clickedTime);
         }
 
-        // При клике по таймлайну всегда запускаем воспроизведение
         setIsPlaying(true);
     };
 
@@ -466,17 +643,14 @@ export const Player: React.FC<PlayerProps> = ({
     };
 
     const handleSelectFilterOption = (option: MotionFilterOption) => {
-        // Для всех фильтров показываем редактор маски
         editingFilterTypeRef.current = option;
 
-        // Определяем базовую сетку из существующего фильтра
         let baseGrid: MaskGrid;
         if (option === 'motion') {
             baseGrid = appliedMotionFilter?.mask
                 ? gridFromMaskPayload(appliedMotionFilter.mask)
                 : createFilledMaskGrid(0);
         } else {
-            // Для фильтров human/transport проверяем, есть ли уже маска в примененном фильтре
             const objectType = option as MotionObjectType;
             if (appliedMotionFilter?.types?.includes(objectType) && appliedMotionFilter?.mask) {
                 baseGrid = gridFromMaskPayload(appliedMotionFilter.mask);
@@ -893,7 +1067,6 @@ export const Player: React.FC<PlayerProps> = ({
         const handleWheel = (e: WheelEvent) => {
             if (showSaveModal) return;
 
-            // Обрабатываем скролл для зума видео без Ctrl
             if (!enableVideoZoom || !containerRef.current || !videoContainerRef.current) return;
 
             const target = e.target as HTMLElement | null;
@@ -1002,20 +1175,6 @@ export const Player: React.FC<PlayerProps> = ({
         setShowSaveModal(true);
     };
 
-    // Функция для получения данных фрагментов из Timeline
-    const getFragmentsFromTimeline = useCallback(() => {
-        if (!timelineRef.current) {
-            return null;
-        }
-
-        const fragmentsData = timelineRef.current.getFragmentsData();
-        if (!fragmentsData) {
-            return null;
-        }
-
-        return fragmentsData;
-    }, []);
-
     // Функция для поиска следующего доступного фрагмента на timeline
     const findNextRecordingSegment = useCallback(
         (currentAbsoluteTime: Date) => {
@@ -1037,24 +1196,6 @@ export const Player: React.FC<PlayerProps> = ({
         },
         [getFragmentsFromTimeline]
     );
-
-    // Функция для нормализации unitLengthSeconds к ближайшему значению из UNIT_LENGTHS
-    // Это необходимо для избежания проблем с плавающей точкой
-    const normalizeUnitLength = useCallback((calculatedValue: number): number => {
-        // Находим ближайшее значение из UNIT_LENGTHS
-        let closestValue = UNIT_LENGTHS[0];
-        let minDifference = Math.abs(calculatedValue - closestValue);
-
-        for (let i = 1; i < UNIT_LENGTHS.length; i++) {
-            const difference = Math.abs(calculatedValue - UNIT_LENGTHS[i]);
-            if (difference < minDifference) {
-                minDifference = difference;
-                closestValue = UNIT_LENGTHS[i];
-            }
-        }
-
-        return closestValue;
-    }, []);
 
     // Функция для поиска следующего отображаемого фрейма (используется при включенном фильтре)
     const findNextVisibleFrameFromTimeline = useCallback(
@@ -1142,148 +1283,97 @@ export const Player: React.FC<PlayerProps> = ({
         url: finalStreamUrl,
         playing: isPlaying,
         muted: isMuted,
-        // posterUrl,
         playbackSpeed,
         onPlayPause: (value?: boolean) => handlePlayPause(value),
         onPlaybackStatusChange: handlePlaybackStatusChange,
         onProgress: p => {
             if (currentMode === Mode.Record && serverTime) {
-                // Вычисляем абсолютное время с учетом накопленного gap
                 const currentTotalProgress = p.currentTime + fragmetsGapRef.current;
                 const currentAbsoluteTime = new Date(serverTime.getTime() + currentTotalProgress * 1000);
 
-                // При включенном фильтре проверяем наличие отображаемых фреймов в ближайшие 5 секунд
-                if (appliedMotionFilter) {
-                    // Пропускаем проверку во время перехода к новому фрагменту
-                    if (isTransitioningToNextFragmentRef.current) {
-                        return;
-                    }
+                const isUsingFilterSeconds = appliedMotionFilter && serverApiVersion !== null && serverApiVersion >= 90;
 
-                    const hasVisibleFrames = checkVisibleFramesInNextSeconds(currentAbsoluteTime, 5);
-
-                    if (!hasVisibleFrames) {
-                        // Если нет отображаемых фреймов в ближайшие 5 секунд,
-                        // находим следующий отображаемый фрейм и переключаемся на него
-                        const nextVisibleFrameTime = findNextVisibleFrameFromTimeline(currentAbsoluteTime);
-
-                        if (nextVisibleFrameTime && nextFragmentTimeRef.current !== nextVisibleFrameTime) {
-                            nextFragmentTimeRef.current = nextVisibleFrameTime;
-                            const newProgress = (nextVisibleFrameTime.getTime() - serverTime.getTime()) / 1000;
-
-                            // Устанавливаем флаг перехода и обновляем gap
-                            isTransitioningToNextFragmentRef.current = true;
-
-                            // Gap равен разности между желаемой позицией и текущей позицией плеера
-                            fragmetsGapRef.current = newProgress - p.currentTime;
-
-                            // Проверяем, находится ли следующий фрейм за пределами видимого таймлайна
-                            // Если да, центрируем таймлайн по времени этого фрейма
-                            if (timelineRef.current) {
-                                const visibleTimeRange = timelineRef.current.getVisibleTimeRange();
-                                if (visibleTimeRange) {
-                                    const nextFrameTime = nextVisibleFrameTime.getTime();
-                                    const visibleStart = visibleTimeRange.start.getTime();
-                                    const visibleEnd = visibleTimeRange.end.getTime();
-
-                                    // Проверяем, находится ли следующий фрейм за пределами видимого диапазона
-                                    const isOutsideVisibleRange =
-                                        nextFrameTime < visibleStart || nextFrameTime > visibleEnd;
-
-                                    if (isOutsideVisibleRange) {
-                                        timelineRef.current.centerOnTime(nextVisibleFrameTime);
-                                    }
-                                }
-                            }
-
-                            // Обновляем serverTime для переключения на новый m3u8 с временной меткой следующего фрейма
-                            // Проверяем, что новое время отличается от текущего serverTime, чтобы избежать бесконечных циклов
-                            if (!serverTime || Math.abs(serverTime.getTime() - nextVisibleFrameTime.getTime()) > 1000) {
-                                handleChangeMode(Mode.Record, nextVisibleFrameTime);
-                            }
-
-                            setProgress(newProgress);
-                            return;
-                        } else {
-                            // Детальное логирование причины остановки
-                            const fragmentsData = getFragmentsFromTimeline();
-                            const currentFragmentIndex = fragmentsData
-                                ? Math.floor(
-                                      (currentAbsoluteTime.getTime() -
-                                          fragmentsData.fragmentsBufferRange.start.getTime()) /
-                                          (UNIT_LENGTHS[fragmentsData.intervalIndex] * 1000)
-                                  )
-                                : -1;
-                            console.warn('[PLAYBACK DEBUG] Stopping playback - no next visible frame', {
-                                currentAbsoluteTime: currentAbsoluteTime.toISOString(),
-                                nextVisibleFrameTime: nextVisibleFrameTime?.toISOString() || null,
-                                nextFragmentTimeRef: nextFragmentTimeRef.current?.toISOString() || null,
-                                fragmentsData: fragmentsData
-                                    ? {
-                                          fragmentsLength: fragmentsData.fragments.length,
-                                          fragmentsBufferRange: {
-                                              start: fragmentsData.fragmentsBufferRange.start.toISOString(),
-                                              end: fragmentsData.fragmentsBufferRange.end.toISOString()
-                                          },
-                                          visibleFramesCount: fragmentsData.fragments.filter(f => f > 0).length,
-                                          currentFragmentIndex,
-                                          futureVisibleFramesCount: fragmentsData.fragments
-                                              .slice(currentFragmentIndex + 1)
-                                              .filter(f => f > 0).length
-                                      }
-                                    : null,
-                                reason: !nextVisibleFrameTime
-                                    ? 'findNextVisibleFrame returned null'
-                                    : nextFragmentTimeRef.current === nextVisibleFrameTime
-                                      ? 'nextFragmentTimeRef equals nextVisibleFrameTime (duplicate transition blocked)'
-                                      : 'unknown'
-                            });
-                            setIsPlaying(false);
+                if (!isUsingFilterSeconds) {
+                    if (appliedMotionFilter) {
+                        if (isTransitioningToNextFragmentRef.current) {
                             return;
                         }
-                    }
-                    // Если есть отображаемые фреймы в ближайшие 5 секунд, продолжаем воспроизведение
-                } else {
-                    // Для обычных фреймов используем стандартную логику
-                    // Проверяем, достигли ли мы конца текущего фрагмента
-                    if (checkIfAtEndOfCurrentSegment(currentAbsoluteTime)) {
-                        // Ищем следующий доступный фрагмент
-                        const nextSegmentTime = findNextRecordingSegment(currentAbsoluteTime);
 
-                        if (nextSegmentTime && nextFragmentTimeRef.current !== nextSegmentTime) {
-                            nextFragmentTimeRef.current = nextSegmentTime;
-                            const newProgress = (nextSegmentTime.getTime() - serverTime.getTime()) / 1000;
+                        const hasVisibleFrames = checkVisibleFramesInNextSeconds(currentAbsoluteTime, 5);
 
-                            // Устанавливаем флаг перехода и обновляем gap
-                            isTransitioningToNextFragmentRef.current = true;
+                        if (!hasVisibleFrames) {
+                            const nextVisibleFrameTime = findNextVisibleFrameFromTimeline(currentAbsoluteTime);
 
-                            // Gap равен разности между желаемой позицией и текущей позицией плеера
-                            fragmetsGapRef.current = newProgress - p.currentTime;
+                            if (nextVisibleFrameTime && nextFragmentTimeRef.current !== nextVisibleFrameTime) {
+                                nextFragmentTimeRef.current = nextVisibleFrameTime;
+                                const newProgress = (nextVisibleFrameTime.getTime() - serverTime.getTime()) / 1000;
 
-                            setProgress(newProgress);
-                            return;
-                        } else {
-                            setIsPlaying(false);
-                            return;
+                                isTransitioningToNextFragmentRef.current = true;
+                                fragmetsGapRef.current = newProgress - p.currentTime;
+
+                                if (timelineRef.current) {
+                                    const visibleTimeRange = timelineRef.current.getVisibleTimeRange();
+                                    if (visibleTimeRange) {
+                                        const nextFrameTime = nextVisibleFrameTime.getTime();
+                                        const visibleStart = visibleTimeRange.start.getTime();
+                                        const visibleEnd = visibleTimeRange.end.getTime();
+
+                                        const isOutsideVisibleRange =
+                                            nextFrameTime < visibleStart || nextFrameTime > visibleEnd;
+
+                                        if (isOutsideVisibleRange) {
+                                            timelineRef.current.centerOnTime(nextVisibleFrameTime);
+                                        }
+                                    }
+                                }
+
+                                if (
+                                    !serverTime ||
+                                    Math.abs(serverTime.getTime() - nextVisibleFrameTime.getTime()) > 1000
+                                ) {
+                                    handleChangeMode(Mode.Record, nextVisibleFrameTime);
+                                }
+
+                                setProgress(newProgress);
+                                return;
+                            } else {
+                                setIsPlaying(false);
+                                return;
+                            }
+                        }
+                    } else {
+                        if (checkIfAtEndOfCurrentSegment(currentAbsoluteTime)) {
+                            const nextSegmentTime = findNextRecordingSegment(currentAbsoluteTime);
+
+                            if (nextSegmentTime && nextFragmentTimeRef.current !== nextSegmentTime) {
+                                nextFragmentTimeRef.current = nextSegmentTime;
+                                const newProgress = (nextSegmentTime.getTime() - serverTime.getTime()) / 1000;
+
+                                isTransitioningToNextFragmentRef.current = true;
+                                fragmetsGapRef.current = newProgress - p.currentTime;
+
+                                setProgress(newProgress);
+                                return;
+                            } else {
+                                setIsPlaying(false);
+                                return;
+                            }
                         }
                     }
                 }
+
+                if (isTransitioningToNextFragmentRef.current) {
+                    isTransitioningToNextFragmentRef.current = false;
+                    nextFragmentTimeRef.current = null;
+                    return;
+                }
+
+                const totalProgress = p.currentTime + fragmetsGapRef.current;
+                setProgress(totalProgress);
             }
-
-            // Пропускаем обычное обновление сразу после перехода к новому фрагменту
-            if (isTransitioningToNextFragmentRef.current) {
-                isTransitioningToNextFragmentRef.current = false;
-                // Очищаем ссылку на предыдущий фрагмент, чтобы не блокировать следующие переходы
-                nextFragmentTimeRef.current = null;
-                return;
-            }
-
-            const totalProgress = p.currentTime + fragmetsGapRef.current;
-
-            setProgress(totalProgress);
         }
     };
 
-    // Определяем, нужно ли показывать вертикальный таймлайн
     const isVerticalTimeline = isMobileDevice && orientation === 'landscape';
 
     const shouldHideUiForMask = isMaskEditorVisible;
@@ -1386,18 +1476,22 @@ export const Player: React.FC<PlayerProps> = ({
                                     {...props}
                                     overlayText={showH265Warning ? OVERLAY_TEXT_265 : undefined}
                                     onFragmentTimeUpdate={(time: Date) => {
-                                        // Обновляем serverTime на актуальное время из первого .ts фрагмента
-                                        // Это переместит индикатор текущего времени на правильную позицию
                                         const videoElement = playerRef.current?.getVideoElement?.();
                                         const videoCurrentTime = videoElement?.currentTime || 0;
 
-                                        // skipCenterTimeline = true, чтобы не центрировать таймлайн
                                         setServerTime(time, true);
 
-                                        // Сразу обновляем progress на текущее время воспроизведения,
-                                        // чтобы индикатор продолжал двигаться вместе с видео
                                         if (videoCurrentTime > 0) {
                                             setProgress(videoCurrentTime);
+                                        }
+                                    }}
+                                    onNextTime={(nextTime: Date) => {
+                                        if (
+                                            appliedMotionFilter &&
+                                            serverApiVersion !== null &&
+                                            serverApiVersion >= 90
+                                        ) {
+                                            handleChangeMode(Mode.Record, nextTime);
                                         }
                                     }}
                                 />
@@ -1560,6 +1654,7 @@ export const Player: React.FC<PlayerProps> = ({
                                 onToggleFilterPanel={handleToggleFilterPanel}
                                 onSelectFilterOption={handleSelectFilterOption}
                                 onClearFilter={handleClearMotionFilter}
+                                serverVersion={serverApiVersion}
                             />
                         </div>
                     </div>

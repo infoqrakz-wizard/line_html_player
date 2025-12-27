@@ -54,6 +54,7 @@ interface PlayerControlsProps {
     onToggleFilterPanel?: () => void;
     onSelectFilterOption?: (option: MotionFilterOption) => void;
     onClearFilter?: () => void;
+    serverVersion?: number | null;
 }
 
 export const PlayerControls: React.FC<PlayerControlsProps> = ({
@@ -84,7 +85,8 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
     activeFilterType = null,
     onToggleFilterPanel,
     onSelectFilterOption,
-    onClearFilter
+    onClearFilter,
+    serverVersion: serverVersionProp
 }) => {
     const {hasTimelineAccess, setTimelineAccess} = useTimelineAuth();
     const [startDate, setStartDate] = useState(new Date());
@@ -93,7 +95,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
     const filterPanelRef = useRef<HTMLDivElement>(null);
     const filterControlsRef = useRef<HTMLDivElement>(null);
     const [arrowOffset, setArrowOffset] = useState<number>(0);
-    const [serverVersion, setServerVersion] = useState<number | null>(null);
+    const [serverVersion, setServerVersion] = useState<number | null>(serverVersionProp ?? null);
 
     const [highlightedDates, setHighlightedDates] = useState<Date[]>([]);
     const loadedMonths = useRef<Set<string>>(new Set());
@@ -106,50 +108,11 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
 
     const allowedDayKeys = useMemo(() => new Set(highlightedDates.map(dayKey)), [highlightedDates]);
 
-    const fetchServerVersion = useCallback(
-        async (preferredProtocol: Protocol): Promise<number | null> => {
-            if (!url || !port || !credentials) {
-                return null;
-            }
-
-            const rpcUrl = buildRequestUrl({
-                host: url,
-                port,
-                protocol: preferredProtocol,
-                proxy,
-                path: proxy
-                    ? '/rpc'
-                    : `/rpc?authorization=Basic ${getAuthToken(credentials)}&content-type=application/json`
-            });
-
-            const headers: HeadersInit = {};
-            if (proxy) {
-                headers['Content-Type'] = 'application/json';
-                headers['Authorization'] = `Basic ${getAuthToken(credentials)}`;
-            }
-
-            try {
-                const response = await fetch(rpcUrl, {
-                    method: 'POST',
-                    headers,
-                    body: JSON.stringify({method: 'get_version'})
-                });
-
-                if (!response.ok) {
-                    return null;
-                }
-
-                const data = await response.json();
-                if (data.result && data.result.version && typeof data.result.version.value === 'number') {
-                    return data.result.version.value;
-                }
-                return null;
-            } catch (error) {
-                return null;
-            }
-        },
-        [url, port, credentials, proxy]
-    );
+    useEffect(() => {
+        if (serverVersionProp !== undefined && serverVersionProp !== null) {
+            setServerVersion(serverVersionProp);
+        }
+    }, [serverVersionProp]);
 
     const fetchMonthTimeline = async (
         startTime: Date,
@@ -371,16 +334,6 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
             document.removeEventListener('mousedown', handleClickOutside);
         };
     }, [isFilterPanelOpen, onToggleFilterPanel]);
-
-    useEffect(() => {
-        const loadServerVersion = async () => {
-            const preferredProtocol = protocol ?? getProtocol();
-            const version = await fetchServerVersion(preferredProtocol);
-            setServerVersion(version);
-        };
-
-        void loadServerVersion();
-    }, [protocol, fetchServerVersion]);
 
     return (
         <div className={`${styles.controls} ${isMobileLandscape ? styles.mobileLandscape : ''}`}>
