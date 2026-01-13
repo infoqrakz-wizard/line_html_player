@@ -510,8 +510,10 @@ export const Player: React.FC<PlayerProps> = ({
     );
 
     useEffect(() => {
+        if (authRequired) return;
         void checkAvailability(`${authLogin}:${authPassword}`);
-    }, [checkAvailability, streamUrl, streamPort, camera, authLogin, authPassword]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [checkAvailability, streamUrl, streamPort, camera]);
 
     useEffect(() => {
         const loadCameras = async () => {
@@ -531,7 +533,8 @@ export const Player: React.FC<PlayerProps> = ({
             }
         };
         void loadCameras();
-    }, [authVerified, streamUrl, streamPort, authLogin, authPassword, camera, protocol, effectiveProxy]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [authVerified, streamUrl, streamPort, camera, protocol, effectiveProxy]);
 
     useEffect(() => {
         setAuthLogin(login);
