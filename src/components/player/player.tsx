@@ -1489,11 +1489,7 @@ export const Player: React.FC<PlayerProps> = ({
                                         }
                                     }}
                                     onNextTime={(nextTime: Date) => {
-                                        if (
-                                            appliedMotionFilter &&
-                                            serverApiVersion !== null &&
-                                            serverApiVersion >= 90
-                                        ) {
+                                        if (serverApiVersion !== null && serverApiVersion >= 90) {
                                             handleChangeMode(Mode.Record, nextTime);
                                         }
                                     }}
