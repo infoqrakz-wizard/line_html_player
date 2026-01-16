@@ -14,6 +14,7 @@ interface DebugPlayerParams extends PlayerProps {
     muted: boolean;
     mode: Mode;
     protocol: Protocol;
+    archiveStartTimeStr: string; // Строка для ввода времени начала архива
 }
 
 /**
@@ -27,14 +28,15 @@ const DebugPlayer: React.FC = () => {
         streamPort: 443,
         login: 'h264',
         password: '',
-        mode: 'live',
+        mode: Mode.Record,
         autoplay: true,
         muted: true,
-        camera: 2,
-        protocol: 'https',
+        camera: 3,
+        protocol: Protocol.Https,
         showCameraSelector: true,
-        proxy: 'https://proxy.devline.ru'
-});
+        proxy: 'https://proxy.devline.ru',
+        archiveStartTimeStr: '2026-01-16T08:27:52.331'
+    });
 
     // Обработчик изменения параметров
     const handleParamChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -175,6 +177,17 @@ const DebugPlayer: React.FC = () => {
                             </select>
                         </div>
 
+                        <div className="form-group">
+                            <label htmlFor="archiveStartTimeStr">Archive Start Time:</label>
+                            <input
+                                type="datetime-local"
+                                id="archiveStartTimeStr"
+                                name="archiveStartTimeStr"
+                                value={params.archiveStartTimeStr.slice(0, 19)}
+                                onChange={handleParamChange}
+                            />
+                        </div>
+
                         <div className="form-group checkbox">
                             <label htmlFor="muted">
                                 <input
@@ -202,7 +215,10 @@ const DebugPlayer: React.FC = () => {
                     <div className="player-wrapper">
                         <TimeProvider>
                             <TimelineAuthProvider>
-                                <Player {...params} />
+                                <Player
+                                    {...params}
+                                    archiveStartTime={params.archiveStartTimeStr || undefined}
+                                />
                             </TimelineAuthProvider>
                         </TimeProvider>
                     </div>

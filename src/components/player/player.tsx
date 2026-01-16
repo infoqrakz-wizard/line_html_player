@@ -109,6 +109,7 @@ export interface PlayerProps {
     isUseProxy?: boolean;
     enableZoomMagnifier?: boolean; // Включить лупу (по умолчанию true)
     enableVideoZoom?: boolean; // Включить зум видео по скроллу (по умолчанию true)
+    archiveStartTime?: string; // Время начала просмотра архива в ISO формате без часового пояса (например, '2024-01-15T14:30:00')
 }
 
 export const Player: React.FC<PlayerProps> = ({
@@ -124,11 +125,12 @@ export const Player: React.FC<PlayerProps> = ({
     proxy,
     isUseProxy,
     enableZoomMagnifier = true,
-    enableVideoZoom = true
+    enableVideoZoom = true,
+    archiveStartTime
 }) => {
     const [authLogin, setAuthLogin] = useState<string>(login);
     const [authPassword, setAuthPassword] = useState<string>(password ?? '');
-    const [currentMode, setCurrentMode] = useState<Mode>(mode);
+    const [currentMode, setCurrentMode] = useState<Mode>(archiveStartTime ? Mode.Record : mode);
     const [isFirstLoad, setIsFirstLoad] = useState(true);
     const [isFullscreen, setIsFullscreen] = useState(false);
     const {serverTime, setServerTime, progress: ctxProgress, setProgress} = useTime();
@@ -399,6 +401,22 @@ export const Player: React.FC<PlayerProps> = ({
             setIsFirstLoad(false);
         }
     }, [currentMode, mode, isFirstLoad]);
+
+    // Инициализация serverTime из archiveStartTime при монтировании (до запроса серверного времени)
+    useEffect(() => {
+        if (archiveStartTime) {
+            setServerTime(new Date(archiveStartTime), true);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // Центрирование таймлайна после авторизации, когда timelineRef готов
+    useEffect(() => {
+        if (archiveStartTime && authVerified && timelineRef.current) {
+            const startTime = new Date(archiveStartTime);
+            timelineRef.current.centerOnTime(startTime);
+        }
+    }, [authVerified, archiveStartTime]);
 
     useEffect(() => {
         const fetchCameraState = async () => {
