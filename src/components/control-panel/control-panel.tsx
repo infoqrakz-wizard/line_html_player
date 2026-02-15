@@ -134,6 +134,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                     proxy={proxy}
                     mode={mode}
                     motionFilter={motionFilter}
+                    serverVersion={serverVersion}
                 />
             )}
         </div>

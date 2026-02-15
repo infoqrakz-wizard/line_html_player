@@ -3,9 +3,10 @@
 /**
  * Компонент для отрисовки canvas временной шкалы
  */
-import React from 'react';
+import React, {useState, useCallback, useEffect} from 'react';
 import {TimelineCanvasProps} from './types';
 import {useTimelineDrawing} from './hooks/use-timeline-drawing';
+import {useTimelinePreview} from './hooks/use-timeline-preview';
 import styles from './timeline.module.scss';
 
 /**
@@ -36,8 +37,29 @@ export const TimelineCanvas = ({
     isVertical = false,
     isMobile = false,
     isDragging = false,
-    mode
+    mode,
+    serverVersion,
+    url,
+    port,
+    credentials,
+    camera,
+    protocol,
+    proxy
 }: TimelineCanvasProps) => {
+    const [containerWidth, setContainerWidth] = useState(0);
+
+    const updateContainerWidth = useCallback(() => {
+        if (containerRef.current) {
+            setContainerWidth(containerRef.current.getBoundingClientRect().width);
+        }
+    }, [containerRef]);
+
+    useEffect(() => {
+        updateContainerWidth();
+        window.addEventListener('resize', updateContainerWidth);
+        return () => window.removeEventListener('resize', updateContainerWidth);
+    }, [updateContainerWidth]);
+
     // Используем хук для отрисовки временной шкалы
     useTimelineDrawing({
         canvasRef,
@@ -59,6 +81,19 @@ export const TimelineCanvas = ({
         mode
     });
 
+    const {previewUrl, previewX, previewTime} = useTimelinePreview({
+        cursorPosition,
+        serverVersion,
+        url: url ?? '',
+        port: port ?? 0,
+        credentials: credentials ?? '',
+        camera: camera ?? 0,
+        protocol,
+        proxy,
+        isDragging,
+        containerWidth
+    });
+
     return (
         <div
             ref={containerRef}
@@ -73,6 +108,20 @@ export const TimelineCanvas = ({
             onTouchEnd={onTouchEnd}
         >
             <canvas ref={canvasRef} />
+            {previewUrl && cursorPosition && !isVertical && (
+                <div
+                    className={styles.previewContainer}
+                    style={{left: previewX}}
+                >
+                    <img
+                        src={previewUrl}
+                        className={styles.previewImage}
+                        alt=""
+                        draggable={false}
+                    />
+                    {previewTime && <div className={styles.previewTime}>{previewTime}</div>}
+                </div>
+            )}
         </div>
     );
 };

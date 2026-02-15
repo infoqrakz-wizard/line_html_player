@@ -31,6 +31,8 @@ export interface TimelineProps {
     proxy?: string;
     /** Фильтр движений */
     motionFilter?: TimelineMotionFilter | null;
+    /** Версия API сервера */
+    serverVersion?: number | null;
 }
 
 /**
@@ -178,6 +180,20 @@ export interface TimelineCanvasProps {
     isDragging?: boolean;
     /** Режим воспроизведения (live/record) */
     mode?: Mode;
+    /** Версия API сервера */
+    serverVersion?: number | null;
+    /** URL сервера */
+    url?: string;
+    /** Порт сервера */
+    port?: number;
+    /** Строка с учетными данными */
+    credentials?: string;
+    /** Номер камеры */
+    camera?: number;
+    /** Протокол */
+    protocol?: Protocol;
+    /** Прокси-сервер */
+    proxy?: string;
 }
 
 /**

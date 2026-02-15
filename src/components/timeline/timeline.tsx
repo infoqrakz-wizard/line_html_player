@@ -15,7 +15,10 @@ import {createMotionFilterSignature} from '../../types/motion-filter';
  * Компонент временной шкалы
  */
 export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
-    ({url, port, credentials, onTimeClick, progress = 0, camera, mode, protocol, proxy, motionFilter}, ref) => {
+    (
+        {url, port, credentials, onTimeClick, progress = 0, camera, mode, protocol, proxy, motionFilter, serverVersion},
+        ref
+    ) => {
         // Создаем ссылки на DOM-элементы
         const containerRef = useRef<HTMLDivElement>(null);
         const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -315,6 +318,13 @@ export const Timeline = React.forwardRef<TimelineRef, TimelineProps>(
                     isMobile={isMobile}
                     isDragging={isDragging}
                     mode={mode}
+                    serverVersion={serverVersion}
+                    url={url}
+                    port={port}
+                    credentials={credentials}
+                    camera={camera}
+                    protocol={protocol}
+                    proxy={proxy}
                 />
             </>
         );
