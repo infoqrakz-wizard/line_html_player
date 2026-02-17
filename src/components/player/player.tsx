@@ -565,128 +565,130 @@ export const Player: React.FC<PlayerProps> = ({
         }
     }, [streamUrl, streamPort, login, password, checkAvailability]);
 
-    const handleChangeMode = (newMode: Mode, time?: Date) => {
-        setCurrentMode(newMode);
-        if (time) {
-            setServerTime(time, true);
-        } else {
-            updateServerTime();
-            // setServerTime(new Date(), false);
-        }
-    };
-
-    const handleTimelineClick = async (clickedTime: Date) => {
-        setPlaybackStatus('loading');
-
-        const currentServerTime = await updateServerTime();
-        const isFutureTime = clickedTime.getTime() > (currentServerTime?.getTime() ?? 0);
-
-        if (isFutureTime) {
-            setCurrentMode(Mode.Live);
-            setProgress(0);
-        } else {
-            handleChangeMode(Mode.Record, clickedTime);
-        }
-
-        setIsPlaying(true);
-    };
-
-    // Обработчики событий
-    const handleTimeChange = async (time: Date) => {
-        setServerTime(time, true); // skipCenterTimeline=true, чтобы центрировать вручную
-        setCurrentMode(Mode.Record);
-        // Явно центрируем таймлайн на выбранном времени
-        if (timelineRef.current) {
-            timelineRef.current.centerOnTime(time);
-            // Ждем обновления visibleTimeRange после центрирования
-            // Используем requestAnimationFrame для ожидания следующего рендера
-            requestAnimationFrame(() => {
-                requestAnimationFrame(async () => {
-                    const visibleTimeRange = timelineRef.current?.getVisibleTimeRange();
-                    if (visibleTimeRange && timelineRef.current) {
-                        // Получаем intervalIndex из данных фрагментов
-                        const fragmentsData = timelineRef.current.getFragmentsData();
-                        const zoomIndex = fragmentsData?.intervalIndex ?? 8;
-                        // Проверяем наличие данных для дней в visibleTimeRange и загружаем недостающие
-                        // Данные, которые уже есть в кэше, будут отображены сразу
-                        await timelineRef.current.checkAndLoadDaysForRange(
-                            visibleTimeRange.start,
-                            visibleTimeRange.end,
-                            zoomIndex
-                        );
-                    }
-                });
-            });
-        }
-    };
-
-    const handlePlayPause = async (value?: boolean) => {
-        const newPlayingState = value ?? !isPlaying;
-
-        // Если переключаемся с паузы на play в режиме Live
-        if (!isPlaying && newPlayingState && currentMode === Mode.Live) {
-            // Обновляем серверное время для актуальной прямой трансляции
-            await updateServerTime();
-            // Сбрасываем progress на актуальное время
-            setProgress(0);
-            // Обновляем cache buster для принудительной перезагрузки видео
-            setLiveStreamCacheBuster(Date.now());
-            // Запрашиваем актуальные фреймы
-            if (timelineRef.current) {
-                timelineRef.current.reloadFragments();
+    const handleChangeMode = useCallback(
+        (newMode: Mode, time?: Date) => {
+            setCurrentMode(newMode);
+            if (time) {
+                setServerTime(time, true);
+            } else {
+                updateServerTime();
             }
-        }
+        },
+        [setServerTime, updateServerTime]
+    );
 
-        setIsPlaying(newPlayingState);
-    };
+    const handleTimelineClick = useCallback(
+        async (clickedTime: Date) => {
+            setPlaybackStatus('loading');
 
-    const handleMuteToggle = () => {
-        setIsMuted(!isMuted);
-    };
+            const currentServerTime = await updateServerTime();
+            const isFutureTime = clickedTime.getTime() > (currentServerTime?.getTime() ?? 0);
 
-    const handleSpeedChange = (speed: number) => {
+            if (isFutureTime) {
+                setCurrentMode(Mode.Live);
+                setProgress(0);
+            } else {
+                handleChangeMode(Mode.Record, clickedTime);
+            }
+
+            setIsPlaying(true);
+        },
+        [updateServerTime, setProgress, handleChangeMode]
+    );
+
+    const handleTimeChange = useCallback(
+        async (time: Date) => {
+            setServerTime(time, true);
+            setCurrentMode(Mode.Record);
+            if (timelineRef.current) {
+                timelineRef.current.centerOnTime(time);
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(async () => {
+                        const visibleTimeRange = timelineRef.current?.getVisibleTimeRange();
+                        if (visibleTimeRange && timelineRef.current) {
+                            const fragmentsData = timelineRef.current.getFragmentsData();
+                            const zoomIndex = fragmentsData?.intervalIndex ?? 8;
+                            await timelineRef.current.checkAndLoadDaysForRange(
+                                visibleTimeRange.start,
+                                visibleTimeRange.end,
+                                zoomIndex
+                            );
+                        }
+                    });
+                });
+            }
+        },
+        [setServerTime]
+    );
+
+    const handlePlayPause = useCallback(
+        async (value?: boolean) => {
+            const newPlayingState = value ?? !isPlaying;
+
+            if (!isPlaying && newPlayingState && currentMode === Mode.Live) {
+                await updateServerTime();
+                setProgress(0);
+                setLiveStreamCacheBuster(Date.now());
+                if (timelineRef.current) {
+                    timelineRef.current.reloadFragments();
+                }
+            }
+
+            setIsPlaying(newPlayingState);
+        },
+        [isPlaying, currentMode, updateServerTime, setProgress]
+    );
+
+    const handleMuteToggle = useCallback(() => {
+        setIsMuted(prev => !prev);
+    }, []);
+
+    const handleSpeedChange = useCallback((speed: number) => {
         setPlaybackSpeed(speed);
-    };
+    }, []);
 
-    const handlePlaybackStatusChange = (status: PlaybackStatus) => {
+    const handlePlaybackStatusChange = useCallback((status: PlaybackStatus) => {
         setPlaybackStatus(status);
-    };
+    }, []);
 
-    const handleMouseEnter = () => {
+    const handleMouseEnter = useCallback(() => {
         if (hideTimeoutRef.current) {
             clearTimeout(hideTimeoutRef.current);
         }
         setShowControls(true);
-    };
+    }, []);
 
-    const handleToggleFilterPanel = () => {
+    const handleToggleFilterPanel = useCallback(() => {
         setIsFilterPanelOpen(prev => !prev);
-    };
+    }, []);
 
-    const handleSelectFilterOption = (option: MotionFilterOption) => {
-        editingFilterTypeRef.current = option;
+    const handleSelectFilterOption = useCallback(
+        (option: MotionFilterOption) => {
+            editingFilterTypeRef.current = option;
 
-        let baseGrid: MaskGrid;
-        if (option === 'motion') {
-            baseGrid = appliedMotionFilter?.mask
-                ? gridFromMaskPayload(appliedMotionFilter.mask)
-                : createFilledMaskGrid(0);
-        } else {
-            const objectType = option as MotionObjectType;
-            if (appliedMotionFilter?.types?.includes(objectType) && appliedMotionFilter?.mask) {
-                baseGrid = gridFromMaskPayload(appliedMotionFilter.mask);
+            let baseGrid: MaskGrid;
+            if (option === 'motion') {
+                baseGrid = appliedMotionFilter?.mask
+                    ? gridFromMaskPayload(appliedMotionFilter.mask)
+                    : createFilledMaskGrid(0);
             } else {
-                baseGrid = createFilledMaskGrid(0);
+                const objectType = option as MotionObjectType;
+                if (appliedMotionFilter?.types?.includes(objectType) && appliedMotionFilter?.mask) {
+                    baseGrid = gridFromMaskPayload(appliedMotionFilter.mask);
+                } else {
+                    baseGrid = createFilledMaskGrid(0);
+                }
             }
-        }
 
-        maskEditorInitialGridRef.current = baseGrid.map(row => [...row]);
-        setMaskGrid(baseGrid);
-        setIsMaskEditorVisible(true);
-        setIsFilterPanelOpen(false);
-    };
+            maskEditorInitialGridRef.current = baseGrid.map(row => [...row]);
+            setMaskGrid(baseGrid);
+            setIsMaskEditorVisible(true);
+            setIsFilterPanelOpen(false);
+        },
+        [appliedMotionFilter]
+    );
 
-    const handleClearMotionFilter = () => {
+    const handleClearMotionFilter = useCallback(() => {
         setAppliedMotionFilter(null);
         setActiveFilterType(null);
         setIsMaskEditorVisible(false);
@@ -694,45 +696,47 @@ export const Player: React.FC<PlayerProps> = ({
         maskEditorInitialGridRef.current = null;
         setMaskGrid(createFilledMaskGrid(0));
         editingFilterTypeRef.current = null;
-    };
+    }, []);
 
-    const handleMaskToggleCell = (rowIndex: number, colIndex: number) => {
+    const handleMaskToggleCell = useCallback((rowIndex: number, colIndex: number) => {
         setMaskGrid(prev => {
             const nextGrid = prev.map(row => row.slice());
             const currentValue = nextGrid[rowIndex][colIndex];
             nextGrid[rowIndex][colIndex] = currentValue === 1 ? 0 : 1;
             return nextGrid;
         });
-    };
+    }, []);
 
-    const handleMaskApply = () => {
-        const payload = buildMaskPayload(maskGrid);
-        const filterType = editingFilterTypeRef.current;
+    const handleMaskApply = useCallback(() => {
+        setMaskGrid(currentMaskGrid => {
+            const payload = buildMaskPayload(currentMaskGrid);
+            const filterType = editingFilterTypeRef.current;
 
-        if (filterType === 'motion') {
-            // Для фильтра движения сохраняем только маску
-            setAppliedMotionFilter({mask: payload});
-            setActiveFilterType('motion');
-        } else if (filterType === 'human' || filterType === 'transport') {
-            // Для фильтров human/transport сохраняем и маску, и тип
-            const objectType = filterType as MotionObjectType;
-            setAppliedMotionFilter({
-                mask: payload,
-                types: [objectType]
-            });
-            setActiveFilterType(filterType);
-        }
+            if (filterType === 'motion') {
+                setAppliedMotionFilter({mask: payload});
+                setActiveFilterType('motion');
+            } else if (filterType === 'human' || filterType === 'transport') {
+                const objectType = filterType as MotionObjectType;
+                setAppliedMotionFilter({
+                    mask: payload,
+                    types: [objectType]
+                });
+                setActiveFilterType(filterType);
+            }
 
-        setIsMaskEditorVisible(false);
-        maskEditorInitialGridRef.current = maskGrid.map(row => [...row]);
-        editingFilterTypeRef.current = null;
-    };
+            setIsMaskEditorVisible(false);
+            maskEditorInitialGridRef.current = currentMaskGrid.map(row => [...row]);
+            editingFilterTypeRef.current = null;
 
-    const handleMouseLeave = () => {
+            return currentMaskGrid;
+        });
+    }, []);
+
+    const handleMouseLeave = useCallback(() => {
         hideTimeoutRef.current = setTimeout(() => {
             setShowControls(false);
         }, 10000);
-    };
+    }, []);
 
     // Функции переключения камеры
     const switchToNextCamera = useCallback(() => {
@@ -1157,44 +1161,55 @@ export const Player: React.FC<PlayerProps> = ({
         };
     }, [enableZoomMagnifier, enableVideoZoom, isMaskEditorVisible, showSaveModal]);
 
-    const handleSaveStreamFinish = (start: Date, end: Date) => {
-        const fileName = `record_${formatDate(start, 'yyyy-MM-dd_HH-mm')}_${formatDate(end, 'yyyy-MM-dd_HH-mm')}`;
-        const durationSeconds = (end.getTime() - start.getTime()) / 1000;
+    const handleSaveStreamFinish = useCallback(
+        (start: Date, end: Date) => {
+            const fileName = `record_${formatDate(start, 'yyyy-MM-dd_HH-mm')}_${formatDate(end, 'yyyy-MM-dd_HH-mm')}`;
+            const durationSeconds = (end.getTime() - start.getTime()) / 1000;
 
-        const formatDuration = (seconds: number): string => {
-            const hours = Math.floor(seconds / 3600);
-            const minutes = Math.floor((seconds % 3600) / 60);
-            const secs = Math.floor(seconds % 60);
+            const formatDuration = (seconds: number): string => {
+                const hours = Math.floor(seconds / 3600);
+                const minutes = Math.floor((seconds % 3600) / 60);
+                const secs = Math.floor(seconds % 60);
 
-            return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-        };
+                return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            };
 
-        const date = formatDate(start, "yyyy-MM-dd'T'HH:mm:ss");
+            const date = formatDate(start, "yyyy-MM-dd'T'HH:mm:ss");
 
-        const url = buildRequestUrl({
-            host: streamUrl,
-            port: streamPort,
-            protocol,
-            proxy: effectiveProxy,
-            path: `/cameras/${camera ?? 0}/streaming/main.mp4?authorization=Basic%20${getAuthToken(
-                `${authLogin}:${authPassword}`
-            )}&time=${date}&duration=${formatDuration(durationSeconds)}&download=1&filename=${fileName}`
-        });
-        const downloadUrl = formatUrlForDownload({
-            url,
-            start,
-            end,
-            fileName,
-            audio: !isNoSound
-        });
+            const url = buildRequestUrl({
+                host: streamUrl,
+                port: streamPort,
+                protocol,
+                proxy: effectiveProxy,
+                path: `/cameras/${camera ?? 0}/streaming/main.mp4?authorization=Basic%20${getAuthToken(
+                    `${authLogin}:${authPassword}`
+                )}&time=${date}&duration=${formatDuration(durationSeconds)}&download=1&filename=${fileName}`
+            });
+            const downloadUrl = formatUrlForDownload({
+                url,
+                start,
+                end,
+                fileName,
+                audio: !isNoSound
+            });
 
-        clickA(downloadUrl);
-        setShowSaveModal(false);
-    };
+            clickA(downloadUrl);
+            setShowSaveModal(false);
+        },
+        [streamUrl, streamPort, protocol, effectiveProxy, camera, authLogin, authPassword, isNoSound]
+    );
 
-    const handleSaveStream = () => {
+    const handleSaveStream = useCallback(() => {
         setShowSaveModal(true);
-    };
+    }, []);
+
+    const handleCloseSaveModal = useCallback(() => {
+        setShowSaveModal(false);
+    }, []);
+
+    const handlePlayOverlayClick = useCallback(() => {
+        handlePlayPause(true);
+    }, [handlePlayPause]);
 
     // Функция для поиска следующего доступного фрагмента на timeline
     const findNextRecordingSegment = useCallback(
@@ -1300,14 +1315,8 @@ export const Player: React.FC<PlayerProps> = ({
         [getFragmentsFromTimeline]
     );
 
-    const props: PlayerComponentProps = {
-        url: finalStreamUrl,
-        playing: isPlaying,
-        muted: isMuted,
-        playbackSpeed,
-        onPlayPause: (value?: boolean) => handlePlayPause(value),
-        onPlaybackStatusChange: handlePlaybackStatusChange,
-        onProgress: p => {
+    const handleProgress = useCallback(
+        (p: {currentTime: number; duration: number}) => {
             if (currentMode === Mode.Record && serverTime) {
                 const currentTotalProgress = p.currentTime + fragmetsGapRef.current;
                 const currentAbsoluteTime = new Date(serverTime.getTime() + currentTotalProgress * 1000);
@@ -1392,7 +1401,29 @@ export const Player: React.FC<PlayerProps> = ({
                 const totalProgress = p.currentTime + fragmetsGapRef.current;
                 setProgress(totalProgress);
             }
-        }
+        },
+        [
+            currentMode,
+            serverTime,
+            appliedMotionFilter,
+            serverApiVersion,
+            checkVisibleFramesInNextSeconds,
+            findNextVisibleFrameFromTimeline,
+            checkIfAtEndOfCurrentSegment,
+            findNextRecordingSegment,
+            handleChangeMode,
+            setProgress
+        ]
+    );
+
+    const props: PlayerComponentProps = {
+        url: finalStreamUrl,
+        playing: isPlaying,
+        muted: isMuted,
+        playbackSpeed,
+        onPlayPause: handlePlayPause,
+        onPlaybackStatusChange: handlePlaybackStatusChange,
+        onProgress: handleProgress
     };
 
     const isVerticalTimeline = isMobileDevice && orientation === 'landscape';
@@ -1536,7 +1567,7 @@ export const Player: React.FC<PlayerProps> = ({
                     )}
                     {!isPlaying && playbackStatus !== 'loading' && playbackStatus !== 'buffering' && (
                         <PlayOverlay
-                            onClick={() => handlePlayPause(true)}
+                            onClick={handlePlayOverlayClick}
                             text={showH265Warning ? OVERLAY_TEXT_265 : undefined}
                         />
                     )}
@@ -1545,7 +1576,7 @@ export const Player: React.FC<PlayerProps> = ({
                         <SaveStreamModal
                             currentTime={addSecondsToDate(serverTime ?? new Date(), ctxProgress)}
                             isOpen={showSaveModal}
-                            onClose={() => setShowSaveModal(false)}
+                            onClose={handleCloseSaveModal}
                             onFinish={handleSaveStreamFinish}
                             url={streamUrl}
                             port={streamPort}
@@ -1655,9 +1686,9 @@ export const Player: React.FC<PlayerProps> = ({
                                 popperBoundaryElement={containerRef.current}
                                 popperPortalId={datepickerPortalIdRef.current}
                                 timelineRef={timelineRef}
-                                onPlayPause={() => handlePlayPause()}
-                                onMuteToggle={() => handleMuteToggle()}
-                                onToggleFullscreen={() => handleToggleFullscreen()}
+                                onPlayPause={handlePlayPause}
+                                onMuteToggle={handleMuteToggle}
+                                onToggleFullscreen={handleToggleFullscreen}
                                 onSpeedChange={handleSpeedChange}
                                 onSaveStream={handleSaveStream}
                                 onTimeClick={handleTimelineClick}
