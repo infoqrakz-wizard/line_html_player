@@ -979,21 +979,33 @@ export const Player: React.FC<PlayerProps> = ({
     }, []);
 
     useEffect(() => {
+        let hideTimeout: NodeJS.Timeout | null = null;
+
         const handleVisibilityChange = () => {
             const isVisible = document.visibilityState === 'visible';
             if (!isVisible) {
-                // Сохраняем текущее состояние воспроизведения и ставим на паузу
-                wasPlayingBeforeHiddenRef.current = isPlaying;
-                if (isPlaying) {
-                    setIsPlaying(false);
-                }
+                // Firefox кратковременно генерирует hidden при открытии/закрытии devtools
+                // и при переходе в полноэкранный режим. Откладываем паузу, чтобы
+                // не реагировать на такие транзитные переключения.
+                hideTimeout = setTimeout(() => {
+                    if (document.visibilityState !== 'visible') {
+                        wasPlayingBeforeHiddenRef.current = isPlaying;
+                        if (isPlaying) {
+                            setIsPlaying(false);
+                        }
+                    }
+                }, 200);
                 return;
             }
 
-            // Вкладка снова видима
+            // Вкладка снова видима — отменяем отложенную паузу, если она ещё не сработала
+            if (hideTimeout) {
+                clearTimeout(hideTimeout);
+                hideTimeout = null;
+            }
+
             const resume = async () => {
                 if (currentMode === Mode.Live) {
-                    // Актуализируем серверное время для прямой трансляции
                     await updateServerTime();
                     setProgress(0);
                 }
@@ -1017,7 +1029,12 @@ export const Player: React.FC<PlayerProps> = ({
         };
 
         document.addEventListener('visibilitychange', handleVisibilityChange);
-        return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            if (hideTimeout) {
+                clearTimeout(hideTimeout);
+            }
+        };
     }, [isPlaying, currentMode, updateServerTime, setProgress]);
 
     useEffect(() => {

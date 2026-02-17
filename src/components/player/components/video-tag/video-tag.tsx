@@ -9,7 +9,7 @@ export interface VideoTagProps {
     muted?: boolean;
     posterUrl?: string;
     onProgress?: (progress: {currentTime: number; duration: number}) => void;
-    onPlayPause?: (playing: boolean) => void;
+    onPlayPause?: (playing?: boolean) => void;
     onPlaybackStatusChange?: (status: import('../player-interface').PlaybackStatus) => void;
     updateServerTime?: () => Promise<Date | undefined>;
     setProgress?: (seconds: number) => void;
@@ -202,8 +202,6 @@ export const VideoTag = forwardRef<PlayerRef, VideoTagProps>((props, ref) => {
                 });
             }
         };
-        const handlePlay = () => onPlayPause?.(true);
-        const handlePause = () => onPlayPause?.(false);
         const handleEnded = () => onPlayPause?.(false);
         const handleError = (e: Event) => {
             console.error('Ошибка воспроизведения видео:', e);
@@ -220,8 +218,6 @@ export const VideoTag = forwardRef<PlayerRef, VideoTagProps>((props, ref) => {
         // Добавляем обработчики событий
         video.addEventListener('loadstart', handleLoadStart);
         video.addEventListener('canplay', handleCanPlay);
-        video.addEventListener('play', handlePlay);
-        video.addEventListener('pause', handlePause);
         video.addEventListener('ended', handleEnded);
         video.addEventListener('error', handleError);
         video.addEventListener('timeupdate', handleTimeUpdate);
@@ -268,8 +264,6 @@ export const VideoTag = forwardRef<PlayerRef, VideoTagProps>((props, ref) => {
         return () => {
             video.removeEventListener('loadstart', handleLoadStart);
             video.removeEventListener('canplay', handleCanPlay);
-            video.removeEventListener('play', handlePlay);
-            video.removeEventListener('pause', handlePause);
             video.removeEventListener('ended', handleEnded);
             video.removeEventListener('error', handleError);
             video.removeEventListener('timeupdate', handleTimeUpdate);
@@ -291,7 +285,7 @@ export const VideoTag = forwardRef<PlayerRef, VideoTagProps>((props, ref) => {
         <VideoContainer isLandscape={isLandscape}>
             <video
                 data-type="video"
-                onClick={() => onPlayPause?.(false)}
+                onClick={() => onPlayPause?.()}
                 ref={videoRef}
                 controls={false}
                 controlsList="nodownload nofullscreen noremoteplayback"

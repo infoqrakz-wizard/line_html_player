@@ -47,7 +47,7 @@ export interface HlsPlayerProps {
     // posterUrl?: string;
     muted?: boolean;
     onProgress?: (progress: {currentTime: number; duration: number}) => void;
-    onPlayPause?: (playing: boolean) => void;
+    onPlayPause?: (playing?: boolean) => void;
     onPlaybackStatusChange?: (status: import('../player-interface').PlaybackStatus) => void;
     overlayText?: string;
     isLandscape?: boolean;
@@ -797,7 +797,7 @@ export const HlsPlayer = forwardRef<PlayerRef, HlsPlayerProps>((props, ref) => {
             <video
                 data-type="hls"
                 ref={videoRef}
-                onClick={() => onPlayPause?.(false)}
+                onClick={() => onPlayPause?.()}
                 controls={false}
                 controlsList="nodownload nofullscreen noremoteplayback"
                 onTimeUpdate={handleTimeUpdate}
